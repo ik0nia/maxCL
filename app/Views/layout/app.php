@@ -2,6 +2,7 @@
 use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\Session;
+use App\Core\Url;
 
 $user = Auth::user();
 $toastSuccess = Session::flash('toast_success');
@@ -25,7 +26,7 @@ $toastError = Session::flash('toast_error');
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.css" rel="stylesheet">
 
-  <link href="/assets/css/app.css" rel="stylesheet">
+  <link href="<?= htmlspecialchars(Url::asset('/assets/css/app.css')) ?>" rel="stylesheet">
 </head>
 <body class="app-body">
   <header class="app-header">
@@ -46,7 +47,7 @@ $toastError = Session::flash('toast_error');
             <div class="fw-semibold" style="line-height: 1.1"><?= htmlspecialchars((string)$user['name']) ?></div>
             <div class="text-muted small"><?= htmlspecialchars((string)$user['role']) ?></div>
           </div>
-          <form method="post" action="/logout" class="m-0">
+          <form method="post" action="<?= htmlspecialchars(Url::to('/logout')) ?>" class="m-0">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
             <button class="btn btn-outline-secondary" type="submit">
               <i class="bi bi-box-arrow-right me-1"></i> Ieșire
@@ -60,36 +61,37 @@ $toastError = Session::flash('toast_error');
   <div class="app-shell">
     <aside class="app-sidebar" id="sidebar">
       <nav class="app-nav">
-        <a class="app-nav-link <?= ($_SERVER['REQUEST_URI'] ?? '/') === '/' ? 'active' : '' ?>" href="/">
+        <?php $p = Url::currentPath(); ?>
+        <a class="app-nav-link <?= $p === '/' ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/')) ?>">
           <i class="bi bi-grid me-2"></i> Panou
         </a>
         <div class="app-nav-section">Operațiuni</div>
-        <a class="app-nav-link" href="/stock">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
           <i class="bi bi-box-seam me-2"></i> Stoc
         </a>
-        <a class="app-nav-link" href="/projects">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
           <i class="bi bi-kanban me-2"></i> Proiecte
         </a>
-        <a class="app-nav-link" href="/clients">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/clients')) ?>">
           <i class="bi bi-people me-2"></i> Clienți
         </a>
 
         <div class="app-nav-section">Catalog</div>
-        <a class="app-nav-link" href="/catalog/finishes">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/catalog/finishes')) ?>">
           <i class="bi bi-palette2 me-2"></i> Finisaje
         </a>
-        <a class="app-nav-link" href="/catalog/materials">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/catalog/materials')) ?>">
           <i class="bi bi-layers me-2"></i> Materiale
         </a>
-        <a class="app-nav-link" href="/catalog/variants">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/catalog/variants')) ?>">
           <i class="bi bi-intersect me-2"></i> Variante
         </a>
 
         <div class="app-nav-section">Sistem</div>
-        <a class="app-nav-link" href="/audit">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
           <i class="bi bi-journal-text me-2"></i> Jurnal activitate
         </a>
-        <a class="app-nav-link" href="/users">
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/users')) ?>">
           <i class="bi bi-person-gear me-2"></i> Utilizatori
         </a>
       </nav>
@@ -110,7 +112,7 @@ $toastError = Session::flash('toast_error');
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js"></script>
 
-  <script src="/assets/js/app.js"></script>
+  <script src="<?= htmlspecialchars(Url::asset('/assets/js/app.js')) ?>"></script>
   <script>
     window.__APP_TOAST_SUCCESS__ = <?= json_encode($toastSuccess, JSON_UNESCAPED_UNICODE) ?>;
     window.__APP_TOAST_ERROR__ = <?= json_encode($toastError, JSON_UNESCAPED_UNICODE) ?>;

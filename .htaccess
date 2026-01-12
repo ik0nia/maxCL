@@ -1,0 +1,12 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Protejează directoare / fișiere sensibile dacă proiectul este copiat în public_html
+RewriteRule ^(app|database|docker|storage)(/|$) - [F]
+RewriteRule ^(\.env|vendor_stub\.php)(/|$) - [F]
+
+# Dacă accesul se face în rădăcina proiectului, trimite către /public
+RewriteCond %{REQUEST_URI} !/public/ [NC]
+RewriteRule ^$ public/ [L,R=302]
+

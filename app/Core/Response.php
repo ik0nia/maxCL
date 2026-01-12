@@ -7,6 +7,16 @@ final class Response
 {
     public static function redirect(string $path): never
     {
+        if (preg_match('#^https?://#i', $path)) {
+            header('Location: ' . $path);
+            exit;
+        }
+
+        if ($path === '' || $path[0] === '/') {
+            header('Location: ' . Url::to($path));
+            exit;
+        }
+
         header('Location: ' . $path);
         exit;
     }

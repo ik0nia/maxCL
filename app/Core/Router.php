@@ -18,9 +18,16 @@ final class Router
         $this->routes['POST'][] = compact('pattern', 'handler', 'middleware');
     }
 
-    public function dispatch(string $method, string $uri): void
+    public function dispatch(string $method, string $uri, string $basePath = ''): void
     {
         $path = parse_url($uri, PHP_URL_PATH) ?? '/';
+        $basePath = rtrim(str_replace('\\', '/', $basePath), '/');
+        if ($basePath !== '' && $basePath !== '/' && str_starts_with($path, $basePath)) {
+            $path = substr($path, strlen($basePath));
+            if ($path === '') {
+                $path = '/';
+            }
+        }
         $method = strtoupper($method);
 
         foreach (($this->routes[$method] ?? []) as $route) {

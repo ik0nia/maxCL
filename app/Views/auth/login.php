@@ -1,6 +1,7 @@
 <?php
 use App\Core\Csrf;
 use App\Core\Session;
+use App\Core\Url;
 
 $toastError = Session::flash('toast_error');
 ?>
@@ -15,7 +16,7 @@ $toastError = Session::flash('toast_error');
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.css" rel="stylesheet">
-  <link href="/assets/css/app.css" rel="stylesheet">
+  <link href="<?= htmlspecialchars(Url::asset('/assets/css/app.css')) ?>" rel="stylesheet">
 </head>
 <body class="app-body">
   <div class="container py-5">
@@ -30,7 +31,7 @@ $toastError = Session::flash('toast_error');
             </div>
           </div>
 
-          <form method="post" action="/login" class="vstack gap-3">
+          <form method="post" action="<?= htmlspecialchars(Url::to('/login')) ?>" class="vstack gap-3">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
             <div>
               <label class="form-label">Email</label>
@@ -42,7 +43,7 @@ $toastError = Session::flash('toast_error');
             </div>
             <button class="btn btn-primary btn-lg" type="submit">Intră în aplicație</button>
             <div class="small text-muted">
-              Dacă este prima rulare, mergi la <a href="/setup">Setup</a> pentru instalare.
+              Dacă este prima rulare, mergi la <a href="<?= htmlspecialchars(Url::to('/setup')) ?>">Setup</a> pentru instalare.
             </div>
           </form>
         </div>

@@ -9,12 +9,17 @@ use App\Core\Response;
 use App\Core\Router;
 use App\Core\Session;
 use App\Core\SqlInstaller;
+use App\Core\Url;
 use App\Core\View;
 
 require __DIR__ . '/../vendor_stub.php';
 
 Env::load(__DIR__ . '/../.env');
 Session::start();
+
+$basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+if ($basePath === '.' || $basePath === '/' ) $basePath = '';
+Url::setBasePath($basePath);
 
 $router = new Router();
 
@@ -91,5 +96,5 @@ $router->get('/api/health', function () {
     Response::json(['ok' => true, 'env' => Env::get('APP_ENV', 'local')]);
 });
 
-$router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');
+$router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/', $basePath);
 
