@@ -11,6 +11,9 @@ use App\Core\Session;
 use App\Core\SqlInstaller;
 use App\Core\Url;
 use App\Core\View;
+use App\Controllers\Catalog\FinishesController;
+use App\Controllers\Catalog\MaterialsController;
+use App\Controllers\Catalog\VariantsController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -96,6 +99,72 @@ $router->post('/setup/run', function () {
     }
     Response::redirect('/setup');
 });
+
+// ---- Uploads (servite din storage/, doar pentru useri autentificați)
+$router->get('/uploads/finishes/{name}', function (array $params) {
+    $name = (string)($params['name'] ?? '');
+    if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $name)) {
+        http_response_code(404);
+        exit;
+    }
+    $fs = __DIR__ . '/../storage/uploads/finishes/' . $name;
+    if (!is_file($fs)) {
+        http_response_code(404);
+        exit;
+    }
+    $ext = strtolower(pathinfo($fs, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'jpg', 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        default => 'application/octet-stream',
+    };
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: private, max-age=86400');
+    readfile($fs);
+    exit;
+}, [Auth::requireLogin()]);
+
+// ---- Catalog (Admin, Gestionar)
+$catalogMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+
+$router->get('/catalog/finishes', fn() => FinishesController::index(), $catalogMW);
+$router->get('/catalog/finishes/create', fn() => FinishesController::createForm(), $catalogMW);
+$router->post('/catalog/finishes/create', fn() => FinishesController::create(), $catalogMW);
+$router->get('/catalog/finishes/{id}/edit', fn($p) => FinishesController::editForm($p), $catalogMW);
+$router->post('/catalog/finishes/{id}/edit', fn($p) => FinishesController::update($p), $catalogMW);
+$router->post('/catalog/finishes/{id}/delete', fn($p) => FinishesController::delete($p), $catalogMW);
+
+$router->get('/catalog/materials', fn() => MaterialsController::index(), $catalogMW);
+$router->get('/catalog/materials/create', fn() => MaterialsController::createForm(), $catalogMW);
+$router->post('/catalog/materials/create', fn() => MaterialsController::create(), $catalogMW);
+$router->get('/catalog/materials/{id}/edit', fn($p) => MaterialsController::editForm($p), $catalogMW);
+$router->post('/catalog/materials/{id}/edit', fn($p) => MaterialsController::update($p), $catalogMW);
+$router->post('/catalog/materials/{id}/delete', fn($p) => MaterialsController::delete($p), $catalogMW);
+
+$router->get('/catalog/variants', fn() => VariantsController::index(), $catalogMW);
+$router->get('/catalog/variants/create', fn() => VariantsController::createForm(), $catalogMW);
+$router->post('/catalog/variants/create', fn() => VariantsController::create(), $catalogMW);
+$router->get('/catalog/variants/{id}/edit', fn($p) => VariantsController::editForm($p), $catalogMW);
+$router->post('/catalog/variants/{id}/edit', fn($p) => VariantsController::update($p), $catalogMW);
+$router->post('/catalog/variants/{id}/delete', fn($p) => VariantsController::delete($p), $catalogMW);
+
+// ---- Rute cu middleware pe roluri (placeholder până implementăm modulele)
+$router->get('/users', fn() => print View::render('system/placeholder', ['title' => 'Utilizatori']), [
+    Auth::requireRole([Auth::ROLE_ADMIN])
+]);
+
+$router->get('/audit', fn() => print View::render('system/placeholder', ['title' => 'Jurnal activitate']), [
+    Auth::requireRole([Auth::ROLE_ADMIN])
+]);
+
+$router->get('/projects', fn() => print View::render('system/placeholder', ['title' => 'Proiecte']), [
+    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
+]);
+
+$router->get('/stock', fn() => print View::render('system/placeholder', ['title' => 'Stoc']), [
+    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
+]);
 
 // API placeholder
 $router->get('/api/health', function () {
