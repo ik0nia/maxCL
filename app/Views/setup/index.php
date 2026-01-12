@@ -1,5 +1,6 @@
 <?php
 use App\Core\View;
+use App\Core\Csrf;
 
 ob_start();
 ?>
@@ -14,9 +15,14 @@ ob_start();
   <div class="col-12 col-lg-7">
     <div class="card app-card p-4">
       <div class="h5">Pasul 1: Rulează schema</div>
-      <div class="text-muted">În următorul pas voi adăuga un buton care rulează `database/schema.sql` și creează userul admin.</div>
+      <div class="text-muted">Rulează `database/schema.sql` și creează userul admin dacă nu există.</div>
       <div class="mt-3">
-        <a class="btn btn-primary disabled" href="#" aria-disabled="true">Instalează acum (urmează)</a>
+        <form method="post" action="/setup/run" class="m-0">
+          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+          <button class="btn btn-primary" type="submit">
+            <i class="bi bi-database-check me-1"></i> Instalează acum
+          </button>
+        </form>
       </div>
     </div>
   </div>

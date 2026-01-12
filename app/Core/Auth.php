@@ -81,14 +81,25 @@ final class Auth
             'name' => (string)$row['name'],
             'role' => (string)$row['role'],
         ];
+
+        try {
+            $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = ?')->execute([(int)$row['id']]);
+        } catch (\Throwable $e) {
+            // ignore
+        }
+        Audit::log('LOGIN', 'users', (int)$row['id'], null, null, ['email' => (string)$row['email']]);
         return true;
     }
 
     public static function logout(): void
     {
         Session::start();
+        $u = self::user();
         unset($_SESSION['user']);
         session_regenerate_id(true);
+        if ($u) {
+            Audit::log('LOGOUT', 'users', (int)$u['id'], null, null, ['email' => (string)$u['email']], (int)$u['id']);
+        }
     }
 }
 

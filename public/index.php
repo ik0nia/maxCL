@@ -2,11 +2,13 @@
 declare(strict_types=1);
 
 use App\Core\Auth;
+use App\Core\DB;
 use App\Core\Csrf;
 use App\Core\Env;
 use App\Core\Response;
 use App\Core\Router;
 use App\Core\Session;
+use App\Core\SqlInstaller;
 use App\Core\View;
 
 require __DIR__ . '/../vendor_stub.php';
@@ -54,6 +56,34 @@ $router->get('/', function () {
 
 $router->get('/setup', function () {
     echo View::render('setup/index', ['title' => 'Instalare / Setup']);
+});
+
+// Rulează installerul (schema + seed admin)
+$router->post('/setup/run', function () {
+    Csrf::verify($_POST['_csrf'] ?? null);
+    try {
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        $res = SqlInstaller::runFile($pdo, __DIR__ . '/../database/schema.sql');
+
+        // Seed admin (idempotent)
+        $email = 'admin@local';
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $stmt->execute([$email]);
+        $exists = $stmt->fetch();
+        if (!$exists) {
+            $hash = password_hash('admin123', PASSWORD_DEFAULT);
+            $pdo->prepare('INSERT INTO users (email, name, role, password_hash, is_active) VALUES (?,?,?,?,1)')
+                ->execute([$email, 'Administrator', Auth::ROLE_ADMIN, $hash]);
+        }
+
+        $pdo->commit();
+        Session::flash('toast_success', 'Instalare finalizată. Poți face login cu admin@local / admin123 (schimbă parola!).');
+    } catch (\Throwable $e) {
+        try { if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+        Session::flash('toast_error', 'Eroare la instalare: ' . $e->getMessage());
+    }
+    Response::redirect('/setup');
 });
 
 // API placeholder
