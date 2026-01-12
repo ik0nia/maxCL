@@ -1,10 +1,22 @@
+Options -Indexes
+
+<IfModule mod_negotiation.c>
+  Options -MultiViews
+</IfModule>
+
+<IfModule mod_rewrite.c>
 RewriteEngine On
 
-# If the request is for an existing file/directory, serve it directly.
+# În majoritatea hostingurilor RewriteBase se deduce automat din folder (ex: /softstoc/public/).
+# Dacă ai încă 404 pe rute, poți seta manual:
+# RewriteBase /softstoc/public/
+
+# Dacă există fișier/folder real (assets, imagini etc), servește-l direct.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Otherwise route everything to the front controller.
-RewriteRule ^ index.php [L]
+# Altfel, routează către front controller.
+RewriteRule ^ index.php [L,QSA]
+</IfModule>
 
