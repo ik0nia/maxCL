@@ -38,8 +38,14 @@ $router->post('/login', function () {
         Response::redirect('/login');
     }
 
-    if (!Auth::attempt($email, $password)) {
-        Session::flash('toast_error', 'Date de autentificare incorecte.');
+    try {
+        if (!Auth::attempt($email, $password)) {
+            Session::flash('toast_error', 'Date de autentificare incorecte.');
+            Response::redirect('/login');
+        }
+    } catch (\Throwable $e) {
+        // De obicei: DB neconfigurat / credențiale greșite în .env
+        Session::flash('toast_error', 'Eroare la conectarea bazei de date. Verifică fișierul .env (DB_HOST/DB_NAME/DB_USER/DB_PASS).');
         Response::redirect('/login');
     }
 
