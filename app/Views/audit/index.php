@@ -83,6 +83,11 @@ ob_start();
                   $msg = $decoded['message'];
                 }
               }
+              // Fallback pentru log-uri vechi (ex: STOCK_PIECE_DELETE fără Placă:)
+              if ($msg && str_starts_with($msg, 'A șters piesă') && !str_contains($msg, 'Placă:') && !empty($r['board_code'])) {
+                $msg .= ' · Placă: ' . (string)$r['board_code'] . ' · ' . (string)($r['board_name'] ?? '') . ' · ' . (string)($r['board_brand'] ?? '') .
+                        ' · ' . (int)($r['board_thickness_mm'] ?? 0) . 'mm · ' . (int)($r['board_std_width_mm'] ?? 0) . '×' . (int)($r['board_std_height_mm'] ?? 0);
+              }
               if (!$msg) {
                 $msg = '—';
               }

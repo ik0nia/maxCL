@@ -43,9 +43,18 @@ final class AuditLog
         $sql = "
           SELECT
             a.id, a.created_at, a.action, a.entity_type, a.entity_id, a.ip, a.meta_json,
+            a.before_json,
+            hb.code AS board_code,
+            hb.name AS board_name,
+            hb.brand AS board_brand,
+            hb.thickness_mm AS board_thickness_mm,
+            hb.std_width_mm AS board_std_width_mm,
+            hb.std_height_mm AS board_std_height_mm,
             u.name AS user_name, u.email AS user_email, u.role AS user_role
           FROM audit_log a
           LEFT JOIN users u ON u.id = a.actor_user_id
+          LEFT JOIN hpl_boards hb
+            ON hb.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(a.before_json, '$.board_id')) AS UNSIGNED)
         ";
 
         if ($where) {

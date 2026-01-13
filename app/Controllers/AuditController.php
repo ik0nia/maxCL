@@ -58,6 +58,31 @@ final class AuditController
         $beforeDecoded = is_string($before) ? json_decode($before, true) : null;
         $afterDecoded = is_string($after) ? json_decode($after, true) : null;
         $metaDecoded = is_string($meta) ? json_decode($meta, true) : null;
+        $message = (is_array($metaDecoded) && isset($metaDecoded['message']) && is_string($metaDecoded['message'])) ? $metaDecoded['message'] : null;
+
+        // Fallback pentru log-uri vechi (ex: STOCK_PIECE_DELETE fără Placă:)
+        if (!$message && (string)$row['action'] === 'STOCK_PIECE_DELETE' && is_array($beforeDecoded)) {
+            $boardId = isset($beforeDecoded['board_id']) ? (int)$beforeDecoded['board_id'] : 0;
+            if ($boardId > 0) {
+                try {
+                    $pdo = \App\Core\DB::pdo();
+                    $st = $pdo->prepare('SELECT code,name,brand,thickness_mm,std_width_mm,std_height_mm FROM hpl_boards WHERE id = ?');
+                    $st->execute([$boardId]);
+                    $b = $st->fetch();
+                    if ($b) {
+                        $message = 'A șters piesă '
+                            . (string)($beforeDecoded['piece_type'] ?? '')
+                            . ' ' . (int)($beforeDecoded['width_mm'] ?? 0) . '×' . (int)($beforeDecoded['height_mm'] ?? 0) . ' mm, '
+                            . (int)($beforeDecoded['qty'] ?? 0) . ' buc'
+                            . ((isset($beforeDecoded['location']) && $beforeDecoded['location'] !== '') ? (', locație ' . (string)$beforeDecoded['location']) : '')
+                            . ' · Placă: ' . (string)$b['code'] . ' · ' . (string)$b['name'] . ' · ' . (string)$b['brand']
+                            . ' · ' . (int)$b['thickness_mm'] . 'mm · ' . (int)$b['std_width_mm'] . '×' . (int)$b['std_height_mm'];
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+        }
 
         Response::json([
             'ok' => true,
@@ -73,7 +98,7 @@ final class AuditController
                 'before_json' => $beforeDecoded ?? $before,
                 'after_json' => $afterDecoded ?? $after,
                 'meta_json' => $metaDecoded ?? $meta,
-                'message' => (is_array($metaDecoded) && isset($metaDecoded['message']) && is_string($metaDecoded['message'])) ? $metaDecoded['message'] : null,
+                'message' => $message,
             ],
         ]);
     }
