@@ -45,6 +45,10 @@ ob_start();
     <?php if ($canWrite): ?>
       <div class="d-flex align-items-center gap-3 flex-wrap">
         <div class="form-check form-switch m-0 app-title-switch">
+          <input class="form-check-input" type="checkbox" id="stockToggleWmCode">
+          <label class="form-check-label" for="stockToggleWmCode">Cod WinMentor</label>
+        </div>
+        <div class="form-check form-switch m-0 app-title-switch">
           <input class="form-check-input" type="checkbox" id="stockTogglePrices">
           <label class="form-check-label" for="stockTogglePrices">Afișare prețuri</label>
         </div>
@@ -157,7 +161,7 @@ ob_start();
     <thead>
       <tr>
         <th style="width:110px">Preview</th>
-        <th>Cod WinMentor</th>
+        <th class="js-wmcode-col d-none">Cod WinMentor</th>
         <th>Denumire</th>
         <th>Grosime</th>
         <th>Dim. standard</th>
@@ -223,7 +227,7 @@ ob_start();
               <?php endif; ?>
             </div>
           </td>
-          <td class="fw-semibold"><?= htmlspecialchars((string)$r['code']) ?></td>
+          <td class="fw-semibold js-wmcode-col d-none"><?= htmlspecialchars((string)$r['code']) ?></td>
           <td><?= htmlspecialchars((string)$r['name']) ?></td>
           <td><?= (int)$r['thickness_mm'] ?> mm</td>
           <td><?= (int)$r['std_width_mm'] ?> × <?= (int)$r['std_height_mm'] ?> mm</td>
@@ -311,18 +315,23 @@ ob_start();
 <script>
   document.addEventListener('DOMContentLoaded', function(){
     const el = document.getElementById('boardsTable');
-    if (el && window.DataTable) new DataTable(el, { pageLength: 25 });
+    if (el && window.DataTable) {
+      window.__stockBoardsDT = new DataTable(el, { pageLength: 25 });
+    }
   });
 </script>
 
 <?php if ($canWrite): ?>
 <script>
   document.addEventListener('DOMContentLoaded', function(){
+    const tWm = document.getElementById('stockToggleWmCode');
     const tPrices = document.getElementById('stockTogglePrices');
     const tAdmin = document.getElementById('stockToggleAdmin');
     const priceCells = Array.from(document.querySelectorAll('.js-price-col'));
+    const wmCells = Array.from(document.querySelectorAll('.js-wmcode-col'));
     const adminCells = Array.from(document.querySelectorAll('.js-admin-actions'));
     const valueCard = document.getElementById('stockValueCard');
+    const dt = window.__stockBoardsDT || null;
 
     function setVisible(list, on){
       list.forEach(el => {
@@ -332,26 +341,36 @@ ob_start();
     }
 
     function apply(){
+      const showWm = !!(tWm && tWm.checked);
       const showPrices = !!(tPrices && tPrices.checked);
       const showAdmin = !!(tAdmin && tAdmin.checked);
+      setVisible(wmCells, showWm);
       setVisible(priceCells, showPrices);
       if (valueCard) valueCard.classList.toggle('d-none', !showPrices);
       setVisible(adminCells, showAdmin);
       try {
+        localStorage.setItem('stock_show_wmcode', showWm ? '1' : '0');
         localStorage.setItem('stock_show_prices', showPrices ? '1' : '0');
         localStorage.setItem('stock_show_admin', showAdmin ? '1' : '0');
+      } catch (e) {}
+
+      try {
+        if (dt && dt.columns && dt.columns.adjust) dt.columns.adjust();
       } catch (e) {}
     }
 
     // default OFF, dar dacă userul a activat anterior, reținem în localStorage
     try {
+      if (tWm) tWm.checked = (localStorage.getItem('stock_show_wmcode') === '1');
       if (tPrices) tPrices.checked = (localStorage.getItem('stock_show_prices') === '1');
       if (tAdmin) tAdmin.checked = (localStorage.getItem('stock_show_admin') === '1');
     } catch (e) {
+      if (tWm) tWm.checked = false;
       if (tPrices) tPrices.checked = false;
       if (tAdmin) tAdmin.checked = false;
     }
 
+    if (tWm) tWm.addEventListener('change', apply);
     if (tPrices) tPrices.addEventListener('change', apply);
     if (tAdmin) tAdmin.addEventListener('change', apply);
     apply();
