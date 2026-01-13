@@ -70,6 +70,7 @@ $router->post('/logout', function () {
 
 // ---- Protected routes (MVP placeholders)
 $router->get('/', fn() => DashboardController::index(), [Auth::requireLogin()]);
+$router->get('/api/dashboard/top-colors', fn() => DashboardController::apiTopColors(), [Auth::requireLogin()]);
 
 $router->get('/setup', function () {
     echo View::render('setup/index', ['title' => 'Instalare / Setup']);

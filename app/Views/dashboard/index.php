@@ -22,12 +22,25 @@ $stockError = $stockError ?? null;
 
   <div class="col-12">
     <div class="card app-card p-3">
-      <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
           <div class="h5 m-0">Culori cu cea mai mare cantitate</div>
           <div class="text-muted">Agregat pe Tip culoare (față), indiferent de textură · evidențiere pe grosimi</div>
         </div>
-        <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+          <div class="input-group input-group-sm" style="max-width:360px">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text"
+                   class="form-control"
+                   id="topColorsSearch"
+                   placeholder="Caută după cod / culoare / cod culoare"
+                   autocomplete="off">
+            <button class="btn btn-outline-secondary" type="button" id="topColorsClear" title="Șterge">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+        </div>
       </div>
 
       <?php if ($stockError): ?>
@@ -36,48 +49,74 @@ $stockError = $stockError ?? null;
           <div class="text-muted">Rulează <a href="<?= htmlspecialchars(Url::to('/setup')) ?>">Setup</a> dacă tabelele de stoc nu sunt instalate încă.</div>
         </div>
       <?php else: ?>
-        <div class="row g-2 mt-2">
-          <?php foreach ($topColors as $c): ?>
-            <?php
-              $thumb = (string)($c['thumb_path'] ?? '');
-              $big = (string)($c['image_path'] ?? '') ?: $thumb;
-              $code = (string)($c['color_code'] ?? '');
-              if ($code === '') $code = '—';
-            ?>
-            <div class="col-6 col-md-4 col-lg-2">
-              <div class="border rounded-4 p-2 h-100" style="border-color:#D9E3E6;background:#fff">
-                <div class="text-center">
-                  <?php if ($thumb): ?>
-                    <a href="#"
-                       data-bs-toggle="modal" data-bs-target="#appLightbox"
-                       data-lightbox-src="<?= htmlspecialchars($big) ?>"
-                       data-lightbox-fallback="<?= htmlspecialchars($thumb) ?>"
-                       data-lightbox-title="<?= htmlspecialchars($code) ?>"
-                       style="display:inline-block;cursor:zoom-in">
-                      <img src="<?= htmlspecialchars($thumb) ?>" style="width:128px;height:128px;object-fit:cover;border-radius:18px;border:1px solid #D9E3E6;">
-                    </a>
-                  <?php endif; ?>
-                </div>
-
-                <div class="mt-2 text-center">
-                  <div class="fw-semibold" style="font-size:1.15rem;line-height:1.1"><?= htmlspecialchars($code) ?></div>
-                  <div class="text-muted" style="font-weight:600"><?= htmlspecialchars((string)$c['color_name']) ?></div>
-                  <div class="text-muted small mt-1">Suprafața totală: <span class="fw-semibold"><?= number_format((float)$c['total_m2'], 2, '.', '') ?></span> mp</div>
-                </div>
-
-                <div class="mt-2 d-flex flex-wrap gap-1 justify-content-center">
-                  <?php foreach (($c['by_thickness'] ?? []) as $t => $m2): ?>
-                    <span class="badge app-badge"><?= (int)$t ?>mm: <?= number_format((float)$m2, 2, '.', '') ?> mp</span>
-                  <?php endforeach; ?>
-                </div>
-              </div>
-            </div>
-          <?php endforeach; ?>
-
-          <?php if (!$topColors): ?>
-            <div class="col-12 text-muted">Nu există date încă.</div>
-          <?php endif; ?>
+        <div class="mt-2">
+          <div id="dashboardTopColorsLoading" class="text-muted small" style="display:none">
+            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            Se caută…
+          </div>
+          <div id="dashboardTopColorsGrid" data-endpoint="<?= htmlspecialchars(Url::to('/api/dashboard/top-colors')) ?>">
+            <?= View::render('dashboard/_top_colors_grid', ['topColors' => $topColors]) ?>
+          </div>
         </div>
+
+        <script>
+          (function () {
+            var $ = window.jQuery;
+            if (!$) return;
+
+            var $input = $('#topColorsSearch');
+            var $clear = $('#topColorsClear');
+            var $gridWrap = $('#dashboardTopColorsGrid');
+            var $loading = $('#dashboardTopColorsLoading');
+            var endpoint = $gridWrap.data('endpoint');
+
+            var timer = null;
+            var lastQ = null;
+            var req = null;
+
+            function setLoading(on) {
+              if (!$loading.length) return;
+              $loading.css('display', on ? 'block' : 'none');
+            }
+
+            function load(q) {
+              if (!endpoint) return;
+              if (req && req.abort) req.abort();
+              setLoading(true);
+              req = $.getJSON(endpoint, { q: q || '' })
+                .done(function (res) {
+                  if (!res || res.ok !== true) {
+                    $gridWrap.html('<div class="text-muted">Nu am putut încărca rezultatele.</div>');
+                    return;
+                  }
+                  $gridWrap.html(res.html || '');
+                })
+                .fail(function (xhr, statusText) {
+                  if (statusText === 'abort') return;
+                  $gridWrap.html('<div class="text-muted">Nu am putut încărca rezultatele.</div>');
+                })
+                .always(function () {
+                  setLoading(false);
+                });
+            }
+
+            $input.on('input', function () {
+              var q = String($input.val() || '');
+              if (timer) window.clearTimeout(timer);
+              timer = window.setTimeout(function () {
+                if (q === lastQ) return;
+                lastQ = q;
+                load(q);
+              }, 250);
+            });
+
+            $clear.on('click', function () {
+              $input.val('');
+              $input.trigger('input');
+              $input.focus();
+            });
+          })();
+        </script>
       <?php endif; ?>
     </div>
   </div>

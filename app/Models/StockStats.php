@@ -39,6 +39,8 @@ final class StockStats
      * Returnează stocul disponibil agregat pe Tip culoare (față) și grosime.
      * Texturile sunt ignorate (se cumulează).
      *
+     * $q filtrează după cod (f.code), culoare (f.color_name) sau cod culoare (f.color_code).
+     *
      * @return array<int, array{
      *   face_color_id:int,
      *   color_name:string,
@@ -50,10 +52,18 @@ final class StockStats
      *   m2:float
      * }>
      */
-    public static function availableByColorAndThickness(): array
+    public static function availableByColorAndThickness(?string $q = null): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        $q = $q !== null ? trim($q) : null;
+        $where = '';
+        $params = [];
+        if ($q !== null && $q !== '') {
+            $where = 'WHERE (f.code LIKE :q OR f.color_name LIKE :q OR f.color_code LIKE :q)';
+            $params[':q'] = '%' . $q . '%';
+        }
+
         $sql = "
             SELECT
               b.face_color_id AS face_color_id,
@@ -67,10 +77,13 @@ final class StockStats
             FROM hpl_boards b
             JOIN finishes f ON f.id = b.face_color_id
             LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+            $where
             GROUP BY b.face_color_id, b.thickness_mm
             ORDER BY m2 DESC
         ";
-        $rows = $pdo->query($sql)->fetchAll();
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
         $out = [];
         foreach ($rows as $r) {
             $out[] = [
