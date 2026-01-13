@@ -1,6 +1,5 @@
 <?php
 $topColors = $topColors ?? [];
-use App\Core\Url;
 ?>
 <div class="row g-2">
   <?php foreach ($topColors as $c): ?>
@@ -10,7 +9,7 @@ use App\Core\Url;
       $code = (string)($c['color_code'] ?? '');
       if ($code === '') $code = '—';
       $cid = (int)($c['face_color_id'] ?? 0);
-      $href = Url::to('/stock') . ($cid > 0 ? ('?color_id=' . $cid) : '');
+      $href = \App\Core\Url::to('/stock') . ($cid > 0 ? ('?color_id=' . $cid) : '');
     ?>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="border rounded-4 p-2 h-100" style="border-color:#D9E3E6;background:#fff">

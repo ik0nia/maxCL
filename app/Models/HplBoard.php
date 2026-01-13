@@ -55,16 +55,21 @@ final class HplBoard
     }
 
     /** @return array<int, array<string,mixed>> */
-    public static function allWithTotals(?int $colorId = null): array
+    public static function allWithTotals(?int $colorId = null, ?int $thicknessMm = null): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $where = '';
+        $whereParts = [];
         $params = [];
         if ($colorId !== null && $colorId > 0) {
-            $where = 'WHERE (b.face_color_id = :cid OR b.back_color_id = :cid)';
+            $whereParts[] = '(b.face_color_id = :cid OR b.back_color_id = :cid)';
             $params[':cid'] = $colorId;
         }
+        if ($thicknessMm !== null && $thicknessMm > 0) {
+            $whereParts[] = 'b.thickness_mm = :th';
+            $params[':th'] = $thicknessMm;
+        }
+        $where = $whereParts ? ('WHERE ' . implode(' AND ', $whereParts)) : '';
         $hasTextures = self::hasTable('textures');
         $joinTextures = $hasTextures
             ? "JOIN textures ft ON ft.id = b.face_texture_id

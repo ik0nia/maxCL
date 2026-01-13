@@ -9,6 +9,7 @@ $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GES
 $isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 $rows = $rows ?? [];
 $filterColor = $filterColor ?? null;
+$filterThicknessMm = $filterThicknessMm ?? null;
 
 // Admin-only: calculează valoarea stocului disponibil (lei)
 $totalValueLei = 0.0;
@@ -47,14 +48,20 @@ ob_start();
   </div>
 </div>
 
-<?php if (is_array($filterColor)): ?>
+<?php if (is_array($filterColor) || ($filterThicknessMm !== null && (int)$filterThicknessMm > 0)): ?>
   <div class="card app-card p-3 mb-3">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div>
-        <div class="fw-semibold">Filtru culoare (față sau verso)</div>
+        <div class="fw-semibold">Filtre active</div>
         <div class="text-muted">
-          <?= htmlspecialchars((string)($filterColor['code'] ?? '—')) ?> · <?= htmlspecialchars((string)($filterColor['color_name'] ?? '')) ?>
-          <?php if (!empty($filterColor['color_code'])): ?> (<?= htmlspecialchars((string)$filterColor['color_code']) ?>)<?php endif; ?>
+          <?php if (is_array($filterColor)): ?>
+            Culoare (față sau verso): <strong><?= htmlspecialchars((string)($filterColor['code'] ?? '—')) ?></strong> · <?= htmlspecialchars((string)($filterColor['color_name'] ?? '')) ?>
+            <?php if (!empty($filterColor['color_code'])): ?> (<?= htmlspecialchars((string)$filterColor['color_code']) ?>)<?php endif; ?>
+          <?php endif; ?>
+          <?php if ($filterThicknessMm !== null && (int)$filterThicknessMm > 0): ?>
+            <?php if (is_array($filterColor)): ?> · <?php endif; ?>
+            Grosime: <strong><?= (int)$filterThicknessMm ?> mm</strong>
+          <?php endif; ?>
         </div>
       </div>
       <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">

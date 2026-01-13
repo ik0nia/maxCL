@@ -77,12 +77,17 @@ final class StockController
             if (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
                 $colorId = Validator::int((string)$_GET['color_id'], 1);
             }
+            $thicknessMm = null;
+            if (isset($_GET['thickness_mm']) && (string)$_GET['thickness_mm'] !== '') {
+                $thicknessMm = Validator::int((string)$_GET['thickness_mm'], 1);
+            }
             $color = $colorId ? Finish::find($colorId) : null;
-            $rows = HplBoard::allWithTotals($colorId ?: null);
+            $rows = HplBoard::allWithTotals($colorId ?: null, $thicknessMm ?: null);
             echo View::render('stock/index', [
                 'title' => 'Stoc',
                 'rows' => $rows,
                 'filterColor' => $color,
+                'filterThicknessMm' => $thicknessMm,
             ]);
         } catch (\Throwable $e) {
             // Cel mai des: tabelele noi nu există încă (nu s-a rulat setup după update).

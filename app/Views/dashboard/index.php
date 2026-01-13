@@ -152,7 +152,12 @@ $stockError = $stockError ?? null;
               <?php endif; ?>
               <?php foreach ($byThickness as $r): ?>
                 <tr>
-                  <td class="fw-semibold"><?= (int)$r['thickness_mm'] ?> mm</td>
+                  <td class="fw-semibold">
+                    <a class="text-decoration-none" style="color:#111"
+                       href="<?= htmlspecialchars(Url::to('/stock') . '?thickness_mm=' . (int)$r['thickness_mm']) ?>">
+                      <?= (int)$r['thickness_mm'] ?> mm
+                    </a>
+                  </td>
                   <td class="text-end"><?= (int)$r['qty'] ?></td>
                   <td class="text-end fw-semibold"><?= number_format((float)$r['m2'], 2, '.', '') ?></td>
                 </tr>
