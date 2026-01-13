@@ -147,7 +147,7 @@ ob_start();
     <thead>
       <tr>
         <th style="width:110px">Preview</th>
-        <th>Cod</th>
+        <th>Cod WinMentor</th>
         <th>Denumire</th>
         <th>Brand</th>
         <th>Grosime</th>
