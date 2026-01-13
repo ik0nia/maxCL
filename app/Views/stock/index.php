@@ -165,10 +165,12 @@ ob_start();
       <?php foreach ($rows as $r): ?>
         <tr>
           <td>
-            <div class="d-flex gap-1">
+            <div class="d-flex gap-2">
               <?php
                 $faceThumb = (string)$r['face_thumb_path'];
                 $backThumb = (string)($r['back_thumb_path'] ?? '');
+                $faceCode = (string)($r['face_color_code'] ?? '');
+                $backCode = (string)($r['back_color_code'] ?? '');
 
                 $faceBigRaw = (string)($r['face_image_path'] ?? '') ?: $faceThumb;
                 $backBigRaw = (string)($r['back_image_path'] ?? '') ?: $backThumb;
@@ -177,23 +179,37 @@ ob_start();
                 $faceBig = (str_starts_with($faceBigRaw, '/uploads/')) ? Url::to($faceBigRaw) : $faceBigRaw;
                 $backBig = (str_starts_with($backBigRaw, '/uploads/')) ? Url::to($backBigRaw) : $backBigRaw;
               ?>
-              <a href="#"
-                 data-bs-toggle="modal" data-bs-target="#appLightbox"
-                 data-lightbox-src="<?= htmlspecialchars($faceBig) ?>"
-                 data-lightbox-title="<?= htmlspecialchars((string)$r['face_color_name']) ?>"
-                 data-lightbox-fallback="<?= htmlspecialchars($faceThumb) ?>"
-                 style="display:inline-block;cursor:zoom-in">
-                <img src="<?= htmlspecialchars($faceThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
-              </a>
-              <?php if (!empty($r['back_thumb_path'])): ?>
+              <div class="text-center" style="min-width:52px">
                 <a href="#"
                    data-bs-toggle="modal" data-bs-target="#appLightbox"
-                   data-lightbox-src="<?= htmlspecialchars($backBig) ?>"
-                   data-lightbox-title="<?= htmlspecialchars((string)$r['back_color_name']) ?>"
-                   data-lightbox-fallback="<?= htmlspecialchars($backThumb) ?>"
+                   data-lightbox-src="<?= htmlspecialchars($faceBig) ?>"
+                   data-lightbox-title="<?= htmlspecialchars((string)$r['face_color_name']) ?>"
+                   data-lightbox-fallback="<?= htmlspecialchars($faceThumb) ?>"
                    style="display:inline-block;cursor:zoom-in">
-                  <img src="<?= htmlspecialchars($backThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+                  <img src="<?= htmlspecialchars($faceThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
                 </a>
+                <?php if (trim($faceCode) !== ''): ?>
+                  <div class="text-muted" style="font-size:.75rem;line-height:1.05;margin-top:2px; font-weight:600">
+                    <?= htmlspecialchars($faceCode) ?>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <?php if (!empty($r['back_thumb_path'])): ?>
+                <div class="text-center" style="min-width:52px">
+                  <a href="#"
+                     data-bs-toggle="modal" data-bs-target="#appLightbox"
+                     data-lightbox-src="<?= htmlspecialchars($backBig) ?>"
+                     data-lightbox-title="<?= htmlspecialchars((string)$r['back_color_name']) ?>"
+                     data-lightbox-fallback="<?= htmlspecialchars($backThumb) ?>"
+                     style="display:inline-block;cursor:zoom-in">
+                    <img src="<?= htmlspecialchars($backThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+                  </a>
+                  <?php if (trim($backCode) !== ''): ?>
+                    <div class="text-muted" style="font-size:.75rem;line-height:1.05;margin-top:2px; font-weight:600">
+                      <?= htmlspecialchars($backCode) ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
               <?php endif; ?>
             </div>
           </td>
