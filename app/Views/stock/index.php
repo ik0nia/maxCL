@@ -44,23 +44,32 @@ ob_start();
           <td>
             <div class="d-flex gap-1">
               <?php
-                $faceBig = (string)($r['face_image_path'] ?? '') ?: (string)$r['face_thumb_path'];
-                $backBig = (string)($r['back_image_path'] ?? '') ?: (string)($r['back_thumb_path'] ?? '');
+                $faceThumb = (string)$r['face_thumb_path'];
+                $backThumb = (string)($r['back_thumb_path'] ?? '');
+
+                $faceBigRaw = (string)($r['face_image_path'] ?? '') ?: $faceThumb;
+                $backBigRaw = (string)($r['back_image_path'] ?? '') ?: $backThumb;
+
+                // Normalizează rutele vechi (ex: /uploads/... fără /public)
+                $faceBig = (str_starts_with($faceBigRaw, '/uploads/')) ? Url::to($faceBigRaw) : $faceBigRaw;
+                $backBig = (str_starts_with($backBigRaw, '/uploads/')) ? Url::to($backBigRaw) : $backBigRaw;
               ?>
               <a href="#"
                  data-bs-toggle="modal" data-bs-target="#appLightbox"
                  data-lightbox-src="<?= htmlspecialchars($faceBig) ?>"
                  data-lightbox-title="<?= htmlspecialchars((string)$r['face_color_name']) ?>"
+                 data-lightbox-fallback="<?= htmlspecialchars($faceThumb) ?>"
                  style="display:inline-block;cursor:zoom-in">
-                <img src="<?= htmlspecialchars((string)$r['face_thumb_path']) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+                <img src="<?= htmlspecialchars($faceThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
               </a>
               <?php if (!empty($r['back_thumb_path'])): ?>
                 <a href="#"
                    data-bs-toggle="modal" data-bs-target="#appLightbox"
                    data-lightbox-src="<?= htmlspecialchars($backBig) ?>"
                    data-lightbox-title="<?= htmlspecialchars((string)$r['back_color_name']) ?>"
+                   data-lightbox-fallback="<?= htmlspecialchars($backThumb) ?>"
                    style="display:inline-block;cursor:zoom-in">
-                  <img src="<?= htmlspecialchars((string)$r['back_thumb_path']) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+                  <img src="<?= htmlspecialchars($backThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
                 </a>
               <?php endif; ?>
             </div>

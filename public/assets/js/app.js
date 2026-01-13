@@ -90,10 +90,15 @@
     const src = trigger.getAttribute('data-lightbox-src') || trigger.getAttribute('data-src');
     if (!src) return;
     const title = trigger.getAttribute('data-lightbox-title') || trigger.getAttribute('data-title') || 'Imagine';
+    const fallback = trigger.getAttribute('data-lightbox-fallback') || '';
 
     const img = document.getElementById('appLightboxImg');
     const ttl = document.getElementById('appLightboxTitle');
     if (img) {
+      // Fallback dacă imaginea mare nu se încarcă (ex: URL vechi fără /public)
+      img.onerror = function () {
+        if (fallback && img.src !== fallback) img.src = fallback;
+      };
       img.src = src;
       img.alt = title;
     }
