@@ -6,6 +6,29 @@ use App\Core\View;
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+$isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
+$rows = $rows ?? [];
+
+// Admin-only: calculează valoarea stocului disponibil (lei)
+$totalValueLei = 0.0;
+if ($isAdmin) {
+  foreach ($rows as $r) {
+    $m2 = (float)($r['stock_m2_available'] ?? 0);
+    if ($m2 <= 0) continue;
+    $ppm = null;
+    if (isset($r['sale_price_per_m2']) && $r['sale_price_per_m2'] !== null && $r['sale_price_per_m2'] !== '' && is_numeric($r['sale_price_per_m2'])) {
+      $ppm = (float)$r['sale_price_per_m2'];
+    } elseif (isset($r['sale_price']) && $r['sale_price'] !== null && $r['sale_price'] !== '' && is_numeric($r['sale_price'])) {
+      $stdW = (int)($r['std_width_mm'] ?? 0);
+      $stdH = (int)($r['std_height_mm'] ?? 0);
+      $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+      if ($area > 0) $ppm = ((float)$r['sale_price']) / $area;
+    }
+    if ($ppm !== null && $ppm >= 0 && is_finite($ppm)) {
+      $totalValueLei += ($m2 * $ppm);
+    }
+  }
+}
 
 ob_start();
 ?>
@@ -23,6 +46,27 @@ ob_start();
   </div>
 </div>
 
+<?php if ($isAdmin): ?>
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card app-card p-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <div class="h5 m-0">Valoare stoc (disponibil)</div>
+            <div class="text-muted">Calcul: mp disponibili × preț/mp (din prețul setat pe placa standard)</div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted small">Total general</div>
+            <div class="fw-semibold" style="font-size:1.35rem;line-height:1.1">
+              <?= number_format((float)$totalValueLei, 2, '.', '') ?> lei
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 <div class="card app-card p-3">
   <table class="table table-hover align-middle mb-0" id="boardsTable">
     <thead>
@@ -35,11 +79,15 @@ ob_start();
         <th>Dim. standard</th>
         <th class="text-end">Stoc (buc)</th>
         <th class="text-end">Stoc (mp)</th>
+        <?php if ($isAdmin): ?>
+          <th class="text-end">Preț/mp</th>
+          <th class="text-end">Valoare (lei)</th>
+        <?php endif; ?>
         <th class="text-end" style="width:220px">Acțiuni</th>
       </tr>
     </thead>
     <tbody>
-      <?php foreach (($rows ?? []) as $r): ?>
+      <?php foreach ($rows as $r): ?>
         <tr>
           <td>
             <div class="d-flex gap-1">
@@ -81,6 +129,23 @@ ob_start();
           <td><?= (int)$r['std_width_mm'] ?> × <?= (int)$r['std_height_mm'] ?> mm</td>
           <td class="text-end fw-semibold"><?= (int)$r['stock_qty_available'] ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>
+          <?php if ($isAdmin): ?>
+            <?php
+              $m2 = (float)($r['stock_m2_available'] ?? 0);
+              $ppm = null;
+              if (isset($r['sale_price_per_m2']) && $r['sale_price_per_m2'] !== null && $r['sale_price_per_m2'] !== '' && is_numeric($r['sale_price_per_m2'])) {
+                $ppm = (float)$r['sale_price_per_m2'];
+              } elseif (isset($r['sale_price']) && $r['sale_price'] !== null && $r['sale_price'] !== '' && is_numeric($r['sale_price'])) {
+                $stdW = (int)($r['std_width_mm'] ?? 0);
+                $stdH = (int)($r['std_height_mm'] ?? 0);
+                $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+                if ($area > 0) $ppm = ((float)$r['sale_price']) / $area;
+              }
+              $val = ($ppm !== null && $ppm >= 0 && is_finite($ppm) && $m2 > 0) ? ($m2 * $ppm) : null;
+            ?>
+            <td class="text-end"><?= $ppm !== null ? number_format((float)$ppm, 2, '.', '') : '—' ?></td>
+            <td class="text-end fw-semibold"><?= $val !== null ? number_format((float)$val, 2, '.', '') : '—' ?></td>
+          <?php endif; ?>
           <td class="text-end">
             <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'])) ?>">
               <i class="bi bi-eye me-1"></i> Vezi

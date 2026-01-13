@@ -15,6 +15,14 @@ $stdArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
 $salePrice = $board['sale_price'] ?? null;
 $salePriceNum = ($salePrice !== null && $salePrice !== '' && is_numeric($salePrice)) ? (float)$salePrice : null;
 $salePerM2 = ($salePriceNum !== null && $stdArea > 0) ? ($salePriceNum / $stdArea) : null;
+$availableM2 = 0.0;
+foreach ($pieces as $p) {
+  if ((string)($p['status'] ?? '') !== 'AVAILABLE') continue;
+  $availableM2 += (float)($p['area_total_m2'] ?? 0);
+}
+$availableValueLei = ($isAdmin && $salePerM2 !== null && is_finite($salePerM2) && $salePerM2 >= 0)
+  ? ($availableM2 * $salePerM2)
+  : null;
 
 ob_start();
 ?>
@@ -70,6 +78,13 @@ ob_start();
           <div class="text-muted">Preț / mp (calculat)</div>
           <div class="fw-semibold"><?= $salePerM2 !== null ? number_format((float)$salePerM2, 2, '.', '') . ' lei/mp' : '—' ?></div>
         </div>
+
+        <?php if ($isAdmin): ?>
+          <div class="d-flex justify-content-between border-top pt-2 mt-2">
+            <div class="text-muted">Valoare stoc disponibil</div>
+            <div class="fw-semibold"><?= $availableValueLei !== null ? number_format((float)$availableValueLei, 2, '.', '') . ' lei' : '—' ?></div>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
 
