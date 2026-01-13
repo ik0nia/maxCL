@@ -149,10 +149,10 @@ ob_start();
         <th style="width:110px">Preview</th>
         <th>Cod WinMentor</th>
         <th>Denumire</th>
-        <th>Brand</th>
         <th>Grosime</th>
         <th>Dim. standard</th>
-        <th class="text-end">Stoc (buc)</th>
+        <th class="text-end">Stoc FULL (buc)</th>
+        <th class="text-end">Stoc OFFCUT (buc)</th>
         <th class="text-end">Stoc (mp)</th>
         <?php if ($isAdmin): ?>
           <th class="text-end">Preț/mp</th>
@@ -215,10 +215,10 @@ ob_start();
           </td>
           <td class="fw-semibold"><?= htmlspecialchars((string)$r['code']) ?></td>
           <td><?= htmlspecialchars((string)$r['name']) ?></td>
-          <td><?= htmlspecialchars((string)$r['brand']) ?></td>
           <td><?= (int)$r['thickness_mm'] ?> mm</td>
           <td><?= (int)$r['std_width_mm'] ?> × <?= (int)$r['std_height_mm'] ?> mm</td>
-          <td class="text-end fw-semibold"><?= (int)$r['stock_qty_available'] ?></td>
+          <td class="text-end fw-semibold"><?= (int)($r['stock_qty_full_available'] ?? 0) ?></td>
+          <td class="text-end fw-semibold"><?= (int)($r['stock_qty_offcut_available'] ?? 0) ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>
           <?php if ($isAdmin): ?>
             <?php

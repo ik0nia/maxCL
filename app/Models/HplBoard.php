@@ -100,6 +100,8 @@ final class HplBoard
               bc.thumb_path AS back_thumb_path,
               bc.image_path AS back_image_path,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS stock_qty_available,
+              COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' AND sp.piece_type='FULL' THEN sp.qty ELSE 0 END),0) AS stock_qty_full_available,
+              COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' AND sp.piece_type='OFFCUT' THEN sp.qty ELSE 0 END),0) AS stock_qty_offcut_available,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS stock_m2_available
             FROM hpl_boards b
             JOIN finishes fc ON fc.id = b.face_color_id
