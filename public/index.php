@@ -149,6 +149,9 @@ $router->post('/hpl/tip-culoare/texturi/create', fn() => InlineTexturesControlle
 $router->post('/hpl/tip-culoare/texturi/{id}/edit', fn($p) => InlineTexturesController::update($p), $catalogMW);
 $router->post('/hpl/tip-culoare/texturi/{id}/delete', fn($p) => InlineTexturesController::delete($p), $catalogMW);
 
+// Compat: vechiul link "Texturi"
+$router->get('/hpl/texturi', fn() => Response::redirect('/hpl/tip-culoare#texturi'), $catalogMW);
+
 // (Materiale + Variante) au fost înlocuite de modulul Stoc (plăci + piese)
 $router->get('/catalog/materials', fn() => Response::redirect('/stock'), $catalogMW);
 $router->get('/catalog/variants', fn() => Response::redirect('/stock'), $catalogMW);

@@ -6,7 +6,8 @@ use App\Models\Texture;
 
 ob_start();
 $textures = [];
-try { $textures = Texture::all(); } catch (\Throwable $e) { $textures = []; }
+$texturesError = null;
+try { $textures = Texture::all(); } catch (\Throwable $e) { $textures = []; $texturesError = $e->getMessage(); }
 ?>
 <div class="app-page-title">
   <div>
@@ -87,6 +88,13 @@ try { $textures = Texture::all(); } catch (\Throwable $e) { $textures = []; }
           </button>
         </div>
       </form>
+
+      <?php if ($texturesError): ?>
+        <div class="alert alert-warning border mb-2" style="border-radius:14px">
+          <div class="fw-semibold">Texturile nu sunt disponibile încă.</div>
+          <div class="text-muted">Rulează din nou <a href="<?= htmlspecialchars(Url::to('/setup')) ?>">Setup</a> (butonul „Instalează acum”) ca să creezi tabela <code>textures</code>.</div>
+        </div>
+      <?php endif; ?>
 
       <table class="table table-hover align-middle mb-0" id="texturesMini">
         <thead>

@@ -18,7 +18,7 @@ final class InlineTexturesController
         $check = Validator::required($_POST, ['name' => 'Denumire']);
         if (!$check['ok']) {
             Session::flash('toast_error', 'Completează denumirea texturii.');
-            Response::redirect('/hpl/tip-culoare');
+            Response::redirect('/hpl/tip-culoare#texturi');
         }
 
         try {
@@ -32,7 +32,7 @@ final class InlineTexturesController
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
         }
-        Response::redirect('/hpl/tip-culoare');
+        Response::redirect('/hpl/tip-culoare#texturi');
     }
 
     public static function update(array $params): void
@@ -42,13 +42,13 @@ final class InlineTexturesController
         $before = Texture::find($id);
         if (!$before) {
             Session::flash('toast_error', 'Textură inexistentă.');
-            Response::redirect('/hpl/tip-culoare');
+            Response::redirect('/hpl/tip-culoare#texturi');
         }
 
         $check = Validator::required($_POST, ['name' => 'Denumire']);
         if (!$check['ok']) {
             Session::flash('toast_error', 'Completează denumirea texturii.');
-            Response::redirect('/hpl/tip-culoare');
+            Response::redirect('/hpl/tip-culoare#texturi');
         }
 
         try {
@@ -62,7 +62,7 @@ final class InlineTexturesController
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
         }
-        Response::redirect('/hpl/tip-culoare');
+        Response::redirect('/hpl/tip-culoare#texturi');
     }
 
     public static function delete(array $params): void
@@ -72,7 +72,7 @@ final class InlineTexturesController
         $before = Texture::find($id);
         if (!$before) {
             Session::flash('toast_error', 'Textură inexistentă.');
-            Response::redirect('/hpl/tip-culoare');
+            Response::redirect('/hpl/tip-culoare#texturi');
         }
 
         try {
@@ -82,7 +82,7 @@ final class InlineTexturesController
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot șterge textura (posibil folosită la plăci).');
         }
-        Response::redirect('/hpl/tip-culoare');
+        Response::redirect('/hpl/tip-culoare#texturi');
     }
 }
 
