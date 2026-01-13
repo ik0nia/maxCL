@@ -100,18 +100,24 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
 
     <div class="col-12 col-lg-8">
       <label class="form-label">Culoare față *</label>
-      <select class="form-select <?= isset($errors['face_color_id']) ? 'is-invalid' : '' ?>"
-              name="face_color_id"
-              id="face_color_id"
-              data-endpoint="<?= htmlspecialchars(Url::to('/api/finishes/search')) ?>"
-              required>
-        <?php if ($faceOpt): ?>
-          <option value="<?= (int)$faceOpt['id'] ?>" selected data-thumb="<?= htmlspecialchars((string)$faceOpt['thumb_path']) ?>">
-            <?= htmlspecialchars((string)$faceOpt['color_name'] . ' (' . (string)$faceOpt['code'] . ')') ?>
-          </option>
-        <?php endif; ?>
-      </select>
-      <?php if (isset($errors['face_color_id'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['face_color_id']) ?></div><?php endif; ?>
+      <input type="hidden" name="face_color_id" id="face_color_id" value="<?= htmlspecialchars((string)($v['face_color_id'] ?? '')) ?>">
+      <div class="position-relative">
+        <div class="input-group">
+          <span class="input-group-text" style="width:54px;justify-content:center">
+            <img id="face_color_thumb"
+                 src="<?= htmlspecialchars((string)($faceOpt['thumb_path'] ?? '')) ?>"
+                 alt=""
+                 style="width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;<?= $faceOpt ? '' : 'display:none' ?>">
+          </span>
+          <input class="form-control <?= isset($errors['face_color_id']) ? 'is-invalid' : '' ?>"
+                 id="face_color_q"
+                 placeholder="Scrie codul… (ex: 1522)"
+                 autocomplete="off"
+                 value="<?= $faceOpt ? htmlspecialchars((string)$faceOpt['color_name'] . ' (' . (string)$faceOpt['code'] . ')') : '' ?>">
+        </div>
+        <?php if (isset($errors['face_color_id'])): ?><div class="invalid-feedback d-block"><?= htmlspecialchars($errors['face_color_id']) ?></div><?php endif; ?>
+        <div class="app-ac-list" id="face_color_list" style="display:none"></div>
+      </div>
     </div>
 
     <div class="col-12 col-lg-4">
@@ -132,17 +138,28 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
 
     <div class="col-12 col-lg-8">
       <label class="form-label">Culoare verso (opțional)</label>
-      <select class="form-select <?= isset($errors['back_color_id']) ? 'is-invalid' : '' ?>"
-              name="back_color_id"
-              id="back_color_id"
-              data-endpoint="<?= htmlspecialchars(Url::to('/api/finishes/search')) ?>">
-        <?php if ($backOpt): ?>
-          <option value="<?= (int)$backOpt['id'] ?>" selected data-thumb="<?= htmlspecialchars((string)$backOpt['thumb_path']) ?>">
-            <?= htmlspecialchars((string)$backOpt['color_name'] . ' (' . (string)$backOpt['code'] . ')') ?>
-          </option>
-        <?php endif; ?>
-      </select>
-      <?php if (isset($errors['back_color_id'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['back_color_id']) ?></div><?php endif; ?>
+      <input type="hidden" name="back_color_id" id="back_color_id" value="<?= htmlspecialchars((string)($v['back_color_id'] ?? '')) ?>">
+      <div class="position-relative">
+        <div class="input-group">
+          <span class="input-group-text" style="width:54px;justify-content:center">
+            <img id="back_color_thumb"
+                 src="<?= htmlspecialchars((string)($backOpt['thumb_path'] ?? '')) ?>"
+                 alt=""
+                 style="width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;<?= $backOpt ? '' : 'display:none' ?>">
+          </span>
+          <input class="form-control <?= isset($errors['back_color_id']) ? 'is-invalid' : '' ?>"
+                 id="back_color_q"
+                 placeholder="Scrie codul… (opțional)"
+                 autocomplete="off"
+                 value="<?= $backOpt ? htmlspecialchars((string)$backOpt['color_name'] . ' (' . (string)$backOpt['code'] . ')') : '' ?>">
+          <button class="btn btn-outline-secondary" type="button" id="back_color_clear" title="Șterge">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <?php if (isset($errors['back_color_id'])): ?><div class="invalid-feedback d-block"><?= htmlspecialchars($errors['back_color_id']) ?></div><?php endif; ?>
+        <div class="app-ac-list" id="back_color_list" style="display:none"></div>
+      </div>
+      <div class="form-text">Dacă lași gol, se consideră „Aceeași față/verso”.</div>
     </div>
 
     <div class="col-12 col-lg-4">
@@ -176,95 +193,180 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
 </div>
 
 <style>
-  .s2-thumb{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px}
-  .s2-row{display:flex;align-items:center}
+  .app-ac-list{
+    position:absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 1080;
+    background: #fff;
+    border: 1px solid #D9E3E6;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(17,17,17,0.08);
+    max-height: 320px;
+    overflow: auto;
+  }
+  .app-ac-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    cursor:pointer;
+    border-bottom: 1px solid #EEF3F5;
+  }
+  .app-ac-item:last-child{border-bottom:0}
+  .app-ac-item:hover, .app-ac-item.active{background:#F3F7F8}
+  .app-ac-thumb{
+    width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;flex:0 0 auto;
+  }
+  .app-ac-text{font-weight:600;color:#111}
+  .app-ac-sub{font-size:.85rem;color:#5F6B72}
 </style>
 <script>
-  function fmtColor(opt){
-    if (!opt || !opt.id) return opt && opt.text ? opt.text : '';
-    const el = opt.element;
-    const thumb = (opt.thumb || (el ? el.getAttribute('data-thumb') : null)) || null;
-    if (!thumb) return opt.text;
-    const $row = $('<span class="s2-row"></span>');
-    $row.append($('<img class="s2-thumb" />').attr('src', thumb));
-    $row.append($('<span></span>').text(opt.text));
-    return $row;
-  }
   $(function(){
-    const finishesEndpoint = $('#face_color_id').data('endpoint') || <?= json_encode(Url::to('/api/finishes/search')) ?>;
-    function initColorSelect($el, opts){
-      const cfg = Object.assign({
-        width: '100%',
-        templateResult: fmtColor,
-        templateSelection: fmtColor,
-        escapeMarkup: m => m,
-        minimumInputLength: 1,
-        minimumResultsForSearch: 0,
-        ajax: {
-          url: finishesEndpoint,
-          dataType: 'json',
-          delay: 200,
-          data: function (params) { return { q: params.term || '' }; },
-          processResults: function (res) {
-            if (!res || res.ok !== true) return { results: [] };
-            return { results: res.items || [] };
-          }
-        }
-      }, opts || {});
-      $el.select2(cfg);
+    const finishesEndpoint = <?= json_encode(Url::to('/api/finishes/search')) ?>;
+
+    function debounce(fn, ms){
+      let t = null;
+      return function(){
+        const args = arguments;
+        if (t) window.clearTimeout(t);
+        t = window.setTimeout(function(){ fn.apply(null, args); }, ms);
+      };
     }
 
-    function makeSelect2BehaveLikeInput($el){
-      // Focus direct în câmpul de căutare când se deschide dropdown-ul
-      $el.on('select2:open', function(){
-        window.setTimeout(function(){
-          const s = document.querySelector('.select2-container--open .select2-search__field');
-          if (s) s.focus();
-        }, 0);
-      });
-      // Deschide dropdown-ul la focus / tastare (ca un input)
-      const $sel = $el.next('.select2-container').find('.select2-selection');
-      $sel.on('focus', function(){ $el.select2('open'); });
-      $sel.on('keydown', function(e){
-        if (!e || !e.key) return;
-        // Dacă dropdown-ul e deja deschis, Select2 gestionează tastarea
-        if (document.querySelector('.select2-container--open')) return;
+    function bindColorAutocomplete(opts){
+      const $q = $(opts.q);
+      const $id = $(opts.id);
+      const $thumb = $(opts.thumb);
+      const $list = $(opts.list);
+      const allowEmpty = !!opts.allowEmpty;
+      let items = [];
+      let active = -1;
 
-        // La tastare, deschide dropdown-ul și pune caracterul în search
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          e.preventDefault();
-          const ch = e.key;
-          $el.select2('open');
-          window.setTimeout(function(){
-            const s = document.querySelector('.select2-container--open .select2-search__field');
-            if (!s) return;
-            s.value = ch;
-            // Trigger input pentru AJAX
-            s.dispatchEvent(new Event('input', { bubbles: true }));
-            s.focus();
-          }, 0);
-        } else if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          $el.select2('open');
+      function hide(){ $list.hide().empty(); active = -1; items = []; }
+      function show(){ if ($list.children().length) $list.show(); }
+
+      function setSelected(it){
+        $id.val(String(it.id || ''));
+        $q.val(String(it.text || ''));
+        if (it.thumb) {
+          $thumb.attr('src', it.thumb).show();
+        } else {
+          $thumb.hide();
         }
+        hide();
+      }
+
+      function clearSelected(){
+        $id.val('');
+        $q.val('');
+        $thumb.hide();
+        hide();
+      }
+
+      function render(resItems){
+        items = resItems || [];
+        $list.empty();
+        if (!items.length) {
+          $list.append($('<div class="app-ac-item"></div>').append($('<div class="text-muted small"></div>').text('Nimic găsit.')));
+          $list.show();
+          return;
+        }
+        items.forEach(function(it, idx){
+          const $row = $('<div class="app-ac-item"></div>');
+          $row.attr('data-idx', String(idx));
+          if (it.thumb) $row.append($('<img class="app-ac-thumb" />').attr('src', it.thumb));
+          const $txt = $('<div style="min-width:0"></div>');
+          $txt.append($('<div class="app-ac-text"></div>').text(it.text || ''));
+          $row.append($txt);
+          $row.on('mousedown', function(e){
+            // mousedown ca să nu se închidă la blur înainte de click
+            e.preventDefault();
+            setSelected(it);
+          });
+          $list.append($row);
+        });
+        $list.show();
+      }
+
+      const doSearch = debounce(function(){
+        const q = String($q.val() || '').trim();
+        if (q.length < 1) { if (allowEmpty) hide(); else hide(); return; }
+        $.getJSON(finishesEndpoint, { q: q })
+          .done(function(res){
+            if (!res || res.ok !== true) { render([]); return; }
+            render(res.items || []);
+          })
+          .fail(function(){ render([]); });
+      }, 200);
+
+      $q.on('input', function(){
+        // dacă userul scrie, invalidează selecția anterioară
+        $id.val('');
+        $thumb.hide();
+        doSearch();
       });
-      // Click oriunde pe selecție -> open
-      $sel.on('click', function(){ $el.select2('open'); });
+
+      $q.on('focus', function(){
+        const q = String($q.val() || '').trim();
+        if (q.length >= 1) doSearch();
+      });
+
+      $q.on('blur', function(){
+        window.setTimeout(function(){ hide(); }, 150);
+      });
+
+      $q.on('keydown', function(e){
+        if (!$list.is(':visible')) return;
+        const max = items.length - 1;
+        if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(max, active + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); }
+        else if (e.key === 'Escape') { e.preventDefault(); hide(); return; }
+        else if (e.key === 'Enter') {
+          if (active >= 0 && items[active]) { e.preventDefault(); setSelected(items[active]); }
+          return;
+        } else {
+          return;
+        }
+        $list.children('.app-ac-item').removeClass('active');
+        const $a = $list.children('.app-ac-item[data-idx="' + active + '"]');
+        $a.addClass('active');
+        show();
+      });
+
+      if (opts.clearBtn) {
+        $(opts.clearBtn).on('click', function(){
+          clearSelected();
+          if (opts.onClear) opts.onClear();
+          $q.focus();
+        });
+      }
     }
 
-    const $face = $('#face_color_id');
-    const $back = $('#back_color_id');
-
-    initColorSelect($face, { placeholder: 'Scrie codul… (ex: 1522)' });
-    initColorSelect($back, { placeholder: 'Aceeași față/verso (opțional)', allowClear: true });
-    makeSelect2BehaveLikeInput($face);
-    makeSelect2BehaveLikeInput($back);
+    // Texturi rămân Select2
     $('#face_texture_id').select2({ width: '100%' });
     $('#back_texture_id').select2({ width: '100%' });
 
-    // Dacă se golește culoarea verso, golește și textura verso (rămâne "Aceeași față/verso")
-    $('#back_color_id').on('select2:clear', function(){
-      $('#back_texture_id').val('').trigger('change');
+    bindColorAutocomplete({
+      q: '#face_color_q',
+      id: '#face_color_id',
+      thumb: '#face_color_thumb',
+      list: '#face_color_list',
+      allowEmpty: false
+    });
+
+    bindColorAutocomplete({
+      q: '#back_color_q',
+      id: '#back_color_id',
+      thumb: '#back_color_thumb',
+      list: '#back_color_list',
+      allowEmpty: true,
+      clearBtn: '#back_color_clear',
+      onClear: function(){
+        // dacă se golește culoarea verso, golește și textura verso
+        $('#back_texture_id').val('').trigger('change');
+      }
     });
 
     function parseDec(v){
