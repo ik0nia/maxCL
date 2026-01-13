@@ -77,6 +77,9 @@ $toastError = Session::flash('toast_error');
         </a>
 
         <div class="app-nav-section">Plăci HPL</div>
+        <a class="app-nav-link <?= str_starts_with($p, '/hpl/catalog') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>">
+          <i class="bi bi-grid-3x3-gap me-2"></i> Catalog
+        </a>
         <a class="app-nav-link <?= str_starts_with($p, '/hpl/tip-culoare') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
           <i class="bi bi-palette2 me-2"></i> Tip culoare
         </a>

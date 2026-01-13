@@ -16,6 +16,26 @@ final class Finish
         return $pdo->query('SELECT * FROM finishes ORDER BY color_name ASC, texture_name ASC')->fetchAll();
     }
 
+    /** @return array<int, array<string,mixed>> */
+    public static function search(?string $q): array
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $q = $q !== null ? trim($q) : '';
+        if ($q === '') {
+            return self::all();
+        }
+
+        $st = $pdo->prepare(
+            "SELECT *
+             FROM finishes
+             WHERE code LIKE :q OR color_name LIKE :q OR color_code LIKE :q
+             ORDER BY color_name ASC, code ASC"
+        );
+        $st->execute([':q' => '%' . $q . '%']);
+        return $st->fetchAll();
+    }
+
     public static function find(int $id): ?array
     {
         /** @var PDO $pdo */

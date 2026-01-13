@@ -16,6 +16,7 @@ use App\Controllers\Catalog\MaterialsController;
 use App\Controllers\Catalog\VariantsController;
 use App\Controllers\StockController;
 use App\Controllers\Hpl\InlineTexturesController;
+use App\Controllers\Hpl\CatalogController as HplCatalogController;
 use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
@@ -132,6 +133,11 @@ $router->get('/uploads/finishes/{name}', function (array $params) {
 
 // ---- Catalog (Admin, Gestionar)
 $catalogMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$hplReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+
+// Plăci HPL: Catalog (vizualizare stoc pe culori/grosimi)
+$router->get('/hpl/catalog', fn() => HplCatalogController::index(), $hplReadMW);
+$router->get('/api/hpl/catalog', fn() => HplCatalogController::apiGrid(), $hplReadMW);
 
 // Plăci HPL: Tip culoare (folosește tabela finishes, dar fără texturi)
 $router->get('/hpl/tip-culoare', fn() => FinishesController::index(), $catalogMW);
