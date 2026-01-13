@@ -65,30 +65,30 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= $p === '/' ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/')) ?>">
           <i class="bi bi-grid me-2"></i> Panou
         </a>
-        <div class="app-nav-section">Operațiuni</div>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
-          <i class="bi bi-box-seam me-2"></i> Stoc
-        </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
+
+        <div class="app-nav-section">Proiecte</div>
+        <a class="app-nav-link <?= str_starts_with($p, '/projects') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
           <i class="bi bi-kanban me-2"></i> Proiecte
         </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/clients')) ?>">
+
+        <div class="app-nav-section">Clienți</div>
+        <a class="app-nav-link <?= str_starts_with($p, '/clients') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/clients')) ?>">
           <i class="bi bi-people me-2"></i> Clienți
         </a>
 
         <div class="app-nav-section">Plăci HPL</div>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
+        <a class="app-nav-link <?= str_starts_with($p, '/hpl/tip-culoare') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
           <i class="bi bi-palette2 me-2"></i> Tip culoare
         </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
+        <a class="app-nav-link <?= str_starts_with($p, '/stock') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
           <i class="bi bi-box-seam me-2"></i> Stoc
         </a>
 
         <div class="app-nav-section">Sistem</div>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
+        <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
           <i class="bi bi-journal-text me-2"></i> Jurnal activitate
         </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/users')) ?>">
+        <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
           <i class="bi bi-person-gear me-2"></i> Utilizatori
         </a>
       </nav>

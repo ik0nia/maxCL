@@ -177,6 +177,10 @@ $router->get('/projects', fn() => print View::render('system/placeholder', ['tit
     Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
 ]);
 
+$router->get('/clients', fn() => print View::render('system/placeholder', ['title' => 'Clienți']), [
+    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])
+]);
+
 // ---- Stoc (Admin/Gestionar/Operator). Operator = read-only (nu poate crea plăci/piese)
 $stockReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $stockWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
