@@ -16,6 +16,12 @@ use App\Models\Texture;
 
 final class StockController
 {
+    /** @return array<int,string> */
+    private static function locations(): array
+    {
+        return ['Depozit', 'Producție', 'Magazin'];
+    }
+
     private static function fmtBoardLabel(array $board, ?int $faceColorId, ?int $faceTextureId, ?int $backColorId, ?int $backTextureId): string
     {
         $faceColor = $faceColorId ? Finish::find($faceColorId) : null;
@@ -333,6 +339,11 @@ final class StockController
             }
         }
 
+        $location = trim((string)($_POST['location'] ?? ''));
+        if ($location !== '' && !in_array($location, self::locations(), true)) {
+            $errors['location'] = 'Locație invalidă.';
+        }
+
         if ($errors) {
             Session::flash('toast_error', 'Completează corect câmpurile piesei.');
             Response::redirect('/stock/boards/' . $boardId);
@@ -357,7 +368,7 @@ final class StockController
             'width_mm' => $width,
             'height_mm' => $height,
             'qty' => (int)$_POST['qty'],
-            'location' => trim((string)$_POST['location']),
+            'location' => $location,
             'notes' => trim((string)($_POST['notes'] ?? '')),
         ];
 

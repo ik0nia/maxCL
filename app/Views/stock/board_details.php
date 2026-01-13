@@ -63,7 +63,12 @@ ob_start();
         </div>
         <div class="col-6 col-md-8">
           <label class="form-label small">Locație</label>
-          <input class="form-control" name="location" placeholder="Ex: R1-S2" required>
+          <select class="form-select" name="location" required>
+            <option value="">Alege locație...</option>
+            <option value="Depozit">Depozit</option>
+            <option value="Producție">Producție</option>
+            <option value="Magazin">Magazin</option>
+          </select>
         </div>
         <div class="col-12">
           <label class="form-label small">Note</label>
