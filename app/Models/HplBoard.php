@@ -8,6 +8,30 @@ use PDO;
 
 final class HplBoard
 {
+    /** @var array<string,bool> */
+    private static array $colCache = [];
+
+    private static function hasColumn(string $name): bool
+    {
+        if (array_key_exists($name, self::$colCache)) {
+            return self::$colCache[$name];
+        }
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare("
+            SELECT COUNT(*) AS c
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'hpl_boards'
+              AND COLUMN_NAME = ?
+        ");
+        $st->execute([$name]);
+        $row = $st->fetch();
+        $ok = ((int)($row['c'] ?? 0)) > 0;
+        self::$colCache[$name] = $ok;
+        return $ok;
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function allWithTotals(): array
     {
@@ -55,26 +79,49 @@ final class HplBoard
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare(
-            'INSERT INTO hpl_boards
-              (code,name,brand,thickness_mm,std_width_mm,std_height_mm,sale_price,face_color_id,face_texture_id,back_color_id,back_texture_id,notes)
-             VALUES
-              (:code,:name,:brand,:thickness_mm,:std_width_mm,:std_height_mm,:sale_price,:face_color_id,:face_texture_id,:back_color_id,:back_texture_id,:notes)'
-        );
-        $st->execute([
-            ':code' => $data['code'],
-            ':name' => $data['name'],
-            ':brand' => $data['brand'],
-            ':thickness_mm' => (int)$data['thickness_mm'],
-            ':std_width_mm' => (int)$data['std_width_mm'],
-            ':std_height_mm' => (int)$data['std_height_mm'],
-            ':sale_price' => $data['sale_price'] !== null ? (float)$data['sale_price'] : null,
-            ':face_color_id' => (int)$data['face_color_id'],
-            ':face_texture_id' => (int)$data['face_texture_id'],
-            ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
-            ':back_texture_id' => $data['back_texture_id'] !== null ? (int)$data['back_texture_id'] : null,
-            ':notes' => $data['notes'] ?: null,
-        ]);
+        $hasSale = self::hasColumn('sale_price');
+        if ($hasSale) {
+            $st = $pdo->prepare(
+                'INSERT INTO hpl_boards
+                  (code,name,brand,thickness_mm,std_width_mm,std_height_mm,sale_price,face_color_id,face_texture_id,back_color_id,back_texture_id,notes)
+                 VALUES
+                  (:code,:name,:brand,:thickness_mm,:std_width_mm,:std_height_mm,:sale_price,:face_color_id,:face_texture_id,:back_color_id,:back_texture_id,:notes)'
+            );
+            $st->execute([
+                ':code' => $data['code'],
+                ':name' => $data['name'],
+                ':brand' => $data['brand'],
+                ':thickness_mm' => (int)$data['thickness_mm'],
+                ':std_width_mm' => (int)$data['std_width_mm'],
+                ':std_height_mm' => (int)$data['std_height_mm'],
+                ':sale_price' => $data['sale_price'] !== null ? (float)$data['sale_price'] : null,
+                ':face_color_id' => (int)$data['face_color_id'],
+                ':face_texture_id' => (int)$data['face_texture_id'],
+                ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
+                ':back_texture_id' => $data['back_texture_id'] !== null ? (int)$data['back_texture_id'] : null,
+                ':notes' => $data['notes'] ?: null,
+            ]);
+        } else {
+            $st = $pdo->prepare(
+                'INSERT INTO hpl_boards
+                  (code,name,brand,thickness_mm,std_width_mm,std_height_mm,face_color_id,face_texture_id,back_color_id,back_texture_id,notes)
+                 VALUES
+                  (:code,:name,:brand,:thickness_mm,:std_width_mm,:std_height_mm,:face_color_id,:face_texture_id,:back_color_id,:back_texture_id,:notes)'
+            );
+            $st->execute([
+                ':code' => $data['code'],
+                ':name' => $data['name'],
+                ':brand' => $data['brand'],
+                ':thickness_mm' => (int)$data['thickness_mm'],
+                ':std_width_mm' => (int)$data['std_width_mm'],
+                ':std_height_mm' => (int)$data['std_height_mm'],
+                ':face_color_id' => (int)$data['face_color_id'],
+                ':face_texture_id' => (int)$data['face_texture_id'],
+                ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
+                ':back_texture_id' => $data['back_texture_id'] !== null ? (int)$data['back_texture_id'] : null,
+                ':notes' => $data['notes'] ?: null,
+            ]);
+        }
         return (int)$pdo->lastInsertId();
     }
 
@@ -83,27 +130,51 @@ final class HplBoard
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare(
-            'UPDATE hpl_boards
-             SET code=:code,name=:name,brand=:brand,thickness_mm=:thickness_mm,std_width_mm=:std_width_mm,std_height_mm=:std_height_mm,
-                 sale_price=:sale_price,face_color_id=:face_color_id,face_texture_id=:face_texture_id,back_color_id=:back_color_id,back_texture_id=:back_texture_id,notes=:notes
-             WHERE id=:id'
-        );
-        $st->execute([
-            ':id' => $id,
-            ':code' => $data['code'],
-            ':name' => $data['name'],
-            ':brand' => $data['brand'],
-            ':thickness_mm' => (int)$data['thickness_mm'],
-            ':std_width_mm' => (int)$data['std_width_mm'],
-            ':std_height_mm' => (int)$data['std_height_mm'],
-            ':sale_price' => $data['sale_price'] !== null ? (float)$data['sale_price'] : null,
-            ':face_color_id' => (int)$data['face_color_id'],
-            ':face_texture_id' => (int)$data['face_texture_id'],
-            ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
-            ':back_texture_id' => $data['back_texture_id'] !== null ? (int)$data['back_texture_id'] : null,
-            ':notes' => $data['notes'] ?: null,
-        ]);
+        $hasSale = self::hasColumn('sale_price');
+        if ($hasSale) {
+            $st = $pdo->prepare(
+                'UPDATE hpl_boards
+                 SET code=:code,name=:name,brand=:brand,thickness_mm=:thickness_mm,std_width_mm=:std_width_mm,std_height_mm=:std_height_mm,
+                     sale_price=:sale_price,face_color_id=:face_color_id,face_texture_id=:face_texture_id,back_color_id=:back_color_id,back_texture_id=:back_texture_id,notes=:notes
+                 WHERE id=:id'
+            );
+            $st->execute([
+                ':id' => $id,
+                ':code' => $data['code'],
+                ':name' => $data['name'],
+                ':brand' => $data['brand'],
+                ':thickness_mm' => (int)$data['thickness_mm'],
+                ':std_width_mm' => (int)$data['std_width_mm'],
+                ':std_height_mm' => (int)$data['std_height_mm'],
+                ':sale_price' => $data['sale_price'] !== null ? (float)$data['sale_price'] : null,
+                ':face_color_id' => (int)$data['face_color_id'],
+                ':face_texture_id' => (int)$data['face_texture_id'],
+                ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
+                ':back_texture_id' => $data['back_texture_id'] !== null ? (int)$data['back_texture_id'] : null,
+                ':notes' => $data['notes'] ?: null,
+            ]);
+        } else {
+            $st = $pdo->prepare(
+                'UPDATE hpl_boards
+                 SET code=:code,name=:name,brand=:brand,thickness_mm=:thickness_mm,std_width_mm=:std_width_mm,std_height_mm=:std_height_mm,
+                     face_color_id=:face_color_id,face_texture_id=:face_texture_id,back_color_id=:back_color_id,back_texture_id=:back_texture_id,notes=:notes
+                 WHERE id=:id'
+            );
+            $st->execute([
+                ':id' => $id,
+                ':code' => $data['code'],
+                ':name' => $data['name'],
+                ':brand' => $data['brand'],
+                ':thickness_mm' => (int)$data['thickness_mm'],
+                ':std_width_mm' => (int)$data['std_width_mm'],
+                ':std_height_mm' => (int)$data['std_height_mm'],
+                ':face_color_id' => (int)$data['face_color_id'],
+                ':face_texture_id' => (int)$data['face_texture_id'],
+                ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
+                ':back_texture_id' => $data['back_texture_id'] !== null ? (int)$data['back_texture_id'] : null,
+                ':notes' => $data['notes'] ?: null,
+            ]);
+        }
     }
 
     public static function delete(int $id): void
