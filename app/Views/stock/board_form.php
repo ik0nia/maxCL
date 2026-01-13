@@ -365,7 +365,8 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
         try {
           const res = await fetchJson(finishesEndpoint, { q: q });
           if (!res || res.ok !== true) {
-            const msg = (res && res.error) ? String(res.error) : 'Nu pot încărca sugestiile.';
+            let msg = (res && res.error) ? String(res.error) : 'Nu pot încărca sugestiile.';
+            if (res && res.debug) msg += ' — ' + String(res.debug);
             listEl.innerHTML = '<div class="app-ac-item"><div class="text-muted small">' + msg.replace(/</g,'&lt;') + '</div></div>';
             show();
             return;

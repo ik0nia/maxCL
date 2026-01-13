@@ -18,7 +18,7 @@ final class FinishesController
             Response::json(['ok' => true, 'q' => $q, 'count' => count($items), 'items' => $items]);
         } catch (\Throwable $e) {
             $env = strtolower((string)Env::get('APP_ENV', 'prod'));
-            $debug = ($env !== 'prod' && $env !== 'production');
+            $debug = Env::bool('APP_DEBUG', false) || ($env !== 'prod' && $env !== 'production');
             Response::json([
                 'ok' => false,
                 'error' => 'Nu pot încărca sugestiile. (API)',
