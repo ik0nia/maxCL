@@ -226,7 +226,27 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
       const $sel = $el.next('.select2-container').find('.select2-selection');
       $sel.on('focus', function(){ $el.select2('open'); });
       $sel.on('keydown', function(e){
-        if (e && e.key && e.key.length === 1) $el.select2('open');
+        if (!e || !e.key) return;
+        // Dacă dropdown-ul e deja deschis, Select2 gestionează tastarea
+        if (document.querySelector('.select2-container--open')) return;
+
+        // La tastare, deschide dropdown-ul și pune caracterul în search
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          const ch = e.key;
+          $el.select2('open');
+          window.setTimeout(function(){
+            const s = document.querySelector('.select2-container--open .select2-search__field');
+            if (!s) return;
+            s.value = ch;
+            // Trigger input pentru AJAX
+            s.dispatchEvent(new Event('input', { bubbles: true }));
+            s.focus();
+          }, 0);
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          $el.select2('open');
+        }
       });
       // Click oriunde pe selecție -> open
       $sel.on('click', function(){ $el.select2('open'); });
