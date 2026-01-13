@@ -65,7 +65,7 @@ final class DashboardController
         $stockError = null;
         try {
             $byThickness = StockStats::availableByThickness();
-            $topColors = self::buildTopColors(null, 6);
+            $topColors = self::buildTopColors(null, 18);
         } catch (\Throwable $e) {
             $stockError = $e->getMessage();
         }
@@ -85,8 +85,8 @@ final class DashboardController
         try {
             $qq = $q !== null ? trim($q) : '';
             // Pentru search afișăm mai multe rezultate (grid-ul poate avea mai multe rânduri),
-            // dar când q e gol păstrăm aceeași logică ca pe dashboard (top 6).
-            $limit = ($qq === '') ? 6 : 36;
+            // dar când q e gol păstrăm aceeași logică ca pe dashboard (top 18).
+            $limit = ($qq === '') ? 18 : 36;
             $topColors = self::buildTopColors($q, $limit);
             $html = View::render('dashboard/_top_colors_grid', [
                 'topColors' => $topColors,
