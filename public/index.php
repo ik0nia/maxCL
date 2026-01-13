@@ -16,6 +16,7 @@ use App\Controllers\Catalog\MaterialsController;
 use App\Controllers\Catalog\VariantsController;
 use App\Controllers\StockController;
 use App\Controllers\Hpl\InlineTexturesController;
+use App\Controllers\DashboardController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -66,9 +67,7 @@ $router->post('/logout', function () {
 }, [Auth::requireLogin()]);
 
 // ---- Protected routes (MVP placeholders)
-$router->get('/', function () {
-    echo View::render('dashboard/index', ['title' => 'Panou']);
-}, [Auth::requireLogin()]);
+$router->get('/', fn() => DashboardController::index(), [Auth::requireLogin()]);
 
 $router->get('/setup', function () {
     echo View::render('setup/index', ['title' => 'Instalare / Setup']);
