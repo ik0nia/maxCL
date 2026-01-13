@@ -22,6 +22,7 @@ use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
+use App\Controllers\System\DbUpdateController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -218,6 +219,9 @@ $router->get('/api/health', function () {
 });
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
+
+$router->get('/system/db-update', fn() => DbUpdateController::index(), [Auth::requireLogin()]);
+$router->post('/system/db-update/run', fn() => DbUpdateController::runNow(), [Auth::requireLogin()]);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/', $basePath);
 
