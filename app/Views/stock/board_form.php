@@ -364,7 +364,12 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
         show();
         try {
           const res = await fetchJson(finishesEndpoint, { q: q });
-          if (!res || res.ok !== true) { render([]); return; }
+          if (!res || res.ok !== true) {
+            const msg = (res && res.error) ? String(res.error) : 'Nu pot încărca sugestiile.';
+            listEl.innerHTML = '<div class="app-ac-item"><div class="text-muted small">' + msg.replace(/</g,'&lt;') + '</div></div>';
+            show();
+            return;
+          }
           render(res.items || []);
         } catch (e) {
           // De obicei: redirect către /login (HTML) sau o eroare de rețea

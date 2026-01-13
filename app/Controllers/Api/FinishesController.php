@@ -14,9 +14,9 @@ final class FinishesController
         $q = isset($_GET['q']) ? (string)$_GET['q'] : (isset($_GET['term']) ? (string)$_GET['term'] : '');
         try {
             $items = Finish::searchForSelect($q, 25);
-            Response::json(['ok' => true, 'items' => $items]);
+            Response::json(['ok' => true, 'q' => $q, 'count' => count($items), 'items' => $items]);
         } catch (\Throwable $e) {
-            Response::json(['ok' => false, 'error' => 'Nu pot încărca sugestiile.'], 500);
+            Response::json(['ok' => false, 'error' => 'Nu pot încărca sugestiile. (API)'], 500);
         }
     }
 }

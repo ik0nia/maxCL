@@ -78,20 +78,27 @@ final class Finish
 
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        $qNoSpace = str_replace(' ', '', $q);
         $like = '%' . $q . '%';
-        $prefix = $q . '%';
+        $like2 = '%' . $qNoSpace . '%';
+        $prefix2 = $qNoSpace . '%';
         $sql = "
           SELECT id, code, color_name, thumb_path
           FROM finishes
-          WHERE code LIKE :like OR color_name LIKE :like OR color_code LIKE :like
+          WHERE
+            code LIKE :like
+            OR REPLACE(code, ' ', '') LIKE :like2
+            OR color_name LIKE :like
+            OR color_code LIKE :like
+            OR REPLACE(COALESCE(color_code,''), ' ', '') LIKE :like2
           ORDER BY
-            CASE WHEN code LIKE :prefix THEN 0 ELSE 1 END,
+            CASE WHEN REPLACE(code, ' ', '') LIKE :prefix2 THEN 0 ELSE 1 END,
             code ASC,
             color_name ASC
           LIMIT $limit
         ";
         $st = $pdo->prepare($sql);
-        $st->execute([':like' => $like, ':prefix' => $prefix]);
+        $st->execute([':like' => $like, ':like2' => $like2, ':prefix2' => $prefix2]);
         $rows = $st->fetchAll();
         $out = [];
         foreach ($rows as $r) {
