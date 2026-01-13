@@ -18,7 +18,7 @@ final class FinishesController
     {
         $rows = Finish::all();
         echo View::render('catalog/finishes/index', [
-            'title' => 'Finisaje',
+            'title' => 'Tip culoare',
             'rows' => $rows,
         ]);
     }
@@ -26,7 +26,7 @@ final class FinishesController
     public static function createForm(): void
     {
         echo View::render('catalog/finishes/form', [
-            'title' => 'Finisaj nou',
+            'title' => 'Tip culoare nou',
             'mode' => 'create',
             'row' => null,
             'errors' => [],
@@ -40,7 +40,6 @@ final class FinishesController
         $check = Validator::required($_POST, [
             'code' => 'Cod',
             'color_name' => 'Nume culoare',
-            'texture_name' => 'Nume textură',
         ]);
         $errors = $check['errors'];
 
@@ -50,7 +49,7 @@ final class FinishesController
 
         if ($errors) {
             echo View::render('catalog/finishes/form', [
-                'title' => 'Finisaj nou',
+                'title' => 'Tip culoare nou',
                 'mode' => 'create',
                 'row' => $_POST,
                 'errors' => $errors,
@@ -64,19 +63,20 @@ final class FinishesController
                 'code' => trim((string)$_POST['code']),
                 'color_name' => trim((string)$_POST['color_name']),
                 'color_code' => trim((string)($_POST['color_code'] ?? '')),
-                'texture_name' => trim((string)$_POST['texture_name']),
-                'texture_code' => trim((string)($_POST['texture_code'] ?? '')),
+                // Textura este gestionată separat (tabel textures). Păstrăm câmpurile vechi goale.
+                'texture_name' => '',
+                'texture_code' => '',
                 'thumb_path' => $upload['thumb_url'],
                 'image_path' => $upload['image_url'],
             ];
 
             $id = Finish::create($data);
-            Audit::log('FINISH_CREATE', 'finishes', $id, null, $data);
-            Session::flash('toast_success', 'Finisaj creat.');
-            Response::redirect('/catalog/finishes');
+            Audit::log('COLOR_TYPE_CREATE', 'finishes', $id, null, $data);
+            Session::flash('toast_success', 'Tip culoare creat.');
+            Response::redirect('/hpl/tip-culoare');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
-            Response::redirect('/catalog/finishes/create');
+            Response::redirect('/hpl/tip-culoare/create');
         }
     }
 
@@ -85,12 +85,12 @@ final class FinishesController
         $id = (int)($params['id'] ?? 0);
         $row = Finish::find($id);
         if (!$row) {
-            Session::flash('toast_error', 'Finisaj inexistent.');
-            Response::redirect('/catalog/finishes');
+            Session::flash('toast_error', 'Tip culoare inexistent.');
+            Response::redirect('/hpl/tip-culoare');
         }
 
         echo View::render('catalog/finishes/form', [
-            'title' => 'Editează finisaj',
+            'title' => 'Editează tip culoare',
             'mode' => 'edit',
             'row' => $row,
             'errors' => [],
@@ -103,21 +103,20 @@ final class FinishesController
         $id = (int)($params['id'] ?? 0);
         $before = Finish::find($id);
         if (!$before) {
-            Session::flash('toast_error', 'Finisaj inexistent.');
-            Response::redirect('/catalog/finishes');
+            Session::flash('toast_error', 'Tip culoare inexistent.');
+            Response::redirect('/hpl/tip-culoare');
         }
 
         $check = Validator::required($_POST, [
             'code' => 'Cod',
             'color_name' => 'Nume culoare',
-            'texture_name' => 'Nume textură',
         ]);
         $errors = $check['errors'];
 
         if ($errors) {
             $row = array_merge($before, $_POST);
             echo View::render('catalog/finishes/form', [
-                'title' => 'Editează finisaj',
+                'title' => 'Editează tip culoare',
                 'mode' => 'edit',
                 'row' => $row,
                 'errors' => $errors,
@@ -138,19 +137,19 @@ final class FinishesController
                 'code' => trim((string)$_POST['code']),
                 'color_name' => trim((string)$_POST['color_name']),
                 'color_code' => trim((string)($_POST['color_code'] ?? '')),
-                'texture_name' => trim((string)$_POST['texture_name']),
-                'texture_code' => trim((string)($_POST['texture_code'] ?? '')),
+                'texture_name' => '',
+                'texture_code' => '',
                 'thumb_path' => $thumb,
                 'image_path' => $img ?: null,
             ];
 
             Finish::update($id, $after);
-            Audit::log('FINISH_UPDATE', 'finishes', $id, $before, $after);
-            Session::flash('toast_success', 'Finisaj actualizat.');
-            Response::redirect('/catalog/finishes');
+            Audit::log('COLOR_TYPE_UPDATE', 'finishes', $id, $before, $after);
+            Session::flash('toast_success', 'Tip culoare actualizat.');
+            Response::redirect('/hpl/tip-culoare');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
-            Response::redirect('/catalog/finishes/' . $id . '/edit');
+            Response::redirect('/hpl/tip-culoare/' . $id . '/edit');
         }
     }
 
@@ -160,18 +159,18 @@ final class FinishesController
         $id = (int)($params['id'] ?? 0);
         $before = Finish::find($id);
         if (!$before) {
-            Session::flash('toast_error', 'Finisaj inexistent.');
-            Response::redirect('/catalog/finishes');
+            Session::flash('toast_error', 'Tip culoare inexistent.');
+            Response::redirect('/hpl/tip-culoare');
         }
 
         try {
             Finish::delete($id);
-            Audit::log('FINISH_DELETE', 'finishes', $id, $before, null);
-            Session::flash('toast_success', 'Finisaj șters.');
+            Audit::log('COLOR_TYPE_DELETE', 'finishes', $id, $before, null);
+            Session::flash('toast_success', 'Tip culoare șters.');
         } catch (\Throwable $e) {
-            Session::flash('toast_error', 'Nu pot șterge finisajul (posibil folosit în variante).');
+            Session::flash('toast_error', 'Nu pot șterge tipul de culoare (posibil folosit).');
         }
-        Response::redirect('/catalog/finishes');
+        Response::redirect('/hpl/tip-culoare');
     }
 }
 

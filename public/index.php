@@ -14,6 +14,7 @@ use App\Core\View;
 use App\Controllers\Catalog\FinishesController;
 use App\Controllers\Catalog\MaterialsController;
 use App\Controllers\Catalog\VariantsController;
+use App\Controllers\Hpl\TexturesController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -128,26 +129,31 @@ $router->get('/uploads/finishes/{name}', function (array $params) {
 // ---- Catalog (Admin, Gestionar)
 $catalogMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 
-$router->get('/catalog/finishes', fn() => FinishesController::index(), $catalogMW);
-$router->get('/catalog/finishes/create', fn() => FinishesController::createForm(), $catalogMW);
-$router->post('/catalog/finishes/create', fn() => FinishesController::create(), $catalogMW);
-$router->get('/catalog/finishes/{id}/edit', fn($p) => FinishesController::editForm($p), $catalogMW);
-$router->post('/catalog/finishes/{id}/edit', fn($p) => FinishesController::update($p), $catalogMW);
-$router->post('/catalog/finishes/{id}/delete', fn($p) => FinishesController::delete($p), $catalogMW);
+// Plăci HPL: Tip culoare (folosește tabela finishes, dar fără texturi)
+$router->get('/hpl/tip-culoare', fn() => FinishesController::index(), $catalogMW);
+$router->get('/hpl/tip-culoare/create', fn() => FinishesController::createForm(), $catalogMW);
+$router->post('/hpl/tip-culoare/create', fn() => FinishesController::create(), $catalogMW);
+$router->get('/hpl/tip-culoare/{id}/edit', fn($p) => FinishesController::editForm($p), $catalogMW);
+$router->post('/hpl/tip-culoare/{id}/edit', fn($p) => FinishesController::update($p), $catalogMW);
+$router->post('/hpl/tip-culoare/{id}/delete', fn($p) => FinishesController::delete($p), $catalogMW);
 
-$router->get('/catalog/materials', fn() => MaterialsController::index(), $catalogMW);
-$router->get('/catalog/materials/create', fn() => MaterialsController::createForm(), $catalogMW);
-$router->post('/catalog/materials/create', fn() => MaterialsController::create(), $catalogMW);
-$router->get('/catalog/materials/{id}/edit', fn($p) => MaterialsController::editForm($p), $catalogMW);
-$router->post('/catalog/materials/{id}/edit', fn($p) => MaterialsController::update($p), $catalogMW);
-$router->post('/catalog/materials/{id}/delete', fn($p) => MaterialsController::delete($p), $catalogMW);
+// Compat: vechile rute trimit la noile rute
+$router->get('/catalog/finishes', fn() => Response::redirect('/hpl/tip-culoare'), $catalogMW);
+$router->get('/catalog/finishes/create', fn() => Response::redirect('/hpl/tip-culoare/create'), $catalogMW);
+$router->get('/catalog/finishes/{id}/edit', fn($p) => Response::redirect('/hpl/tip-culoare/' . (int)$p['id'] . '/edit'), $catalogMW);
 
-$router->get('/catalog/variants', fn() => VariantsController::index(), $catalogMW);
-$router->get('/catalog/variants/create', fn() => VariantsController::createForm(), $catalogMW);
-$router->post('/catalog/variants/create', fn() => VariantsController::create(), $catalogMW);
-$router->get('/catalog/variants/{id}/edit', fn($p) => VariantsController::editForm($p), $catalogMW);
-$router->post('/catalog/variants/{id}/edit', fn($p) => VariantsController::update($p), $catalogMW);
-$router->post('/catalog/variants/{id}/delete', fn($p) => VariantsController::delete($p), $catalogMW);
+// Plăci HPL: Texturi
+$router->get('/hpl/texturi', fn() => TexturesController::index(), $catalogMW);
+$router->get('/hpl/texturi/create', fn() => TexturesController::createForm(), $catalogMW);
+$router->post('/hpl/texturi/create', fn() => TexturesController::create(), $catalogMW);
+$router->get('/hpl/texturi/{id}/edit', fn($p) => TexturesController::editForm($p), $catalogMW);
+$router->post('/hpl/texturi/{id}/edit', fn($p) => TexturesController::update($p), $catalogMW);
+$router->post('/hpl/texturi/{id}/delete', fn($p) => TexturesController::delete($p), $catalogMW);
+
+// (Materiale + Variante) vor fi înlocuite de modulul Stoc (plăci + piese)
+// Păstrăm temporar rutele vechi ca redirect la /stock
+$router->get('/catalog/materials', fn() => Response::redirect('/stock'), $catalogMW);
+$router->get('/catalog/variants', fn() => Response::redirect('/stock'), $catalogMW);
 
 // ---- Rute cu middleware pe roluri (placeholder până implementăm modulele)
 $router->get('/users', fn() => print View::render('system/placeholder', ['title' => 'Utilizatori']), [
@@ -162,7 +168,7 @@ $router->get('/projects', fn() => print View::render('system/placeholder', ['tit
     Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
 ]);
 
-$router->get('/stock', fn() => print View::render('system/placeholder', ['title' => 'Stoc']), [
+$router->get('/stock', fn() => print View::render('system/placeholder', ['title' => 'Stoc (Plăci HPL)']), [
     Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
 ]);
 

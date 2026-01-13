@@ -76,15 +76,15 @@ $toastError = Session::flash('toast_error');
           <i class="bi bi-people me-2"></i> Clienți
         </a>
 
-        <div class="app-nav-section">Catalog</div>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/catalog/finishes')) ?>">
-          <i class="bi bi-palette2 me-2"></i> Finisaje
+        <div class="app-nav-section">Plăci HPL</div>
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
+          <i class="bi bi-palette2 me-2"></i> Tip culoare
         </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/catalog/materials')) ?>">
-          <i class="bi bi-layers me-2"></i> Materiale
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/hpl/texturi')) ?>">
+          <i class="bi bi-grid-3x3-gap me-2"></i> Texturi
         </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/catalog/variants')) ?>">
-          <i class="bi bi-intersect me-2"></i> Variante
+        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
+          <i class="bi bi-box-seam me-2"></i> Stoc
         </a>
 
         <div class="app-nav-section">Sistem</div>
