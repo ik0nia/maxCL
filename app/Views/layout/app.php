@@ -101,6 +101,21 @@ $toastError = Session::flash('toast_error');
     </main>
   </div>
 
+  <!-- Lightbox (Bootstrap modal) -->
+  <div class="modal fade" id="appLightbox" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content" style="border-radius:14px">
+        <div class="modal-header">
+          <h5 class="modal-title" id="appLightboxTitle">Imagine</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Închide"></button>
+        </div>
+        <div class="modal-body p-2">
+          <img id="appLightboxImg" src="" alt="" style="width:100%;height:auto;border-radius:12px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 

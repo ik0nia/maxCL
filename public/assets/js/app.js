@@ -34,5 +34,25 @@
       }
     });
   }
+
+  // Lightbox: click on elements with data-lightbox-src
+  document.addEventListener('click', function (e) {
+    const el = e.target.closest('[data-lightbox-src]');
+    if (!el) return;
+    const src = el.getAttribute('data-lightbox-src');
+    if (!src) return;
+    const title = el.getAttribute('data-lightbox-title') || 'Imagine';
+    const img = document.getElementById('appLightboxImg');
+    const ttl = document.getElementById('appLightboxTitle');
+    const modalEl = document.getElementById('appLightbox');
+    if (!img || !ttl || !modalEl || !window.bootstrap) return;
+
+    e.preventDefault();
+    img.src = src;
+    img.alt = title;
+    ttl.textContent = title;
+    const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  });
 })();
 

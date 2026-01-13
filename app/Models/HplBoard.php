@@ -19,10 +19,12 @@ final class HplBoard
               fc.color_name AS face_color_name,
               fc.code AS face_color_code,
               fc.thumb_path AS face_thumb_path,
+              fc.image_path AS face_image_path,
               ft.name AS face_texture_name,
               bc.color_name AS back_color_name,
               bc.code AS back_color_code,
               bc.thumb_path AS back_thumb_path,
+              bc.image_path AS back_image_path,
               bt.name AS back_texture_name,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS stock_qty_available,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS stock_m2_available

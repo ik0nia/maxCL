@@ -300,12 +300,23 @@ final class StockController
             Response::redirect('/stock/boards/' . $boardId);
         }
 
+        $width = (int)$_POST['width_mm'];
+        $height = (int)$_POST['height_mm'];
+        $stdW = (int)($board['std_width_mm'] ?? 0);
+        $stdH = (int)($board['std_height_mm'] ?? 0);
+
+        // Regula: FULL = doar dimensiuni standard. Dacă diferă -> OFFCUT automat.
+        if ($type === 'FULL' && ($width !== $stdW || $height !== $stdH)) {
+            $type = 'OFFCUT';
+            Session::flash('toast_error', 'Dimensiunile diferă de standard; piesa a fost salvată automat ca OFFCUT.');
+        }
+
         $data = [
             'board_id' => $boardId,
             'piece_type' => $type,
             'status' => 'AVAILABLE',
-            'width_mm' => (int)$_POST['width_mm'],
-            'height_mm' => (int)$_POST['height_mm'],
+            'width_mm' => $width,
+            'height_mm' => $height,
             'qty' => (int)$_POST['qty'],
             'location' => trim((string)$_POST['location']),
             'notes' => trim((string)($_POST['notes'] ?? '')),
@@ -314,6 +325,28 @@ final class StockController
         $pieceId = HplStockPiece::create($data);
         Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, null, $data);
         Session::flash('toast_success', 'Piesă adăugată în stoc.');
+        Response::redirect('/stock/boards/' . $boardId);
+    }
+
+    // Ștergere piesă (doar ADMIN)
+    public static function deletePiece(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $boardId = (int)($params['boardId'] ?? 0);
+        $pieceId = (int)($params['pieceId'] ?? 0);
+        $before = HplStockPiece::find($pieceId);
+        if (!$before || (int)$before['board_id'] !== $boardId) {
+            Session::flash('toast_error', 'Piesă inexistentă.');
+            Response::redirect('/stock/boards/' . $boardId);
+        }
+
+        try {
+            HplStockPiece::delete($pieceId);
+            Audit::log('STOCK_PIECE_DELETE', 'hpl_stock_pieces', $pieceId, $before, null);
+            Session::flash('toast_success', 'Piesă ștearsă.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge piesa.');
+        }
         Response::redirect('/stock/boards/' . $boardId);
     }
 }

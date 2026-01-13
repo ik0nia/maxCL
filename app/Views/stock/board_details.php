@@ -8,6 +8,7 @@ $board = $board ?? [];
 $pieces = $pieces ?? [];
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+$isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 
 ob_start();
 ?>
@@ -69,6 +70,11 @@ ob_start();
           <input class="form-control" name="notes">
         </div>
         <div class="col-12">
+          <div class="text-muted small">
+            Notă: dacă dimensiunile diferă de standard, piesa se salvează automat ca <strong>OFFCUT</strong>.
+          </div>
+        </div>
+        <div class="col-12">
           <button class="btn btn-primary w-100" type="submit">
             <i class="bi bi-plus-lg me-1"></i> Adaugă piesă
           </button>
@@ -90,6 +96,7 @@ ob_start();
             <th class="text-end">Buc</th>
             <th>Locație</th>
             <th class="text-end">mp</th>
+            <?php if ($isAdmin): ?><th class="text-end" style="width:110px">Acțiuni</th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -101,6 +108,17 @@ ob_start();
               <td class="text-end"><?= (int)$p['qty'] ?></td>
               <td><?= htmlspecialchars((string)$p['location']) ?></td>
               <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
+              <?php if ($isAdmin): ?>
+                <td class="text-end">
+                  <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/' . (int)$p['id'] . '/delete')) ?>"
+                        class="d-inline" onsubmit="return confirm('Sigur vrei să ștergi această piesă?');">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">
+                      <i class="bi bi-trash me-1"></i> Șterge
+                    </button>
+                  </form>
+                </td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
         </tbody>
