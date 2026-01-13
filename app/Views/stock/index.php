@@ -9,7 +9,9 @@ $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GES
 $isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 $rows = $rows ?? [];
 $filterColor = $filterColor ?? null;
+$filterColorQuery = (string)($filterColorQuery ?? '');
 $filterThicknessMm = $filterThicknessMm ?? null;
+$thicknessOptions = $thicknessOptions ?? [];
 
 // Admin-only: calculează valoarea stocului disponibil (lei)
 $totalValueLei = 0.0;
@@ -46,6 +48,54 @@ ob_start();
       </a>
     <?php endif; ?>
   </div>
+</div>
+
+<div class="card app-card p-3 mb-3">
+  <form method="get" action="<?= htmlspecialchars(Url::to('/stock')) ?>" class="row g-2 align-items-end">
+    <div class="col-12 col-lg-6">
+      <label class="form-label mb-1">Culoare (față sau verso)</label>
+      <div class="input-group position-relative">
+        <span class="input-group-text" style="width:54px;justify-content:center">
+          <?php $fcThumb = is_array($filterColor) ? (string)($filterColor['thumb_path'] ?? '') : ''; ?>
+          <img id="stock_filter_color_thumb"
+               src="<?= htmlspecialchars($fcThumb) ?>"
+               alt=""
+               style="width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;<?= $fcThumb !== '' ? '' : 'display:none' ?>">
+        </span>
+        <input class="form-control"
+               id="stock_filter_color_q"
+               name="color"
+               placeholder="Scrie codul… (ex: 617)"
+               autocomplete="off"
+               value="<?= htmlspecialchars($filterColorQuery !== '' ? $filterColorQuery : (is_array($filterColor) ? (string)($filterColor['code'] ?? '') : '')) ?>">
+        <button class="btn btn-outline-secondary" type="button" id="stock_filter_color_clear" title="Șterge">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div class="app-ac-list" id="stock_filter_color_list" style="display:none"></div>
+      <div class="form-text">Caută după cod (autocomplete) și filtrează plăcile care au culoarea pe față sau pe verso.</div>
+    </div>
+
+    <div class="col-12 col-lg-3">
+      <label class="form-label mb-1">Grosime</label>
+      <select class="form-select" name="thickness_mm">
+        <option value="">Toate grosimile</option>
+        <?php foreach ($thicknessOptions as $th): ?>
+          <?php $sel = ((string)(int)$th === (string)(int)($filterThicknessMm ?? 0)) ? 'selected' : ''; ?>
+          <option value="<?= (int)$th ?>" <?= $sel ?>><?= (int)$th ?> mm</option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="col-12 col-lg-3 d-flex gap-2">
+      <button class="btn btn-primary flex-grow-1" type="submit">
+        <i class="bi bi-funnel me-1"></i> Filtrează
+      </button>
+      <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
+        Resetează
+      </a>
+    </div>
+  </form>
 </div>
 
 <?php if (is_array($filterColor) || ($filterThicknessMm !== null && (int)$filterThicknessMm > 0)): ?>
@@ -194,10 +244,207 @@ ob_start();
   </table>
 </div>
 
+<style>
+  .app-ac-list{
+    position:fixed;
+    z-index: 2000;
+    background: #fff;
+    border: 1px solid #D9E3E6;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(17,17,17,0.08);
+    max-height: 320px;
+    overflow: auto;
+  }
+  .app-ac-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    cursor:pointer;
+    border-bottom: 1px solid #EEF3F5;
+  }
+  .app-ac-item:last-child{border-bottom:0}
+  .app-ac-item:hover, .app-ac-item.active{background:#F3F7F8}
+  .app-ac-thumb{
+    width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;flex:0 0 auto;
+  }
+  .app-ac-text{font-weight:600;color:#111}
+  .app-ac-sub{font-size:.85rem;color:#5F6B72}
+</style>
 <script>
   document.addEventListener('DOMContentLoaded', function(){
     const el = document.getElementById('boardsTable');
     if (el && window.DataTable) new DataTable(el, { pageLength: 25 });
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    const finishesEndpoint = <?= json_encode(Url::to('/api/finishes/search')) ?>;
+    const qEl = document.getElementById('stock_filter_color_q');
+    const listEl = document.getElementById('stock_filter_color_list');
+    const thumbEl = document.getElementById('stock_filter_color_thumb');
+    const clearBtn = document.getElementById('stock_filter_color_clear');
+    if (!qEl || !listEl || !thumbEl) return;
+
+    // dropdown în <body> (evită overflow clipping)
+    if (!listEl.__acInBody) {
+      document.body.appendChild(listEl);
+      listEl.__acInBody = true;
+    }
+
+    function debounce(fn, ms){
+      let t = null;
+      return function(){
+        const args = arguments;
+        if (t) window.clearTimeout(t);
+        t = window.setTimeout(function(){ fn.apply(null, args); }, ms);
+      };
+    }
+
+    async function fetchJson(url, params){
+      let u = String(url || '');
+      const qp = new URLSearchParams();
+      Object.keys(params || {}).forEach(k => qp.set(k, String(params[k] ?? '')));
+      const qs = qp.toString();
+      if (qs) u += (u.indexOf('?') >= 0 ? '&' : '?') + qs;
+
+      const res = await fetch(u, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }});
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('application/json')) throw new Error('non_json');
+      return await res.json();
+    }
+
+    let items = [];
+    let active = -1;
+
+    function place(){
+      const r = qEl.getBoundingClientRect();
+      listEl.style.top = (r.bottom + 6) + 'px';
+      listEl.style.left = r.left + 'px';
+      listEl.style.width = r.width + 'px';
+    }
+    function hide(){
+      listEl.style.display = 'none';
+      listEl.innerHTML = '';
+      active = -1;
+      items = [];
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place, true);
+    }
+    function show(){
+      if (!listEl.children.length) return;
+      place();
+      listEl.style.display = 'block';
+      window.addEventListener('scroll', place, true);
+      window.addEventListener('resize', place, true);
+    }
+    function setThumb(url){
+      if (url) {
+        thumbEl.setAttribute('src', url);
+        thumbEl.style.display = '';
+      } else {
+        thumbEl.style.display = 'none';
+      }
+    }
+    function setSelected(it){
+      const code = String(it.code || '').trim();
+      qEl.value = code !== '' ? code : String(it.text || '');
+      setThumb(it.thumb || '');
+      hide();
+    }
+
+    function render(resItems){
+      items = Array.isArray(resItems) ? resItems : [];
+      listEl.innerHTML = '';
+      if (!items.length) {
+        const row = document.createElement('div');
+        row.className = 'app-ac-item';
+        const muted = document.createElement('div');
+        muted.className = 'text-muted small';
+        muted.textContent = 'Nimic găsit.';
+        row.appendChild(muted);
+        listEl.appendChild(row);
+        show();
+        return;
+      }
+      items.forEach(function(it, idx){
+        const row = document.createElement('div');
+        row.className = 'app-ac-item';
+        row.dataset.idx = String(idx);
+        if (it.thumb) {
+          const img = document.createElement('img');
+          img.className = 'app-ac-thumb';
+          img.src = String(it.thumb);
+          img.alt = '';
+          row.appendChild(img);
+        } else {
+          const ph = document.createElement('div');
+          ph.className = 'app-ac-thumb';
+          ph.style.background = '#F3F7F8';
+          row.appendChild(ph);
+        }
+        const wrap = document.createElement('div');
+        const t = document.createElement('div');
+        t.className = 'app-ac-text';
+        t.textContent = String(it.code || it.text || '—');
+        const s = document.createElement('div');
+        s.className = 'app-ac-sub';
+        s.textContent = String(it.name || '');
+        wrap.appendChild(t);
+        if (s.textContent.trim() !== '') wrap.appendChild(s);
+        row.appendChild(wrap);
+        row.addEventListener('mousedown', function(e){
+          e.preventDefault();
+          setSelected(it);
+        });
+        listEl.appendChild(row);
+      });
+      show();
+    }
+
+    const doSearch = debounce(async function(){
+      const q = String(qEl.value || '').trim();
+      if (q.length < 1) { hide(); return; }
+      try {
+        const data = await fetchJson(finishesEndpoint, { q: q, limit: 20 });
+        render(data && data.items ? data.items : []);
+      } catch (e) {
+        hide();
+      }
+    }, 200);
+
+    qEl.addEventListener('input', doSearch);
+    qEl.addEventListener('focus', doSearch);
+    document.addEventListener('click', function(ev){
+      if (ev.target === qEl) return;
+      if (listEl.contains(ev.target)) return;
+      hide();
+    });
+
+    qEl.addEventListener('keydown', function(ev){
+      if (listEl.style.display !== 'block') return;
+      const max = items.length - 1;
+      if (ev.key === 'ArrowDown') { ev.preventDefault(); active = Math.min(max, active + 1); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); active = Math.max(0, active - 1); }
+      else if (ev.key === 'Enter') {
+        if (active >= 0 && items[active]) { ev.preventDefault(); setSelected(items[active]); }
+        hide();
+      } else if (ev.key === 'Escape') { hide(); }
+      const els = listEl.querySelectorAll('.app-ac-item');
+      els.forEach(function(el, i){
+        if (i === active) el.classList.add('active');
+        else el.classList.remove('active');
+      });
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function(){
+        qEl.value = '';
+        setThumb('');
+        hide();
+      });
+    }
   });
 </script>
 <?php

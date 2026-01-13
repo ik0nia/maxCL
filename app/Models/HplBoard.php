@@ -107,6 +107,25 @@ final class HplBoard
         return $st->fetchAll();
     }
 
+    /** @return array<int,int> */
+    public static function thicknessOptions(): array
+    {
+        try {
+            /** @var PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->query('SELECT DISTINCT thickness_mm FROM hpl_boards WHERE thickness_mm IS NOT NULL ORDER BY thickness_mm ASC');
+            $rows = $st->fetchAll();
+            $out = [];
+            foreach ($rows as $r) {
+                $v = (int)($r['thickness_mm'] ?? 0);
+                if ($v > 0) $out[] = $v;
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     public static function find(int $id): ?array
     {
         /** @var PDO $pdo */

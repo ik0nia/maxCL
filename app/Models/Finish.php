@@ -81,7 +81,7 @@ final class Finish
         return $st->fetchAll();
     }
 
-    /** @return array<int, array{id:int, text:string, thumb:string}> */
+    /** @return array<int, array{id:int, text:string, thumb:string, code:string, name:string}> */
     public static function searchForSelect(?string $q, int $limit = 20): array
     {
         $q = $q !== null ? trim($q) : '';
@@ -126,6 +126,8 @@ final class Finish
                 'id' => $id,
                 'text' => $text,
                 'thumb' => (string)($r['thumb_path'] ?? ''),
+                'code' => trim($code),
+                'name' => trim($name),
             ];
         }
         return $out;

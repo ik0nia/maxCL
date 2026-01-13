@@ -98,7 +98,9 @@ final class StockController
                 'title' => 'Stoc',
                 'rows' => $rows,
                 'filterColor' => $color,
+                'filterColorQuery' => $color ? (string)($color['code'] ?? '') : $colorRaw,
                 'filterThicknessMm' => $thicknessMm,
+                'thicknessOptions' => HplBoard::thicknessOptions(),
             ]);
         } catch (\Throwable $e) {
             // Cel mai des: tabelele noi nu există încă (nu s-a rulat setup după update).
