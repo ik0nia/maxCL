@@ -50,6 +50,15 @@ final class AuditController
             Response::json(['ok' => false, 'error' => 'Înregistrare inexistentă.'], 404);
         }
 
+        $before = $row['before_json'];
+        $after = $row['after_json'];
+        $meta = $row['meta_json'];
+
+        // Decode JSON columns to arrays when possible (for nicer UI)
+        $beforeDecoded = is_string($before) ? json_decode($before, true) : null;
+        $afterDecoded = is_string($after) ? json_decode($after, true) : null;
+        $metaDecoded = is_string($meta) ? json_decode($meta, true) : null;
+
         Response::json([
             'ok' => true,
             'data' => [
@@ -61,9 +70,9 @@ final class AuditController
                 'entity_id' => $row['entity_id'],
                 'ip' => $row['ip'],
                 'user_agent' => $row['user_agent'],
-                'before_json' => $row['before_json'],
-                'after_json' => $row['after_json'],
-                'meta_json' => $row['meta_json'],
+                'before_json' => $beforeDecoded ?? $before,
+                'after_json' => $afterDecoded ?? $after,
+                'meta_json' => $metaDecoded ?? $meta,
             ],
         ]);
     }

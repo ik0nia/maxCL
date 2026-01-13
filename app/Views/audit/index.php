@@ -94,6 +94,29 @@ ob_start();
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Închide"></button>
       </div>
       <div class="modal-body">
+        <div class="card border-0 mb-3" style="background:#F3F7F8;border-radius:14px">
+          <div class="p-3">
+            <div class="row g-2">
+              <div class="col-12 col-lg-6">
+                <div class="text-muted small">Acțiune</div>
+                <div class="fw-semibold" id="auditHdrAction">—</div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="text-muted small">Entitate</div>
+                <div class="fw-semibold" id="auditHdrEntity">—</div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="text-muted small">Data</div>
+                <div class="fw-semibold" id="auditHdrDate">—</div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="text-muted small">IP / User-Agent</div>
+                <div class="fw-semibold" id="auditHdrIpUa">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="row g-3">
           <div class="col-12 col-lg-6">
             <div class="fw-semibold mb-1">Înainte</div>
@@ -131,22 +154,36 @@ ob_start();
       $('#auditBefore').text('Se încarcă...');
       $('#auditAfter').text('Se încarcă...');
       $('#auditMeta').text('Se încarcă...');
+      $('#auditHdrAction').text('Se încarcă...');
+      $('#auditHdrEntity').text('Se încarcă...');
+      $('#auditHdrDate').text('Se încarcă...');
+      $('#auditHdrIpUa').text('Se încarcă...');
       try{
         const res = await fetch(<?= json_encode(Url::to('/api/audit/')) ?> + id, { headers: { 'Accept': 'application/json' }});
         const json = await res.json();
         if (!json.ok) throw new Error(json.error || 'Eroare.');
         const d = json.data;
-        const pretty = (s) => {
-          if (!s) return '—';
-          try { return JSON.stringify(JSON.parse(s), null, 2); } catch(e){ return String(s); }
+        const pretty = (v) => {
+          if (v === null || v === undefined || v === '') return '—';
+          if (typeof v === 'object') return JSON.stringify(v, null, 2);
+          try { return JSON.stringify(JSON.parse(v), null, 2); } catch(e){ return String(v); }
         };
         $('#auditBefore').text(pretty(d.before_json));
         $('#auditAfter').text(pretty(d.after_json));
         $('#auditMeta').text(pretty(d.meta_json));
+
+        $('#auditHdrAction').text(d.action || '—');
+        $('#auditHdrEntity').text((d.entity_type ? d.entity_type : '—') + (d.entity_id ? (' #' + d.entity_id) : ''));
+        $('#auditHdrDate').text(d.created_at || '—');
+        $('#auditHdrIpUa').text((d.ip || '—') + (d.user_agent ? (' · ' + d.user_agent) : ''));
       } catch(e){
         $('#auditBefore').text('Eroare la încărcare.');
         $('#auditAfter').text('Eroare la încărcare.');
         $('#auditMeta').text(String(e));
+        $('#auditHdrAction').text('Eroare');
+        $('#auditHdrEntity').text('—');
+        $('#auditHdrDate').text('—');
+        $('#auditHdrIpUa').text('—');
       }
     });
   });
