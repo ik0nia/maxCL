@@ -6,16 +6,16 @@ use App\Core\View;
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
-$isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
+$canSeePrices = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 $rows = $rows ?? [];
 $filterColor = $filterColor ?? null;
 $filterColorQuery = (string)($filterColorQuery ?? '');
 $filterThicknessMm = $filterThicknessMm ?? null;
 $thicknessOptions = $thicknessOptions ?? [];
 
-// Admin-only: calculează valoarea stocului disponibil (lei)
+// Valoare stoc (lei) — vizibilă doar la cerere (toggle), pentru Admin/Gestionar
 $totalValueLei = 0.0;
-if ($isAdmin) {
+if ($canSeePrices) {
   foreach ($rows as $r) {
     $m2 = (float)($r['stock_m2_available'] ?? 0);
     if ($m2 <= 0) continue;
@@ -43,6 +43,16 @@ ob_start();
   </div>
   <div class="d-flex gap-2">
     <?php if ($canWrite): ?>
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="form-check form-switch m-0 app-title-switch">
+          <input class="form-check-input" type="checkbox" id="stockTogglePrices">
+          <label class="form-check-label" for="stockTogglePrices">Afișare prețuri</label>
+        </div>
+        <div class="form-check form-switch m-0 app-title-switch">
+          <input class="form-check-input" type="checkbox" id="stockToggleAdmin">
+          <label class="form-check-label" for="stockToggleAdmin">Administrare</label>
+        </div>
+      </div>
       <a href="<?= htmlspecialchars(Url::to('/stock/boards/create')) ?>" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i> Placă nouă
       </a>
@@ -121,8 +131,8 @@ ob_start();
   </div>
 <?php endif; ?>
 
-<?php if ($isAdmin): ?>
-  <div class="row g-3 mb-3">
+<?php if ($canSeePrices): ?>
+  <div class="row g-3 mb-3 d-none" id="stockValueCard">
     <div class="col-12">
       <div class="card app-card p-3">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -154,9 +164,9 @@ ob_start();
         <th class="text-end">Stoc FULL (buc)</th>
         <th class="text-end">Stoc OFFCUT (buc)</th>
         <th class="text-end">Stoc (mp)</th>
-        <?php if ($isAdmin): ?>
-          <th class="text-end">Preț/mp</th>
-          <th class="text-end">Valoare (lei)</th>
+        <?php if ($canSeePrices): ?>
+          <th class="text-end js-price-col d-none">Preț/mp</th>
+          <th class="text-end js-price-col d-none">Valoare (lei)</th>
         <?php endif; ?>
         <th class="text-end" style="width:220px">Acțiuni</th>
       </tr>
@@ -220,7 +230,7 @@ ob_start();
           <td class="text-end fw-semibold"><?= (int)($r['stock_qty_full_available'] ?? 0) ?></td>
           <td class="text-end fw-semibold"><?= (int)($r['stock_qty_offcut_available'] ?? 0) ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>
-          <?php if ($isAdmin): ?>
+          <?php if ($canSeePrices): ?>
             <?php
               $m2 = (float)($r['stock_m2_available'] ?? 0);
               $ppm = null;
@@ -234,24 +244,26 @@ ob_start();
               }
               $val = ($ppm !== null && $ppm >= 0 && is_finite($ppm) && $m2 > 0) ? ($m2 * $ppm) : null;
             ?>
-            <td class="text-end"><?= $ppm !== null ? number_format((float)$ppm, 2, '.', '') : '—' ?></td>
-            <td class="text-end fw-semibold"><?= $val !== null ? number_format((float)$val, 2, '.', '') : '—' ?></td>
+            <td class="text-end js-price-col d-none"><?= $ppm !== null ? number_format((float)$ppm, 2, '.', '') : '—' ?></td>
+            <td class="text-end fw-semibold js-price-col d-none"><?= $val !== null ? number_format((float)$val, 2, '.', '') : '—' ?></td>
           <?php endif; ?>
           <td class="text-end">
             <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'])) ?>">
               <i class="bi bi-eye me-1"></i> Vezi
             </a>
             <?php if ($canWrite): ?>
-              <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'] . '/edit')) ?>">
-                <i class="bi bi-pencil me-1"></i> Editează
-              </a>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'] . '/delete')) ?>" class="d-inline"
-                    onsubmit="return confirm('Sigur vrei să ștergi această placă? (doar dacă nu are piese asociate)');">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                <button class="btn btn-outline-secondary btn-sm" type="submit">
-                  <i class="bi bi-trash me-1"></i> Șterge
-                </button>
-              </form>
+              <span class="js-admin-actions d-none">
+                <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'] . '/edit')) ?>">
+                  <i class="bi bi-pencil me-1"></i> Editează
+                </a>
+                <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'] . '/delete')) ?>" class="d-inline"
+                      onsubmit="return confirm('Sigur vrei să ștergi această placă? (doar dacă nu are piese asociate)');">
+                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                  <button class="btn btn-outline-secondary btn-sm" type="submit">
+                    <i class="bi bi-trash me-1"></i> Șterge
+                  </button>
+                </form>
+              </span>
             <?php endif; ?>
           </td>
         </tr>
@@ -264,6 +276,9 @@ ob_start();
   /* Fine-tuning pentru bara de filtre */
   .app-stock-filter-color .form-text{margin-bottom:0}
   .app-stock-filter-actions{align-items:center}
+  .app-title-switch{display:flex;align-items:center;gap:.35rem}
+  .app-title-switch .form-check-input{margin-top:0}
+  .app-title-switch .form-check-label{font-weight:600;color:#5F6B72}
   @media (max-width: 991.98px){
     .app-stock-filter-actions .btn{flex:1 1 auto;}
   }
@@ -299,6 +314,50 @@ ob_start();
     if (el && window.DataTable) new DataTable(el, { pageLength: 25 });
   });
 </script>
+
+<?php if ($canWrite): ?>
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    const tPrices = document.getElementById('stockTogglePrices');
+    const tAdmin = document.getElementById('stockToggleAdmin');
+    const priceCells = Array.from(document.querySelectorAll('.js-price-col'));
+    const adminCells = Array.from(document.querySelectorAll('.js-admin-actions'));
+    const valueCard = document.getElementById('stockValueCard');
+
+    function setVisible(list, on){
+      list.forEach(el => {
+        if (!el) return;
+        el.classList.toggle('d-none', !on);
+      });
+    }
+
+    function apply(){
+      const showPrices = !!(tPrices && tPrices.checked);
+      const showAdmin = !!(tAdmin && tAdmin.checked);
+      setVisible(priceCells, showPrices);
+      if (valueCard) valueCard.classList.toggle('d-none', !showPrices);
+      setVisible(adminCells, showAdmin);
+      try {
+        localStorage.setItem('stock_show_prices', showPrices ? '1' : '0');
+        localStorage.setItem('stock_show_admin', showAdmin ? '1' : '0');
+      } catch (e) {}
+    }
+
+    // default OFF, dar dacă userul a activat anterior, reținem în localStorage
+    try {
+      if (tPrices) tPrices.checked = (localStorage.getItem('stock_show_prices') === '1');
+      if (tAdmin) tAdmin.checked = (localStorage.getItem('stock_show_admin') === '1');
+    } catch (e) {
+      if (tPrices) tPrices.checked = false;
+      if (tAdmin) tAdmin.checked = false;
+    }
+
+    if (tPrices) tPrices.addEventListener('change', apply);
+    if (tAdmin) tAdmin.addEventListener('change', apply);
+    apply();
+  });
+</script>
+<?php endif; ?>
 
 <script>
   document.addEventListener('DOMContentLoaded', function(){
