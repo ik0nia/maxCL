@@ -82,23 +82,24 @@ final class Finish
         $like = '%' . $q . '%';
         $like2 = '%' . $qNoSpace . '%';
         $prefix2 = $qNoSpace . '%';
+        // IMPORTANT: evităm placeholder-e nominale repetate (pot produce HY093 pe unele drivere PDO)
         $sql = "
           SELECT id, code, color_name, thumb_path
           FROM finishes
           WHERE
-            code LIKE :like
-            OR REPLACE(code, ' ', '') LIKE :like2
-            OR color_name LIKE :like
-            OR color_code LIKE :like
-            OR REPLACE(COALESCE(color_code,''), ' ', '') LIKE :like2
+            code LIKE ?
+            OR REPLACE(code, ' ', '') LIKE ?
+            OR color_name LIKE ?
+            OR color_code LIKE ?
+            OR REPLACE(COALESCE(color_code,''), ' ', '') LIKE ?
           ORDER BY
-            CASE WHEN REPLACE(code, ' ', '') LIKE :prefix2 THEN 0 ELSE 1 END,
+            CASE WHEN REPLACE(code, ' ', '') LIKE ? THEN 0 ELSE 1 END,
             code ASC,
             color_name ASC
           LIMIT $limit
         ";
         $st = $pdo->prepare($sql);
-        $st->execute([':like' => $like, ':like2' => $like2, ':prefix2' => $prefix2]);
+        $st->execute([$like, $like2, $like, $like, $like2, $prefix2]);
         $rows = $st->fetchAll();
         $out = [];
         foreach ($rows as $r) {
