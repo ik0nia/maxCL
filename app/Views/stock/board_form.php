@@ -220,7 +220,7 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
   .app-ac-sub{font-size:.85rem;color:#5F6B72}
 </style>
 <script>
-  $(function(){
+  document.addEventListener('DOMContentLoaded', function(){
     const finishesEndpoint = <?= json_encode(Url::to('/api/finishes/search')) ?>;
 
     function debounce(fn, ms){
@@ -232,110 +232,146 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
       };
     }
 
+    async function fetchJson(url, params){
+      const u = new URL(url, window.location.origin);
+      Object.keys(params || {}).forEach(k => u.searchParams.set(k, String(params[k] ?? '')));
+      const res = await fetch(u.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json' }});
+      return await res.json();
+    }
+
     function bindColorAutocomplete(opts){
-      const $q = $(opts.q);
-      const $id = $(opts.id);
-      const $thumb = $(opts.thumb);
-      const $list = $(opts.list);
+      const qEl = document.querySelector(opts.q);
+      const idEl = document.querySelector(opts.id);
+      const thumbEl = document.querySelector(opts.thumb);
+      const listEl = document.querySelector(opts.list);
       const allowEmpty = !!opts.allowEmpty;
+      if (!qEl || !idEl || !thumbEl || !listEl) return;
+
+      // Move dropdown to <body> to avoid overflow clipping
+      if (!listEl.__acInBody) {
+        document.body.appendChild(listEl);
+        listEl.__acInBody = true;
+      }
+
       let items = [];
       let active = -1;
 
-      // Move dropdown to <body> to avoid overflow clipping
-      if (!$list.data('acInBody')) {
-        $list.appendTo(document.body);
-        $list.data('acInBody', true);
-      }
-
       function place(){
-        const el = $q.get(0);
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        $list.css({
-          top: (r.bottom + 6) + 'px',
-          left: r.left + 'px',
-          width: r.width + 'px'
-        });
+        const r = qEl.getBoundingClientRect();
+        listEl.style.top = (r.bottom + 6) + 'px';
+        listEl.style.left = r.left + 'px';
+        listEl.style.width = r.width + 'px';
       }
 
-      function hide(){ $list.hide().empty(); active = -1; items = []; $(window).off('scroll.ac resize.ac', place); }
-      function show(){ if ($list.children().length) { place(); $list.show(); $(window).on('scroll.ac resize.ac', place); } }
+      function hide(){
+        listEl.style.display = 'none';
+        listEl.innerHTML = '';
+        active = -1;
+        items = [];
+        window.removeEventListener('scroll', place, true);
+        window.removeEventListener('resize', place, true);
+      }
+
+      function show(){
+        if (!listEl.children.length) return;
+        place();
+        listEl.style.display = 'block';
+        window.addEventListener('scroll', place, true);
+        window.addEventListener('resize', place, true);
+      }
+
+      function setThumb(url){
+        if (url) {
+          thumbEl.setAttribute('src', url);
+          thumbEl.style.display = '';
+        } else {
+          thumbEl.style.display = 'none';
+        }
+      }
 
       function setSelected(it){
-        $id.val(String(it.id || ''));
-        $q.val(String(it.text || ''));
-        if (it.thumb) {
-          $thumb.attr('src', it.thumb).show();
-        } else {
-          $thumb.hide();
-        }
+        idEl.value = String(it.id || '');
+        qEl.value = String(it.text || '');
+        setThumb(it.thumb || '');
         hide();
       }
 
       function clearSelected(){
-        $id.val('');
-        $q.val('');
-        $thumb.hide();
+        idEl.value = '';
+        qEl.value = '';
+        setThumb('');
         hide();
       }
 
       function render(resItems){
-        items = resItems || [];
-        $list.empty();
+        items = Array.isArray(resItems) ? resItems : [];
+        listEl.innerHTML = '';
         if (!items.length) {
-          $list.append($('<div class="app-ac-item"></div>').append($('<div class="text-muted small"></div>').text('Nimic găsit.')));
+          const row = document.createElement('div');
+          row.className = 'app-ac-item';
+          const muted = document.createElement('div');
+          muted.className = 'text-muted small';
+          muted.textContent = 'Nimic găsit.';
+          row.appendChild(muted);
+          listEl.appendChild(row);
           show();
           return;
         }
+
         items.forEach(function(it, idx){
-          const $row = $('<div class="app-ac-item"></div>');
-          $row.attr('data-idx', String(idx));
-          if (it.thumb) $row.append($('<img class="app-ac-thumb" />').attr('src', it.thumb));
-          const $txt = $('<div style="min-width:0"></div>');
-          $txt.append($('<div class="app-ac-text"></div>').text(it.text || ''));
-          $row.append($txt);
-          $row.on('mousedown', function(e){
-            // mousedown ca să nu se închidă la blur înainte de click
+          const row = document.createElement('div');
+          row.className = 'app-ac-item';
+          row.dataset.idx = String(idx);
+          if (it.thumb) {
+            const img = document.createElement('img');
+            img.className = 'app-ac-thumb';
+            img.src = it.thumb;
+            row.appendChild(img);
+          }
+          const box = document.createElement('div');
+          box.style.minWidth = '0';
+          const t = document.createElement('div');
+          t.className = 'app-ac-text';
+          t.textContent = it.text || '';
+          box.appendChild(t);
+          row.appendChild(box);
+          row.addEventListener('mousedown', function(e){
             e.preventDefault();
             setSelected(it);
           });
-          $list.append($row);
+          listEl.appendChild(row);
         });
         show();
       }
 
-      const doSearch = debounce(function(){
-        const q = String($q.val() || '').trim();
-        if (q.length < 1) { if (allowEmpty) hide(); else hide(); return; }
-        // Show immediate feedback while searching
-        $list.empty().append($('<div class="app-ac-item"></div>').append($('<div class="text-muted small"></div>').text('Se caută…')));
+      const doSearch = debounce(async function(){
+        const q = String(qEl.value || '').trim();
+        if (q.length < 1) { hide(); return; }
+        listEl.innerHTML = '<div class="app-ac-item"><div class="text-muted small">Se caută…</div></div>';
         show();
-        $.getJSON(finishesEndpoint, { q: q })
-          .done(function(res){
-            if (!res || res.ok !== true) { render([]); return; }
-            render(res.items || []);
-          })
-          .fail(function(){ render([]); });
+        try {
+          const res = await fetchJson(finishesEndpoint, { q: q });
+          if (!res || res.ok !== true) { render([]); return; }
+          render(res.items || []);
+        } catch (e) {
+          render([]);
+        }
       }, 200);
 
-      $q.on('input', function(){
-        // dacă userul scrie, invalidează selecția anterioară
-        $id.val('');
-        $thumb.hide();
+      qEl.addEventListener('input', function(){
+        idEl.value = '';
+        setThumb('');
         doSearch();
       });
-
-      $q.on('focus', function(){
-        const q = String($q.val() || '').trim();
+      qEl.addEventListener('focus', function(){
+        const q = String(qEl.value || '').trim();
         if (q.length >= 1) doSearch();
       });
-
-      $q.on('blur', function(){
-        window.setTimeout(function(){ hide(); }, 150);
+      qEl.addEventListener('blur', function(){
+        window.setTimeout(hide, 150);
       });
-
-      $q.on('keydown', function(e){
-        if (!$list.is(':visible')) return;
+      qEl.addEventListener('keydown', function(e){
+        if (listEl.style.display !== 'block') return;
         const max = items.length - 1;
         if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(max, active + 1); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); }
@@ -343,27 +379,32 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
         else if (e.key === 'Enter') {
           if (active >= 0 && items[active]) { e.preventDefault(); setSelected(items[active]); }
           return;
-        } else {
-          return;
-        }
-        $list.children('.app-ac-item').removeClass('active');
-        const $a = $list.children('.app-ac-item[data-idx="' + active + '"]');
-        $a.addClass('active');
+        } else { return; }
+
+        Array.from(listEl.querySelectorAll('.app-ac-item')).forEach(el => el.classList.remove('active'));
+        const a = listEl.querySelector('.app-ac-item[data-idx="' + active + '"]');
+        if (a) a.classList.add('active');
         show();
       });
 
       if (opts.clearBtn) {
-        $(opts.clearBtn).on('click', function(){
-          clearSelected();
-          if (opts.onClear) opts.onClear();
-          $q.focus();
-        });
+        const btn = document.querySelector(opts.clearBtn);
+        if (btn) {
+          btn.addEventListener('click', function(){
+            clearSelected();
+            if (opts.onClear) opts.onClear();
+            qEl.focus();
+          });
+        }
       }
     }
 
-    // Texturi rămân Select2
-    $('#face_texture_id').select2({ width: '100%' });
-    $('#back_texture_id').select2({ width: '100%' });
+    // Texturi: Select2 dacă există jQuery + plugin, altfel rămâne select normal
+    const $ = window.jQuery;
+    if ($ && $.fn && $.fn.select2) {
+      $('#face_texture_id').select2({ width: '100%' });
+      $('#back_texture_id').select2({ width: '100%' });
+    }
 
     bindColorAutocomplete({
       q: '#face_color_q',
@@ -381,8 +422,10 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
       allowEmpty: true,
       clearBtn: '#back_color_clear',
       onClear: function(){
-        // dacă se golește culoarea verso, golește și textura verso
-        $('#back_texture_id').val('').trigger('change');
+        const backTex = document.getElementById('back_texture_id');
+        if (!backTex) return;
+        backTex.value = '';
+        if (window.jQuery) window.jQuery(backTex).trigger('change');
       }
     });
 
@@ -404,8 +447,13 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
       const ppm = sp / area;
       $('#sale_price_per_m2').val(ppm.toFixed(2));
     }
-    $('#sale_price').on('input', recomputePrice);
-    $('input[name="std_width_mm"], input[name="std_height_mm"]').on('input', recomputePrice);
+    // Price / mp (vanilla listeners)
+    const saleEl = document.getElementById('sale_price');
+    const wEl = document.querySelector('input[name="std_width_mm"]');
+    const hEl = document.querySelector('input[name="std_height_mm"]');
+    if (saleEl) saleEl.addEventListener('input', recomputePrice);
+    if (wEl) wEl.addEventListener('input', recomputePrice);
+    if (hEl) hEl.addEventListener('input', recomputePrice);
     recomputePrice();
   });
 </script>
