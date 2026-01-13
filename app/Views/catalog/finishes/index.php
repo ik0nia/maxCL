@@ -37,7 +37,19 @@ try { $textures = Texture::all(); } catch (\Throwable $e) { $textures = []; $tex
           <?php foreach (($rows ?? []) as $r): ?>
             <tr>
               <td>
-                <img src="<?= htmlspecialchars((string)$r['thumb_path']) ?>" alt="thumb" style="width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;">
+                <?php
+                  $thumb = (string)$r['thumb_path'];
+                  $bigRaw = (string)($r['image_path'] ?? '') ?: $thumb;
+                  $big = (str_starts_with($bigRaw, '/uploads/')) ? Url::to($bigRaw) : $bigRaw;
+                ?>
+                <a href="#"
+                   data-bs-toggle="modal" data-bs-target="#appLightbox"
+                   data-lightbox-src="<?= htmlspecialchars($big) ?>"
+                   data-lightbox-title="<?= htmlspecialchars((string)$r['color_name']) ?>"
+                   data-lightbox-fallback="<?= htmlspecialchars($thumb) ?>"
+                   style="display:inline-block;cursor:zoom-in">
+                  <img src="<?= htmlspecialchars($thumb) ?>" alt="thumb" style="width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;">
+                </a>
               </td>
               <td class="fw-semibold"><?= htmlspecialchars((string)$r['code']) ?></td>
               <td>

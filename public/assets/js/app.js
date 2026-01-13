@@ -94,10 +94,27 @@
 
     const img = document.getElementById('appLightboxImg');
     const ttl = document.getElementById('appLightboxTitle');
+    const err = document.getElementById('appLightboxError');
+    const link = document.getElementById('appLightboxLink');
     if (img) {
+      if (err) err.style.display = 'none';
+      img.style.display = '';
+      if (link) link.href = src;
+
       // Fallback dacă imaginea mare nu se încarcă (ex: URL vechi fără /public)
       img.onerror = function () {
-        if (fallback && img.src !== fallback) img.src = fallback;
+        if (fallback && img.src !== fallback) {
+          img.src = fallback;
+          if (link) link.href = fallback;
+          return;
+        }
+        // dacă și fallback-ul eșuează, afișează mesaj
+        if (err) err.style.display = 'block';
+        img.style.display = 'none';
+      };
+      img.onload = function () {
+        if (err) err.style.display = 'none';
+        img.style.display = '';
       };
       img.src = src;
       img.alt = title;

@@ -47,7 +47,19 @@ ob_start();
       <?php if (isset($errors['image'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['image']) ?></div><?php endif; ?>
       <?php if ($isEdit && !empty($v['thumb_path'])): ?>
         <div class="mt-2 d-flex align-items-center gap-2">
-          <img src="<?= htmlspecialchars((string)$v['thumb_path']) ?>" style="width:48px;height:48px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+          <?php
+            $thumb = (string)$v['thumb_path'];
+            $bigRaw = (string)($v['image_path'] ?? '') ?: $thumb;
+            $big = (str_starts_with($bigRaw, '/uploads/')) ? Url::to($bigRaw) : $bigRaw;
+          ?>
+          <a href="#"
+             data-bs-toggle="modal" data-bs-target="#appLightbox"
+             data-lightbox-src="<?= htmlspecialchars($big) ?>"
+             data-lightbox-title="<?= htmlspecialchars((string)($v['color_name'] ?? 'Imagine')) ?>"
+             data-lightbox-fallback="<?= htmlspecialchars($thumb) ?>"
+             style="display:inline-block;cursor:zoom-in">
+            <img src="<?= htmlspecialchars($thumb) ?>" style="width:48px;height:48px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+          </a>
           <div class="text-muted small">Thumbnail curent</div>
         </div>
       <?php endif; ?>
