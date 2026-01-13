@@ -275,29 +275,55 @@ final class DbMigrations
 
     private static function tableExists(PDO $pdo, string $table): bool
     {
-        $st = $pdo->prepare("
-            SELECT COUNT(*) AS c
-            FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = ?
-        ");
-        $st->execute([$table]);
-        $r = $st->fetch();
-        return ((int)($r['c'] ?? 0)) > 0;
+        // Compat hosting: unele conturi nu au acces la information_schema.
+        // Folosim SHOW TABLES (mai permisiv) și doar ca fallback information_schema.
+        try {
+            $st = $pdo->prepare("SHOW TABLES LIKE ?");
+            $st->execute([$table]);
+            return (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            // fallback best-effort
+            try {
+                $st = $pdo->prepare("
+                    SELECT COUNT(*) AS c
+                    FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = ?
+                ");
+                $st->execute([$table]);
+                $r = $st->fetch();
+                return ((int)($r['c'] ?? 0)) > 0;
+            } catch (\Throwable $e2) {
+                return false;
+            }
+        }
     }
 
     private static function columnExists(PDO $pdo, string $table, string $col): bool
     {
-        $st = $pdo->prepare("
-            SELECT COUNT(*) AS c
-            FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = ?
-              AND COLUMN_NAME = ?
-        ");
-        $st->execute([$table, $col]);
-        $r = $st->fetch();
-        return ((int)($r['c'] ?? 0)) > 0;
+        // Compat hosting: SHOW COLUMNS nu depinde de information_schema.
+        try {
+            $tbl = str_replace('`', '``', $table);
+            $st = $pdo->prepare("SHOW COLUMNS FROM `{$tbl}` LIKE ?");
+            $st->execute([$col]);
+            return (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            // fallback best-effort
+            try {
+                $st = $pdo->prepare("
+                    SELECT COUNT(*) AS c
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = ?
+                      AND COLUMN_NAME = ?
+                ");
+                $st->execute([$table, $col]);
+                $r = $st->fetch();
+                return ((int)($r['c'] ?? 0)) > 0;
+            } catch (\Throwable $e2) {
+                return false;
+            }
+        }
     }
 }
 
