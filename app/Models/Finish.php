@@ -106,9 +106,13 @@ final class Finish
             $id = (int)$r['id'];
             $code = (string)($r['code'] ?? '');
             $name = (string)($r['color_name'] ?? '');
+            $text = trim($code) !== '' ? trim($code) : '—';
+            if (trim($name) !== '') {
+                $text .= ' - ' . trim($name);
+            }
             $out[] = [
                 'id' => $id,
-                'text' => trim($name . ' (' . $code . ')'),
+                'text' => $text,
                 'thumb' => (string)($r['thumb_path'] ?? ''),
             ];
         }
