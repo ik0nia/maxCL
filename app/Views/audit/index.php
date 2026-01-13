@@ -167,10 +167,17 @@ ob_start();
     const el = document.getElementById('auditTable');
     if (el && window.DataTable) new DataTable(el, { pageLength: 25, order: [[0,'desc']] });
 
+    // Fallback: Bootstrap poate trimite relatedTarget=null în anumite cazuri (DataTables redraw etc).
+    // Salvăm ultimul id apăsat ca să încărcăm sigur detaliile.
+    window.__LAST_AUDIT_ID__ = null;
+    $(document).on('click', '.auditDetailsBtn', function () {
+      window.__LAST_AUDIT_ID__ = this.getAttribute('data-id');
+    });
+
     $('#auditDetailsModal').on('show.bs.modal', async function (ev) {
       const btn = ev.relatedTarget;
-      if (!btn) return;
-      const id = btn.getAttribute('data-id');
+      const id = (btn && btn.getAttribute) ? btn.getAttribute('data-id') : (window.__LAST_AUDIT_ID__ || null);
+      if (!id) return;
       $('#auditBefore').text('Se încarcă...');
       $('#auditAfter').text('Se încarcă...');
       $('#auditMeta').text('Se încarcă...');
