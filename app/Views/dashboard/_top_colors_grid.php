@@ -8,8 +8,7 @@ $topColors = $topColors ?? [];
       $big = (string)($c['image_path'] ?? '') ?: $thumb;
       $code = (string)($c['color_code'] ?? '');
       if ($code === '') $code = '—';
-      $cid = (int)($c['face_color_id'] ?? 0);
-      $href = \App\Core\Url::to('/stock') . ($cid > 0 ? ('?color_id=' . $cid) : '');
+      $href = \App\Core\Url::to('/stock') . ($code !== '—' ? ('?color=' . rawurlencode($code)) : '');
     ?>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="border rounded-4 p-2 h-100" style="border-color:#D9E3E6;background:#fff">

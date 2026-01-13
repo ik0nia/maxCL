@@ -16,7 +16,7 @@ $totalByFinish = $totalByFinish ?? [];
       $name = (string)($f['color_name'] ?? '');
       $byT = $stockByFinish[$id] ?? [];
       $tot = (float)($totalByFinish[$id] ?? 0.0);
-      $href = Url::to('/stock') . ($id > 0 ? ('?color_id=' . $id) : '');
+      $href = Url::to('/stock') . ($code !== '—' ? ('?color=' . rawurlencode($code)) : '');
     ?>
     <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xxl-2">
       <div class="card app-card p-3 h-100">

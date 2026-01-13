@@ -73,15 +73,26 @@ final class StockController
     public static function index(): void
     {
         try {
+            // Filtru culoare: acceptă atât cod (ex: 617) cât și id intern (compat)
             $colorId = null;
-            if (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
-                $colorId = Validator::int((string)$_GET['color_id'], 1);
+            $color = null;
+            $colorRaw = isset($_GET['color']) ? trim((string)$_GET['color']) : '';
+            if ($colorRaw !== '') {
+                $color = Finish::findByCode($colorRaw);
+                if (!$color) {
+                    $maybeId = Validator::int($colorRaw, 1);
+                    if ($maybeId) $color = Finish::find($maybeId);
+                }
+            } elseif (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
+                $maybeId = Validator::int((string)$_GET['color_id'], 1);
+                if ($maybeId) $color = Finish::find($maybeId);
             }
+            if ($color) $colorId = (int)$color['id'];
+
             $thicknessMm = null;
             if (isset($_GET['thickness_mm']) && (string)$_GET['thickness_mm'] !== '') {
                 $thicknessMm = Validator::int((string)$_GET['thickness_mm'], 1);
             }
-            $color = $colorId ? Finish::find($colorId) : null;
             $rows = HplBoard::allWithTotals($colorId ?: null, $thicknessMm ?: null);
             echo View::render('stock/index', [
                 'title' => 'Stoc',

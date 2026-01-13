@@ -46,6 +46,18 @@ final class Finish
         return $r ?: null;
     }
 
+    public static function findByCode(string $code): ?array
+    {
+        $code = trim($code);
+        if ($code === '') return null;
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('SELECT * FROM finishes WHERE code = ? LIMIT 1');
+        $st->execute([$code]);
+        $r = $st->fetch();
+        return $r ?: null;
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function forSelect(): array
     {
