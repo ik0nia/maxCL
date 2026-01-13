@@ -165,60 +165,78 @@ ob_start();
 </div>
 
 <script>
-  $(function(){
-    $('#audit_user_id').select2({ width: '100%' });
-    $('#audit_action').select2({ width: '100%' });
+  // IMPORTANT: acest script rulează înainte de footer, unde sunt încărcate jQuery/Select2.
+  // Folosim vanilla JS pentru modal ca să fie sigur că se populează.
+  document.addEventListener('DOMContentLoaded', function () {
+    // Select2 (opțional)
+    const $ = window.jQuery;
+    if ($ && $.fn && $.fn.select2) {
+      $('#audit_user_id').select2({ width: '100%' });
+      $('#audit_action').select2({ width: '100%' });
+    }
 
+    // DataTables (vanilla)
     const el = document.getElementById('auditTable');
     if (el && window.DataTable) new DataTable(el, { pageLength: 25, order: [[0,'desc']] });
 
-    // Fallback: Bootstrap poate trimite relatedTarget=null în anumite cazuri (DataTables redraw etc).
-    // Salvăm ultimul id apăsat ca să încărcăm sigur detaliile.
+    // Fallback: Bootstrap poate trimite relatedTarget=null în anumite cazuri.
     window.__LAST_AUDIT_ID__ = null;
-    $(document).on('click', '.auditDetailsBtn', function () {
-      window.__LAST_AUDIT_ID__ = this.getAttribute('data-id');
+    document.addEventListener('click', function (e) {
+      const btn = e.target && e.target.closest ? e.target.closest('.auditDetailsBtn') : null;
+      if (!btn) return;
+      window.__LAST_AUDIT_ID__ = btn.getAttribute('data-id');
     });
 
-    $('#auditDetailsModal').on('show.bs.modal', async function (ev) {
+    const modalEl = document.getElementById('auditDetailsModal');
+    if (!modalEl) return;
+
+    function setText(id, v) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
+    }
+    function pretty(v) {
+      if (v === null || v === undefined || v === '') return '—';
+      if (typeof v === 'object') return JSON.stringify(v, null, 2);
+      try { return JSON.stringify(JSON.parse(v), null, 2); } catch (e) { return String(v); }
+    }
+
+    modalEl.addEventListener('show.bs.modal', async function (ev) {
       const btn = ev.relatedTarget;
       const id = (btn && btn.getAttribute) ? btn.getAttribute('data-id') : (window.__LAST_AUDIT_ID__ || null);
       if (!id) return;
-      $('#auditBefore').text('Se încarcă...');
-      $('#auditAfter').text('Se încarcă...');
-      $('#auditMeta').text('Se încarcă...');
-      $('#auditHdrAction').text('Se încarcă...');
-      $('#auditHdrEntity').text('Se încarcă...');
-      $('#auditHdrMessage').text('Se încarcă...');
-      $('#auditHdrDate').text('Se încarcă...');
-      $('#auditHdrIpUa').text('Se încarcă...');
-      try{
+
+      setText('auditBefore', 'Se încarcă...');
+      setText('auditAfter', 'Se încarcă...');
+      setText('auditMeta', 'Se încarcă...');
+      setText('auditHdrAction', 'Se încarcă...');
+      setText('auditHdrEntity', 'Se încarcă...');
+      setText('auditHdrMessage', 'Se încarcă...');
+      setText('auditHdrDate', 'Se încarcă...');
+      setText('auditHdrIpUa', 'Se încarcă...');
+
+      try {
         const res = await fetch(<?= json_encode(Url::to('/api/audit/')) ?> + id, { headers: { 'Accept': 'application/json' }});
         const json = await res.json();
-        if (!json.ok) throw new Error(json.error || 'Eroare.');
-        const d = json.data;
-        const pretty = (v) => {
-          if (v === null || v === undefined || v === '') return '—';
-          if (typeof v === 'object') return JSON.stringify(v, null, 2);
-          try { return JSON.stringify(JSON.parse(v), null, 2); } catch(e){ return String(v); }
-        };
-        $('#auditBefore').text(pretty(d.before_json));
-        $('#auditAfter').text(pretty(d.after_json));
-        $('#auditMeta').text(pretty(d.meta_json));
+        if (!json || json.ok !== true) throw new Error((json && json.error) ? json.error : 'Eroare.');
+        const d = json.data || {};
 
-        $('#auditHdrAction').text(d.action || '—');
-        $('#auditHdrEntity').text((d.entity_type ? d.entity_type : '—') + (d.entity_id ? (' #' + d.entity_id) : ''));
-        $('#auditHdrMessage').text(d.message || '—');
-        $('#auditHdrDate').text(d.created_at || '—');
-        $('#auditHdrIpUa').text((d.ip || '—') + (d.user_agent ? (' · ' + d.user_agent) : ''));
-      } catch(e){
-        $('#auditBefore').text('Eroare la încărcare.');
-        $('#auditAfter').text('Eroare la încărcare.');
-        $('#auditMeta').text(String(e));
-        $('#auditHdrAction').text('Eroare');
-        $('#auditHdrEntity').text('—');
-        $('#auditHdrMessage').text('—');
-        $('#auditHdrDate').text('—');
-        $('#auditHdrIpUa').text('—');
+        setText('auditBefore', pretty(d.before_json));
+        setText('auditAfter', pretty(d.after_json));
+        setText('auditMeta', pretty(d.meta_json));
+        setText('auditHdrAction', d.action || '—');
+        setText('auditHdrEntity', (d.entity_type ? d.entity_type : '—') + (d.entity_id ? (' #' + d.entity_id) : ''));
+        setText('auditHdrMessage', d.message || '—');
+        setText('auditHdrDate', d.created_at || '—');
+        setText('auditHdrIpUa', (d.ip || '—') + (d.user_agent ? (' · ' + d.user_agent) : ''));
+      } catch (e) {
+        setText('auditBefore', 'Eroare la încărcare.');
+        setText('auditAfter', 'Eroare la încărcare.');
+        setText('auditMeta', String(e));
+        setText('auditHdrAction', 'Eroare');
+        setText('auditHdrEntity', '—');
+        setText('auditHdrMessage', '—');
+        setText('auditHdrDate', '—');
+        setText('auditHdrIpUa', '—');
       }
     });
   });
