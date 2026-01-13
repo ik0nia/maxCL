@@ -42,7 +42,7 @@ final class AuditLog
 
         $sql = "
           SELECT
-            a.id, a.created_at, a.action, a.entity_type, a.entity_id, a.ip,
+            a.id, a.created_at, a.action, a.entity_type, a.entity_id, a.ip, a.meta_json,
             u.name AS user_name, u.email AS user_email, u.role AS user_role
           FROM audit_log a
           LEFT JOIN users u ON u.id = a.actor_user_id

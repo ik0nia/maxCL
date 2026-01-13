@@ -59,6 +59,7 @@ ob_start();
         <th style="width:160px">Data</th>
         <th>Utilizator</th>
         <th>Acțiune</th>
+        <th>Descriere</th>
         <th>Entitate</th>
         <th style="width:110px">IP</th>
         <th class="text-end" style="width:140px">Detalii</th>
@@ -73,6 +74,21 @@ ob_start();
             <div class="text-muted small"><?= htmlspecialchars((string)($r['user_email'] ?? '—')) ?></div>
           </td>
           <td><span class="badge app-badge"><?= htmlspecialchars((string)$r['action']) ?></span></td>
+          <td>
+            <?php
+              $msg = null;
+              if (!empty($r['meta_json'])) {
+                $decoded = json_decode((string)$r['meta_json'], true);
+                if (is_array($decoded) && isset($decoded['message']) && is_string($decoded['message'])) {
+                  $msg = $decoded['message'];
+                }
+              }
+              if (!$msg) {
+                $msg = '—';
+              }
+            ?>
+            <div class="fw-semibold"><?= htmlspecialchars($msg) ?></div>
+          </td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['entity_type'] ?? '—')) ?><?= $r['entity_id'] ? ' #' . htmlspecialchars((string)$r['entity_id']) : '' ?></td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['ip'] ?? '—')) ?></td>
           <td class="text-end">
@@ -104,6 +120,10 @@ ob_start();
               <div class="col-12 col-lg-6">
                 <div class="text-muted small">Entitate</div>
                 <div class="fw-semibold" id="auditHdrEntity">—</div>
+              </div>
+              <div class="col-12">
+                <div class="text-muted small">Descriere</div>
+                <div class="fw-semibold" id="auditHdrMessage">—</div>
               </div>
               <div class="col-12 col-lg-6">
                 <div class="text-muted small">Data</div>
@@ -156,6 +176,7 @@ ob_start();
       $('#auditMeta').text('Se încarcă...');
       $('#auditHdrAction').text('Se încarcă...');
       $('#auditHdrEntity').text('Se încarcă...');
+      $('#auditHdrMessage').text('Se încarcă...');
       $('#auditHdrDate').text('Se încarcă...');
       $('#auditHdrIpUa').text('Se încarcă...');
       try{
@@ -174,6 +195,7 @@ ob_start();
 
         $('#auditHdrAction').text(d.action || '—');
         $('#auditHdrEntity').text((d.entity_type ? d.entity_type : '—') + (d.entity_id ? (' #' + d.entity_id) : ''));
+        $('#auditHdrMessage').text(d.message || '—');
         $('#auditHdrDate').text(d.created_at || '—');
         $('#auditHdrIpUa').text((d.ip || '—') + (d.user_agent ? (' · ' + d.user_agent) : ''));
       } catch(e){
@@ -182,6 +204,7 @@ ob_start();
         $('#auditMeta').text(String(e));
         $('#auditHdrAction').text('Eroare');
         $('#auditHdrEntity').text('—');
+        $('#auditHdrMessage').text('—');
         $('#auditHdrDate').text('—');
         $('#auditHdrIpUa').text('—');
       }

@@ -16,6 +16,41 @@ use App\Models\Texture;
 
 final class StockController
 {
+    private static function fmtBoardLabel(array $board, ?int $faceColorId, ?int $faceTextureId, ?int $backColorId, ?int $backTextureId): string
+    {
+        $faceColor = $faceColorId ? Finish::find($faceColorId) : null;
+        $faceTex = $faceTextureId ? Texture::find($faceTextureId) : null;
+        $backColor = $backColorId ? Finish::find($backColorId) : null;
+        $backTex = $backTextureId ? Texture::find($backTextureId) : null;
+
+        $face = trim(
+            (($faceColor['color_name'] ?? '') ? (string)$faceColor['color_name'] : '—') .
+            (($faceTex['name'] ?? '') ? (' / ' . (string)$faceTex['name']) : '')
+        );
+        $back = '';
+        if ($backColor || $backTex) {
+            $back = trim(
+                (($backColor['color_name'] ?? '') ? (string)$backColor['color_name'] : '—') .
+                (($backTex['name'] ?? '') ? (' / ' . (string)$backTex['name']) : '')
+            );
+        }
+
+        $code = (string)($board['code'] ?? '');
+        $name = (string)($board['name'] ?? '');
+        $brand = (string)($board['brand'] ?? '');
+        $th = (int)($board['thickness_mm'] ?? 0);
+        $stdW = (int)($board['std_width_mm'] ?? 0);
+        $stdH = (int)($board['std_height_mm'] ?? 0);
+
+        $label = trim("{$code} · {$name} · {$brand} · {$th}mm · {$stdW}×{$stdH}");
+        if ($back !== '') {
+            $label .= " · Față: {$face} · Verso: {$back}";
+        } else {
+            $label .= " · Față: {$face}";
+        }
+        return $label;
+    }
+
     public static function index(): void
     {
         try {
@@ -141,7 +176,8 @@ final class StockController
                 'notes' => trim((string)($_POST['notes'] ?? '')),
             ];
             HplBoard::update($id, $after);
-            Audit::log('BOARD_UPDATE', 'hpl_boards', $id, $before, $after);
+            $msg = 'A actualizat placa: ' . self::fmtBoardLabel($after, $faceColor, $faceTex, $backColor, $backTex);
+            Audit::log('BOARD_UPDATE', 'hpl_boards', $id, $before, $after, ['message' => $msg]);
             Session::flash('toast_success', 'Placă actualizată.');
             Response::redirect('/stock/boards/' . $id);
         } catch (\Throwable $e) {
@@ -168,7 +204,8 @@ final class StockController
             }
 
             HplBoard::delete($id);
-            Audit::log('BOARD_DELETE', 'hpl_boards', $id, $before, null);
+            $msg = 'A șters placa: ' . self::fmtBoardLabel($before, (int)$before['face_color_id'], (int)$before['face_texture_id'], $before['back_color_id'] ? (int)$before['back_color_id'] : null, $before['back_texture_id'] ? (int)$before['back_texture_id'] : null);
+            Audit::log('BOARD_DELETE', 'hpl_boards', $id, $before, null, ['message' => $msg]);
             Session::flash('toast_success', 'Placă ștearsă.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot șterge placa.');
@@ -237,7 +274,8 @@ final class StockController
                 'notes' => trim((string)($_POST['notes'] ?? '')),
             ];
             $id = HplBoard::create($data);
-            Audit::log('BOARD_CREATE', 'hpl_boards', $id, null, $data);
+            $msg = 'A creat placa: ' . self::fmtBoardLabel($data, $faceColor, $faceTex, $backColor, $backTex);
+            Audit::log('BOARD_CREATE', 'hpl_boards', $id, null, $data, ['message' => $msg]);
             Session::flash('toast_success', 'Placă creată.');
             Response::redirect('/stock');
         } catch (\Throwable $e) {
@@ -324,9 +362,20 @@ final class StockController
         ];
 
         $pieceId = HplStockPiece::create($data);
+        $m2 = (($width * $height) / 1000000.0) * (int)$data['qty'];
+        $boardLabel = self::fmtBoardLabel($board, (int)$board['face_color_id'], (int)$board['face_texture_id'], $board['back_color_id'] ? (int)$board['back_color_id'] : null, $board['back_texture_id'] ? (int)$board['back_texture_id'] : null);
+        $msg = 'A adăugat piesă ' . $type . " {$width}×{$height} mm, " . (int)$data['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$data['location'] . " · Placă: {$boardLabel}";
         Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, null, $data, [
+            'message' => $msg,
+            'board_id' => $boardId,
+            'board_code' => (string)($board['code'] ?? ''),
             'requested_type' => $requestedType,
             'final_type' => $type,
+            'width_mm' => $width,
+            'height_mm' => $height,
+            'qty' => (int)$data['qty'],
+            'area_m2' => $m2,
+            'location' => (string)$data['location'],
             'std_width_mm' => $stdW,
             'std_height_mm' => $stdH,
         ]);
@@ -348,7 +397,12 @@ final class StockController
 
         try {
             HplStockPiece::delete($pieceId);
-            Audit::log('STOCK_PIECE_DELETE', 'hpl_stock_pieces', $pieceId, $before, null);
+            $m2 = (((int)$before['width_mm'] * (int)$before['height_mm']) / 1000000.0) * (int)$before['qty'];
+            $msg = 'A șters piesă ' . (string)$before['piece_type'] . ' ' . (int)$before['width_mm'] . '×' . (int)$before['height_mm'] . ' mm, ' . (int)$before['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$before['location'];
+            Audit::log('STOCK_PIECE_DELETE', 'hpl_stock_pieces', $pieceId, $before, null, [
+                'message' => $msg,
+                'area_m2' => $m2,
+            ]);
             Session::flash('toast_success', 'Piesă ștearsă.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot șterge piesa.');

@@ -96,6 +96,8 @@ final class UsersController
             'name' => $name,
             'role' => $role,
             'is_active' => $isActive,
+        ], [
+            'message' => 'A creat utilizator: ' . $name . ' (' . $email . ') · rol ' . $role,
         ]);
         Session::flash('toast_success', 'Utilizator creat.');
         Response::redirect('/users');
@@ -197,7 +199,9 @@ final class UsersController
             'name' => (string)$before['name'],
             'role' => (string)$before['role'],
             'is_active' => (int)$before['is_active'],
-        ], array_merge($after, ['password_changed' => $pwdChanged]));
+        ], array_merge($after, ['password_changed' => $pwdChanged]), [
+            'message' => 'A actualizat utilizator: ' . $after['name'] . ' (' . $after['email'] . ') · rol ' . $after['role'] . ($pwdChanged ? ' · parolă schimbată' : ''),
+        ]);
 
         Session::flash('toast_success', 'Utilizator actualizat.');
         Response::redirect('/users');

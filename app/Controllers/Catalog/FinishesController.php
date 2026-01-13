@@ -71,7 +71,9 @@ final class FinishesController
             ];
 
             $id = Finish::create($data);
-            Audit::log('COLOR_TYPE_CREATE', 'finishes', $id, null, $data);
+            Audit::log('COLOR_TYPE_CREATE', 'finishes', $id, null, $data, [
+                'message' => 'A creat tip culoare: ' . $data['code'] . ' · ' . $data['color_name'],
+            ]);
             Session::flash('toast_success', 'Tip culoare creat.');
             Response::redirect('/hpl/tip-culoare');
         } catch (\Throwable $e) {
@@ -144,7 +146,9 @@ final class FinishesController
             ];
 
             Finish::update($id, $after);
-            Audit::log('COLOR_TYPE_UPDATE', 'finishes', $id, $before, $after);
+            Audit::log('COLOR_TYPE_UPDATE', 'finishes', $id, $before, $after, [
+                'message' => 'A actualizat tip culoare: ' . $after['code'] . ' · ' . $after['color_name'],
+            ]);
             Session::flash('toast_success', 'Tip culoare actualizat.');
             Response::redirect('/hpl/tip-culoare');
         } catch (\Throwable $e) {
@@ -165,7 +169,9 @@ final class FinishesController
 
         try {
             Finish::delete($id);
-            Audit::log('COLOR_TYPE_DELETE', 'finishes', $id, $before, null);
+            Audit::log('COLOR_TYPE_DELETE', 'finishes', $id, $before, null, [
+                'message' => 'A șters tip culoare: ' . (string)$before['code'] . ' · ' . (string)$before['color_name'],
+            ]);
             Session::flash('toast_success', 'Tip culoare șters.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot șterge tipul de culoare (posibil folosit).');

@@ -27,7 +27,9 @@ final class InlineTexturesController
                 'name' => trim((string)$_POST['name']),
             ];
             $id = Texture::create($data);
-            Audit::log('TEXTURE_CREATE', 'textures', $id, null, $data);
+            Audit::log('TEXTURE_CREATE', 'textures', $id, null, $data, [
+                'message' => 'A creat textură: ' . ($data['code'] ? ($data['code'] . ' · ') : '') . $data['name'],
+            ]);
             Session::flash('toast_success', 'Textură creată.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
@@ -57,7 +59,9 @@ final class InlineTexturesController
                 'name' => trim((string)$_POST['name']),
             ];
             Texture::update($id, $after);
-            Audit::log('TEXTURE_UPDATE', 'textures', $id, $before, $after);
+            Audit::log('TEXTURE_UPDATE', 'textures', $id, $before, $after, [
+                'message' => 'A actualizat textură: ' . ($after['code'] ? ($after['code'] . ' · ') : '') . $after['name'],
+            ]);
             Session::flash('toast_success', 'Textură actualizată.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
@@ -77,7 +81,9 @@ final class InlineTexturesController
 
         try {
             Texture::delete($id);
-            Audit::log('TEXTURE_DELETE', 'textures', $id, $before, null);
+            Audit::log('TEXTURE_DELETE', 'textures', $id, $before, null, [
+                'message' => 'A șters textură: ' . (!empty($before['code']) ? ((string)$before['code'] . ' · ') : '') . (string)$before['name'],
+            ]);
             Session::flash('toast_success', 'Textură ștearsă.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot șterge textura (posibil folosită la plăci).');

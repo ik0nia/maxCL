@@ -73,6 +73,7 @@ final class AuditController
                 'before_json' => $beforeDecoded ?? $before,
                 'after_json' => $afterDecoded ?? $after,
                 'meta_json' => $metaDecoded ?? $meta,
+                'message' => (is_array($metaDecoded) && isset($metaDecoded['message']) && is_string($metaDecoded['message'])) ? $metaDecoded['message'] : null,
             ],
         ]);
     }
