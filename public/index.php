@@ -20,6 +20,7 @@ use App\Controllers\Hpl\CatalogController as HplCatalogController;
 use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
+use App\Controllers\ClientsController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -183,9 +184,16 @@ $router->get('/projects', fn() => print View::render('system/placeholder', ['tit
     Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
 ]);
 
-$router->get('/clients', fn() => print View::render('system/placeholder', ['title' => 'Clienți']), [
-    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])
-]);
+$clientsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+
+$router->get('/clients', fn() => ClientsController::index(), $clientsReadMW);
+$router->get('/clients/create', fn() => ClientsController::createForm(), $clientsWriteMW);
+$router->post('/clients/create', fn() => ClientsController::create(), $clientsWriteMW);
+$router->get('/clients/{id}', fn($p) => ClientsController::show($p), $clientsReadMW);
+$router->get('/clients/{id}/edit', fn($p) => ClientsController::editForm($p), $clientsWriteMW);
+$router->post('/clients/{id}/edit', fn($p) => ClientsController::update($p), $clientsWriteMW);
+$router->post('/clients/{id}/delete', fn($p) => ClientsController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 
 // ---- Stoc (Admin/Gestionar/Operator). Operator = read-only (nu poate crea plăci/piese)
 $stockReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
