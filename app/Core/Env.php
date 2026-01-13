@@ -44,7 +44,9 @@ final class Env
                 $value = substr($value, 1, -1);
             }
 
-            if ($key !== '' && getenv($key) === false) {
+            // .env trebuie să aibă prioritate față de variabilele deja setate pe hosting,
+            // altfel schimbările (ex: APP_ENV / APP_DEBUG / DB_*) nu se aplică.
+            if ($key !== '') {
                 putenv($key . '=' . $value);
                 $_ENV[$key] = $value;
                 $_SERVER[$key] = $value;
