@@ -110,6 +110,10 @@ $toastError = Session::flash('toast_error');
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Închide"></button>
         </div>
         <div class="modal-body p-2">
+          <div id="appLightboxError" class="p-3 text-muted" style="display:none">
+            Nu pot încărca imaginea.
+            <a id="appLightboxLink" href="#" target="_blank" rel="noopener">Deschide în tab nou</a>
+          </div>
           <img id="appLightboxImg" src="" alt="" style="width:100%;height:auto;border-radius:12px;">
         </div>
       </div>
