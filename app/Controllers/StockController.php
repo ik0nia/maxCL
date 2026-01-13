@@ -50,6 +50,132 @@ final class StockController
         }
     }
 
+    public static function editBoardForm(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        try {
+            $board = HplBoard::find($id);
+            if (!$board) {
+                Session::flash('toast_error', 'Placă inexistentă.');
+                Response::redirect('/stock');
+            }
+            echo View::render('stock/board_form', [
+                'title' => 'Editează placă',
+                'mode' => 'edit',
+                'row' => $board,
+                'errors' => [],
+                'colors' => Finish::forSelect(),
+                'textures' => Texture::forSelect(),
+            ]);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot încărca placa. Rulează Setup dacă lipsesc tabele.');
+            Response::redirect('/stock');
+        }
+    }
+
+    public static function updateBoard(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $id = (int)($params['id'] ?? 0);
+        $before = HplBoard::find($id);
+        if (!$before) {
+            Session::flash('toast_error', 'Placă inexistentă.');
+            Response::redirect('/stock');
+        }
+
+        $check = Validator::required($_POST, [
+            'code' => 'Cod',
+            'name' => 'Denumire',
+            'brand' => 'Brand',
+            'thickness_mm' => 'Grosime (mm)',
+            'std_width_mm' => 'Lățime standard (mm)',
+            'std_height_mm' => 'Lungime standard (mm)',
+            'face_color_id' => 'Culoare față',
+            'face_texture_id' => 'Textură față',
+        ]);
+        $errors = $check['errors'];
+
+        foreach (['thickness_mm' => 1, 'std_width_mm' => 1, 'std_height_mm' => 1] as $k => $min) {
+            if (!empty($_POST[$k] ?? '') && Validator::int((string)$_POST[$k], $min, 100000) === null) {
+                $errors[$k] = 'Valoare invalidă.';
+            }
+        }
+
+        $faceColor = Validator::int((string)($_POST['face_color_id'] ?? ''), 1) ?? null;
+        $faceTex = Validator::int((string)($_POST['face_texture_id'] ?? ''), 1) ?? null;
+        $backColorRaw = trim((string)($_POST['back_color_id'] ?? ''));
+        $backTexRaw = trim((string)($_POST['back_texture_id'] ?? ''));
+        $backColor = $backColorRaw === '' ? null : (Validator::int($backColorRaw, 1) ?? null);
+        $backTex = $backTexRaw === '' ? null : (Validator::int($backTexRaw, 1) ?? null);
+
+        if ($faceColor === null) $errors['face_color_id'] = 'Selectează culoarea feței.';
+        if ($faceTex === null) $errors['face_texture_id'] = 'Selectează textura feței.';
+        if ($backColorRaw !== '' && $backColor === null) $errors['back_color_id'] = 'Culoarea verso este invalidă.';
+        if ($backTexRaw !== '' && $backTex === null) $errors['back_texture_id'] = 'Textura verso este invalidă.';
+
+        if ($errors) {
+            $row = array_merge($before, $_POST);
+            echo View::render('stock/board_form', [
+                'title' => 'Editează placă',
+                'mode' => 'edit',
+                'row' => $row,
+                'errors' => $errors,
+                'colors' => Finish::forSelect(),
+                'textures' => Texture::forSelect(),
+            ]);
+            return;
+        }
+
+        try {
+            $after = [
+                'code' => trim((string)$_POST['code']),
+                'name' => trim((string)$_POST['name']),
+                'brand' => trim((string)$_POST['brand']),
+                'thickness_mm' => (int)$_POST['thickness_mm'],
+                'std_width_mm' => (int)$_POST['std_width_mm'],
+                'std_height_mm' => (int)$_POST['std_height_mm'],
+                'face_color_id' => $faceColor,
+                'face_texture_id' => $faceTex,
+                'back_color_id' => $backColor,
+                'back_texture_id' => $backTex,
+                'notes' => trim((string)($_POST['notes'] ?? '')),
+            ];
+            HplBoard::update($id, $after);
+            Audit::log('BOARD_UPDATE', 'hpl_boards', $id, $before, $after);
+            Session::flash('toast_success', 'Placă actualizată.');
+            Response::redirect('/stock/boards/' . $id);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
+            Response::redirect('/stock/boards/' . $id . '/edit');
+        }
+    }
+
+    public static function deleteBoard(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $id = (int)($params['id'] ?? 0);
+        $before = HplBoard::find($id);
+        if (!$before) {
+            Session::flash('toast_error', 'Placă inexistentă.');
+            Response::redirect('/stock');
+        }
+
+        try {
+            $cnt = HplStockPiece::countForBoard($id);
+            if ($cnt > 0) {
+                Session::flash('toast_error', 'Nu pot șterge placa: există piese asociate în stoc. Șterge întâi piesele.');
+                Response::redirect('/stock/boards/' . $id);
+            }
+
+            HplBoard::delete($id);
+            Audit::log('BOARD_DELETE', 'hpl_boards', $id, $before, null);
+            Session::flash('toast_success', 'Placă ștearsă.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge placa.');
+        }
+        Response::redirect('/stock');
+    }
+
     public static function createBoard(): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);

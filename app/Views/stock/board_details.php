@@ -1,10 +1,13 @@
 <?php
 use App\Core\Csrf;
+use App\Core\Auth;
 use App\Core\Url;
 use App\Core\View;
 
 $board = $board ?? [];
 $pieces = $pieces ?? [];
+$u = Auth::user();
+$canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 
 ob_start();
 ?>
@@ -15,6 +18,18 @@ ob_start();
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary">Înapoi</a>
+    <?php if ($canWrite): ?>
+      <a href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/edit')) ?>" class="btn btn-outline-secondary">
+        <i class="bi bi-pencil me-1"></i> Editează
+      </a>
+      <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/delete')) ?>" class="m-0"
+            onsubmit="return confirm('Sigur vrei să ștergi această placă? (doar dacă nu are piese asociate)');">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+        <button class="btn btn-outline-secondary" type="submit">
+          <i class="bi bi-trash me-1"></i> Șterge
+        </button>
+      </form>
+    <?php endif; ?>
   </div>
 </div>
 

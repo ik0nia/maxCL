@@ -18,6 +18,16 @@ final class HplStockPiece
         return $st->fetchAll();
     }
 
+    public static function countForBoard(int $boardId): int
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('SELECT COUNT(*) AS c FROM hpl_stock_pieces WHERE board_id = ?');
+        $st->execute([$boardId]);
+        $r = $st->fetch();
+        return (int)($r['c'] ?? 0);
+    }
+
     /** @param array<string,mixed> $data */
     public static function create(array $data): int
     {

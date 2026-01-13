@@ -1,6 +1,11 @@
 <?php
+use App\Core\Auth;
+use App\Core\Csrf;
 use App\Core\Url;
 use App\Core\View;
+
+$u = Auth::user();
+$canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 
 ob_start();
 ?>
@@ -10,9 +15,11 @@ ob_start();
     <div class="text-muted">Catalog plăci + total buc/mp (disponibil)</div>
   </div>
   <div class="d-flex gap-2">
-    <a href="<?= htmlspecialchars(Url::to('/stock/boards/create')) ?>" class="btn btn-primary">
-      <i class="bi bi-plus-lg me-1"></i> Placă nouă
-    </a>
+    <?php if ($canWrite): ?>
+      <a href="<?= htmlspecialchars(Url::to('/stock/boards/create')) ?>" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> Placă nouă
+      </a>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -28,7 +35,7 @@ ob_start();
         <th>Dim. standard</th>
         <th class="text-end">Stoc (buc)</th>
         <th class="text-end">Stoc (mp)</th>
-        <th class="text-end" style="width:140px">Detalii</th>
+        <th class="text-end" style="width:220px">Acțiuni</th>
       </tr>
     </thead>
     <tbody>
@@ -53,6 +60,18 @@ ob_start();
             <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'])) ?>">
               <i class="bi bi-eye me-1"></i> Vezi
             </a>
+            <?php if ($canWrite): ?>
+              <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'] . '/edit')) ?>">
+                <i class="bi bi-pencil me-1"></i> Editează
+              </a>
+              <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'] . '/delete')) ?>" class="d-inline"
+                    onsubmit="return confirm('Sigur vrei să ștergi această placă? (doar dacă nu are piese asociate)');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-outline-secondary btn-sm" type="submit">
+                  <i class="bi bi-trash me-1"></i> Șterge
+                </button>
+              </form>
+            <?php endif; ?>
           </td>
         </tr>
       <?php endforeach; ?>
