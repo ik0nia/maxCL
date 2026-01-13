@@ -194,11 +194,8 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
 
 <style>
   .app-ac-list{
-    position:absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    z-index: 1080;
+    position:fixed;
+    z-index: 2000;
     background: #fff;
     border: 1px solid #D9E3E6;
     border-radius: 14px;
@@ -244,8 +241,25 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
       let items = [];
       let active = -1;
 
-      function hide(){ $list.hide().empty(); active = -1; items = []; }
-      function show(){ if ($list.children().length) $list.show(); }
+      // Move dropdown to <body> to avoid overflow clipping
+      if (!$list.data('acInBody')) {
+        $list.appendTo(document.body);
+        $list.data('acInBody', true);
+      }
+
+      function place(){
+        const el = $q.get(0);
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        $list.css({
+          top: (r.bottom + 6) + 'px',
+          left: r.left + 'px',
+          width: r.width + 'px'
+        });
+      }
+
+      function hide(){ $list.hide().empty(); active = -1; items = []; $(window).off('scroll.ac resize.ac', place); }
+      function show(){ if ($list.children().length) { place(); $list.show(); $(window).on('scroll.ac resize.ac', place); } }
 
       function setSelected(it){
         $id.val(String(it.id || ''));
@@ -270,7 +284,7 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
         $list.empty();
         if (!items.length) {
           $list.append($('<div class="app-ac-item"></div>').append($('<div class="text-muted small"></div>').text('Nimic găsit.')));
-          $list.show();
+          show();
           return;
         }
         items.forEach(function(it, idx){
@@ -287,12 +301,15 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
           });
           $list.append($row);
         });
-        $list.show();
+        show();
       }
 
       const doSearch = debounce(function(){
         const q = String($q.val() || '').trim();
         if (q.length < 1) { if (allowEmpty) hide(); else hide(); return; }
+        // Show immediate feedback while searching
+        $list.empty().append($('<div class="app-ac-item"></div>').append($('<div class="text-muted small"></div>').text('Se caută…')));
+        show();
         $.getJSON(finishesEndpoint, { q: q })
           .done(function(res){
             if (!res || res.ok !== true) { render([]); return; }
