@@ -80,9 +80,6 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
           <i class="bi bi-palette2 me-2"></i> Tip culoare
         </a>
-        <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/hpl/texturi')) ?>">
-          <i class="bi bi-grid-3x3-gap me-2"></i> Texturi
-        </a>
         <a class="app-nav-link" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
           <i class="bi bi-box-seam me-2"></i> Stoc
         </a>

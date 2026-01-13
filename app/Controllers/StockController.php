@@ -18,23 +18,36 @@ final class StockController
 {
     public static function index(): void
     {
-        $rows = HplBoard::allWithTotals();
-        echo View::render('stock/index', [
-            'title' => 'Stoc',
-            'rows' => $rows,
-        ]);
+        try {
+            $rows = HplBoard::allWithTotals();
+            echo View::render('stock/index', [
+                'title' => 'Stoc',
+                'rows' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            // Cel mai des: tabelele noi nu există încă (nu s-a rulat setup după update).
+            echo View::render('system/placeholder', [
+                'title' => 'Stoc',
+                'message' => 'Stoc indisponibil momentan. Rulează din nou Setup (butonul „Instalează acum”) ca să creezi tabelele noi (textures/hpl_boards/hpl_stock_pieces).',
+            ]);
+        }
     }
 
     public static function createBoardForm(): void
     {
-        echo View::render('stock/board_form', [
-            'title' => 'Placă nouă',
-            'mode' => 'create',
-            'row' => null,
-            'errors' => [],
-            'colors' => Finish::forSelect(),
-            'textures' => Texture::forSelect(),
-        ]);
+        try {
+            echo View::render('stock/board_form', [
+                'title' => 'Placă nouă',
+                'mode' => 'create',
+                'row' => null,
+                'errors' => [],
+                'colors' => Finish::forSelect(),
+                'textures' => Texture::forSelect(),
+            ]);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot încărca formularul. Rulează Setup pentru a crea tabelele necesare.');
+            Response::redirect('/setup');
+        }
     }
 
     public static function createBoard(): void
@@ -109,18 +122,23 @@ final class StockController
 
     public static function boardDetails(array $params): void
     {
-        $id = (int)($params['id'] ?? 0);
-        $board = HplBoard::find($id);
-        if (!$board) {
-            Session::flash('toast_error', 'Placă inexistentă.');
-            Response::redirect('/stock');
+        try {
+            $id = (int)($params['id'] ?? 0);
+            $board = HplBoard::find($id);
+            if (!$board) {
+                Session::flash('toast_error', 'Placă inexistentă.');
+                Response::redirect('/stock');
+            }
+            $pieces = HplStockPiece::forBoard($id);
+            echo View::render('stock/board_details', [
+                'title' => 'Stoc · Placă',
+                'board' => $board,
+                'pieces' => $pieces,
+            ]);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Stoc indisponibil. Rulează Setup.');
+            Response::redirect('/setup');
         }
-        $pieces = HplStockPiece::forBoard($id);
-        echo View::render('stock/board_details', [
-            'title' => 'Stoc · Placă',
-            'board' => $board,
-            'pieces' => $pieces,
-        ]);
     }
 
     public static function addPiece(array $params): void

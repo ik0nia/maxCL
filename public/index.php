@@ -14,8 +14,8 @@ use App\Core\View;
 use App\Controllers\Catalog\FinishesController;
 use App\Controllers\Catalog\MaterialsController;
 use App\Controllers\Catalog\VariantsController;
-use App\Controllers\Hpl\TexturesController;
 use App\Controllers\StockController;
+use App\Controllers\Hpl\InlineTexturesController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -144,12 +144,10 @@ $router->get('/catalog/finishes/create', fn() => Response::redirect('/hpl/tip-cu
 $router->get('/catalog/finishes/{id}/edit', fn($p) => Response::redirect('/hpl/tip-culoare/' . (int)$p['id'] . '/edit'), $catalogMW);
 
 // Plăci HPL: Texturi
-$router->get('/hpl/texturi', fn() => TexturesController::index(), $catalogMW);
-$router->get('/hpl/texturi/create', fn() => TexturesController::createForm(), $catalogMW);
-$router->post('/hpl/texturi/create', fn() => TexturesController::create(), $catalogMW);
-$router->get('/hpl/texturi/{id}/edit', fn($p) => TexturesController::editForm($p), $catalogMW);
-$router->post('/hpl/texturi/{id}/edit', fn($p) => TexturesController::update($p), $catalogMW);
-$router->post('/hpl/texturi/{id}/delete', fn($p) => TexturesController::delete($p), $catalogMW);
+// (Pagina separată Texturi a fost eliminată; texturile se gestionează din Tip culoare)
+$router->post('/hpl/tip-culoare/texturi/create', fn() => InlineTexturesController::create(), $catalogMW);
+$router->post('/hpl/tip-culoare/texturi/{id}/edit', fn($p) => InlineTexturesController::update($p), $catalogMW);
+$router->post('/hpl/tip-culoare/texturi/{id}/delete', fn($p) => InlineTexturesController::delete($p), $catalogMW);
 
 // (Materiale + Variante) au fost înlocuite de modulul Stoc (plăci + piese)
 $router->get('/catalog/materials', fn() => Response::redirect('/stock'), $catalogMW);
