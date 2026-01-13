@@ -398,10 +398,28 @@ final class StockController
         try {
             HplStockPiece::delete($pieceId);
             $m2 = (((int)$before['width_mm'] * (int)$before['height_mm']) / 1000000.0) * (int)$before['qty'];
-            $msg = 'A șters piesă ' . (string)$before['piece_type'] . ' ' . (int)$before['width_mm'] . '×' . (int)$before['height_mm'] . ' mm, ' . (int)$before['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$before['location'];
+            $board = HplBoard::find($boardId);
+            $boardLabel = $board
+                ? self::fmtBoardLabel(
+                    $board,
+                    (int)$board['face_color_id'],
+                    (int)$board['face_texture_id'],
+                    $board['back_color_id'] ? (int)$board['back_color_id'] : null,
+                    $board['back_texture_id'] ? (int)$board['back_texture_id'] : null
+                )
+                : ('ID ' . $boardId);
+
+            $msg = 'A șters piesă ' . (string)$before['piece_type'] . ' ' . (int)$before['width_mm'] . '×' . (int)$before['height_mm'] . ' mm, ' . (int)$before['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$before['location'] . " · Placă: {$boardLabel}";
+
             Audit::log('STOCK_PIECE_DELETE', 'hpl_stock_pieces', $pieceId, $before, null, [
                 'message' => $msg,
+                'board_id' => $boardId,
+                'board_code' => $board ? (string)($board['code'] ?? '') : null,
                 'area_m2' => $m2,
+                'width_mm' => (int)$before['width_mm'],
+                'height_mm' => (int)$before['height_mm'],
+                'qty' => (int)$before['qty'],
+                'location' => (string)$before['location'],
             ]);
             Session::flash('toast_success', 'Piesă ștearsă.');
         } catch (\Throwable $e) {
