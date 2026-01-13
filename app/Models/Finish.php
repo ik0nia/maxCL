@@ -8,12 +8,37 @@ use PDO;
 
 final class Finish
 {
+    /** @var array<string,bool> */
+    private static array $colCache = [];
+
+    private static function hasColumn(string $name): bool
+    {
+        if (array_key_exists($name, self::$colCache)) {
+            return self::$colCache[$name];
+        }
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        try {
+            $st = $pdo->prepare("SHOW COLUMNS FROM finishes LIKE ?");
+            $st->execute([$name]);
+            $ok = (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
+        self::$colCache[$name] = $ok;
+        return $ok;
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function all(): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        return $pdo->query('SELECT * FROM finishes ORDER BY color_name ASC, texture_name ASC')->fetchAll();
+        $order = ['color_name ASC'];
+        if (self::hasColumn('texture_name')) $order[] = 'texture_name ASC';
+        if (self::hasColumn('code')) $order[] = 'code ASC';
+        $sql = 'SELECT * FROM finishes ORDER BY ' . implode(', ', $order);
+        return $pdo->query($sql)->fetchAll();
     }
 
     /** @return array<int, array<string,mixed>> */
@@ -26,13 +51,19 @@ final class Finish
             return self::all();
         }
 
-        $st = $pdo->prepare(
-            "SELECT *
-             FROM finishes
-             WHERE code LIKE :q OR color_name LIKE :q OR color_code LIKE :q
-             ORDER BY color_name ASC, code ASC"
-        );
-        $st->execute([':q' => '%' . $q . '%']);
+        $conds = [];
+        $params = [];
+        $like = '%' . $q . '%';
+        if (self::hasColumn('code')) { $conds[] = 'code LIKE ?'; $params[] = $like; }
+        $conds[] = 'color_name LIKE ?'; $params[] = $like;
+        if (self::hasColumn('color_code')) { $conds[] = 'color_code LIKE ?'; $params[] = $like; }
+        $where = $conds ? ('WHERE ' . implode(' OR ', $conds)) : '';
+
+        $order = ['color_name ASC'];
+        if (self::hasColumn('code')) $order[] = 'code ASC';
+        $sql = "SELECT * FROM finishes $where ORDER BY " . implode(', ', $order);
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
         return $st->fetchAll();
     }
 
