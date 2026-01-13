@@ -10,7 +10,8 @@ final class FinishesController
 {
     public static function search(): void
     {
-        $q = isset($_GET['q']) ? (string)$_GET['q'] : '';
+        // Acceptă atât q (custom) cât și term (compat select2)
+        $q = isset($_GET['q']) ? (string)$_GET['q'] : (isset($_GET['term']) ? (string)$_GET['term'] : '');
         try {
             $items = Finish::searchForSelect($q, 25);
             Response::json(['ok' => true, 'items' => $items]);

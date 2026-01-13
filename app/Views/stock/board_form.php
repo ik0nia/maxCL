@@ -233,9 +233,22 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
     }
 
     async function fetchJson(url, params){
-      const u = new URL(url, window.location.origin);
-      Object.keys(params || {}).forEach(k => u.searchParams.set(k, String(params[k] ?? '')));
-      const res = await fetch(u.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json' }});
+      // url vine deja cu basePath (Url::to), deci îl folosim direct
+      let u = String(url || '');
+      const qp = new URLSearchParams();
+      Object.keys(params || {}).forEach(k => qp.set(k, String(params[k] ?? '')));
+      const qs = qp.toString();
+      if (qs) u += (u.indexOf('?') >= 0 ? '&' : '?') + qs;
+
+      const res = await fetch(u, {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('application/json')) {
+        throw new Error('non_json');
+      }
       return await res.json();
     }
 
@@ -354,7 +367,9 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
           if (!res || res.ok !== true) { render([]); return; }
           render(res.items || []);
         } catch (e) {
-          render([]);
+          // De obicei: redirect către /login (HTML) sau o eroare de rețea
+          listEl.innerHTML = '<div class="app-ac-item"><div class="text-muted small">Nu pot încărca sugestiile. Verifică dacă ești autentificat.</div></div>';
+          show();
         }
       }, 200);
 
