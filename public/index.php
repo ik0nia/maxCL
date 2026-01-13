@@ -33,6 +33,10 @@ $basePath = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'
 if ($basePath === '.' || $basePath === '/' ) $basePath = '';
 Url::setBasePath($basePath);
 
+// Auto-migrări DB (best-effort) după update din Git.
+// Nu blochează aplicația dacă DB nu e configurat sau nu există permisiuni.
+\App\Core\DbMigrations::runAuto();
+
 $router = new Router();
 
 // ---- Public routes
