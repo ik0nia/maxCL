@@ -51,8 +51,8 @@ ob_start();
 </div>
 
 <div class="card app-card p-3 mb-3">
-  <form method="get" action="<?= htmlspecialchars(Url::to('/stock')) ?>" class="d-flex flex-wrap gap-2 align-items-end">
-    <div class="app-stock-filter-color flex-grow-1">
+  <form method="get" action="<?= htmlspecialchars(Url::to('/stock')) ?>" class="row g-2 align-items-start">
+    <div class="col-12 col-lg-7 app-stock-filter-color">
       <label class="form-label mb-1">Culoare (față sau verso)</label>
       <div class="input-group position-relative">
         <span class="input-group-text" style="width:54px;justify-content:center">
@@ -76,7 +76,7 @@ ob_start();
       <div class="form-text">Caută după cod (autocomplete) și filtrează plăcile care au culoarea pe față sau pe verso.</div>
     </div>
 
-    <div class="app-stock-filter-thickness">
+    <div class="col-12 col-lg-2 app-stock-filter-thickness">
       <label class="form-label mb-1">Grosime</label>
       <select class="form-select" name="thickness_mm">
         <option value="">Toate grosimile</option>
@@ -87,8 +87,8 @@ ob_start();
       </select>
     </div>
 
-    <div class="app-stock-filter-actions d-flex gap-2">
-      <button class="btn btn-primary" type="submit">
+    <div class="col-12 col-lg-3 app-stock-filter-actions d-flex gap-2">
+      <button class="btn btn-primary flex-grow-1" type="submit">
         <i class="bi bi-funnel me-1"></i> Filtrează
       </button>
       <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
@@ -245,13 +245,10 @@ ob_start();
 </div>
 
 <style>
-  .app-stock-filter-color{min-width: 360px;}
-  .app-stock-filter-thickness{width: 240px;}
-  .app-stock-filter-actions{margin-left:auto;}
+  /* Fine-tuning pentru bara de filtre */
+  .app-stock-filter-color .form-text{margin-bottom:0}
+  .app-stock-filter-actions{align-items:center}
   @media (max-width: 991.98px){
-    .app-stock-filter-color{min-width: 100%;}
-    .app-stock-filter-thickness{width: 100%;}
-    .app-stock-filter-actions{margin-left:0; width:100%;}
     .app-stock-filter-actions .btn{flex:1 1 auto;}
   }
   .app-ac-list{
