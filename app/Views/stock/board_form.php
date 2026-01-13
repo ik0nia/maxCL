@@ -199,6 +199,7 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
         templateSelection: fmtColor,
         escapeMarkup: m => m,
         minimumInputLength: 1,
+        minimumResultsForSearch: 0,
         ajax: {
           url: finishesEndpoint,
           dataType: 'json',
@@ -213,8 +214,31 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
       $el.select2(cfg);
     }
 
-    initColorSelect($('#face_color_id'), { placeholder: 'Caută după cod…' });
-    initColorSelect($('#back_color_id'), { placeholder: 'Aceeași față/verso', allowClear: true });
+    function makeSelect2BehaveLikeInput($el){
+      // Focus direct în câmpul de căutare când se deschide dropdown-ul
+      $el.on('select2:open', function(){
+        window.setTimeout(function(){
+          const s = document.querySelector('.select2-container--open .select2-search__field');
+          if (s) s.focus();
+        }, 0);
+      });
+      // Deschide dropdown-ul la focus / tastare (ca un input)
+      const $sel = $el.next('.select2-container').find('.select2-selection');
+      $sel.on('focus', function(){ $el.select2('open'); });
+      $sel.on('keydown', function(e){
+        if (e && e.key && e.key.length === 1) $el.select2('open');
+      });
+      // Click oriunde pe selecție -> open
+      $sel.on('click', function(){ $el.select2('open'); });
+    }
+
+    const $face = $('#face_color_id');
+    const $back = $('#back_color_id');
+
+    initColorSelect($face, { placeholder: 'Scrie codul… (ex: 1522)' });
+    initColorSelect($back, { placeholder: 'Aceeași față/verso (opțional)', allowClear: true });
+    makeSelect2BehaveLikeInput($face);
+    makeSelect2BehaveLikeInput($back);
     $('#face_texture_id').select2({ width: '100%' });
     $('#back_texture_id').select2({ width: '100%' });
 
