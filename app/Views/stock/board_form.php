@@ -11,6 +11,12 @@ $colors = $colors ?? [];
 $textures = $textures ?? [];
 
 ob_start();
+$stdW0 = (int)($v['std_width_mm'] ?? 0);
+$stdH0 = (int)($v['std_height_mm'] ?? 0);
+$area0 = ($stdW0 > 0 && $stdH0 > 0) ? (($stdW0 * $stdH0) / 1000000.0) : 0.0;
+$sale0 = $v['sale_price'] ?? '';
+$sale0num = is_numeric(str_replace(',', '.', (string)$sale0)) ? (float)str_replace(',', '.', (string)$sale0) : null;
+$ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
 ?>
 <div class="app-page-title">
   <div>
@@ -63,6 +69,25 @@ ob_start();
       <input type="number" min="1" class="form-control <?= isset($errors['std_height_mm']) ? 'is-invalid' : '' ?>" name="std_height_mm"
              value="<?= htmlspecialchars((string)($v['std_height_mm'] ?? '')) ?>" required>
       <?php if (isset($errors['std_height_mm'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['std_height_mm']) ?></div><?php endif; ?>
+    </div>
+
+    <div class="col-12 col-md-3">
+      <label class="form-label">Preț vânzare (placă standard) (lei)</label>
+      <input type="text"
+             inputmode="decimal"
+             class="form-control <?= isset($errors['sale_price']) ? 'is-invalid' : '' ?>"
+             name="sale_price"
+             id="sale_price"
+             placeholder="ex: 350.00"
+             value="<?= htmlspecialchars((string)($v['sale_price'] ?? '')) ?>">
+      <?php if (isset($errors['sale_price'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['sale_price']) ?></div><?php endif; ?>
+      <div class="form-text">Poți folosi și virgulă (ex: 350,00).</div>
+    </div>
+
+    <div class="col-12 col-md-3">
+      <label class="form-label">Preț / mp (calculat)</label>
+      <input type="text" class="form-control" id="sale_price_per_m2" value="<?= $ppm0 !== null ? htmlspecialchars(number_format((float)$ppm0, 2, '.', '')) : '' ?>" readonly>
+      <div class="form-text">Calculat automat din dimensiunea standard.</div>
     </div>
 
     <div class="col-12 col-lg-6">
@@ -163,6 +188,28 @@ ob_start();
     $('#back_color_id').select2({ width: '100%', templateResult: fmtColor, templateSelection: fmtColor, escapeMarkup: m => m });
     $('#face_texture_id').select2({ width: '100%' });
     $('#back_texture_id').select2({ width: '100%' });
+
+    function parseDec(v){
+      v = String(v || '').trim().replace(',', '.');
+      if (!v) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    function recomputePrice(){
+      const w = parseInt($('input[name="std_width_mm"]').val() || '0', 10);
+      const h = parseInt($('input[name="std_height_mm"]').val() || '0', 10);
+      const sp = parseDec($('#sale_price').val());
+      const area = (w > 0 && h > 0) ? ((w * h) / 1000000.0) : 0;
+      if (sp === null || area <= 0) {
+        $('#sale_price_per_m2').val('');
+        return;
+      }
+      const ppm = sp / area;
+      $('#sale_price_per_m2').val(ppm.toFixed(2));
+    }
+    $('#sale_price').on('input', recomputePrice);
+    $('input[name="std_width_mm"], input[name="std_height_mm"]').on('input', recomputePrice);
+    recomputePrice();
   });
 </script>
 <?php

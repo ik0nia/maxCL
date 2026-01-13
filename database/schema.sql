@@ -58,6 +58,13 @@ CREATE TABLE IF NOT EXISTS hpl_boards (
   thickness_mm INT NOT NULL,
   std_width_mm INT NOT NULL,
   std_height_mm INT NOT NULL,
+  sale_price DECIMAL(12,2) NULL,
+  sale_price_per_m2 DECIMAL(12,2) AS (
+    CASE
+      WHEN sale_price IS NULL OR std_width_mm <= 0 OR std_height_mm <= 0 THEN NULL
+      ELSE CAST(ROUND((sale_price / ((std_width_mm * std_height_mm) / 1000000.0)), 2) AS DECIMAL(12,2))
+    END
+  ) STORED,
   face_color_id INT UNSIGNED NOT NULL,
   face_texture_id INT UNSIGNED NOT NULL,
   back_color_id INT UNSIGNED NULL,
@@ -78,6 +85,18 @@ CREATE TABLE IF NOT EXISTS hpl_boards (
   CONSTRAINT fk_hpl_back_color FOREIGN KEY (back_color_id) REFERENCES finishes(id),
   CONSTRAINT fk_hpl_back_texture FOREIGN KEY (back_texture_id) REFERENCES textures(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migrare idempotentă (pentru instalări existente)
+ALTER TABLE hpl_boards
+  ADD COLUMN IF NOT EXISTS sale_price DECIMAL(12,2) NULL;
+
+ALTER TABLE hpl_boards
+  ADD COLUMN IF NOT EXISTS sale_price_per_m2 DECIMAL(12,2) AS (
+    CASE
+      WHEN sale_price IS NULL OR std_width_mm <= 0 OR std_height_mm <= 0 THEN NULL
+      ELSE CAST(ROUND((sale_price / ((std_width_mm * std_height_mm) / 1000000.0)), 2) AS DECIMAL(12,2))
+    END
+  ) STORED;
 
 CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -9,6 +9,12 @@ $pieces = $pieces ?? [];
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 $isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
+$stdW = (int)($board['std_width_mm'] ?? 0);
+$stdH = (int)($board['std_height_mm'] ?? 0);
+$stdArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+$salePrice = $board['sale_price'] ?? null;
+$salePriceNum = ($salePrice !== null && $salePrice !== '' && is_numeric($salePrice)) ? (float)$salePrice : null;
+$salePerM2 = ($salePriceNum !== null && $stdArea > 0) ? ($salePriceNum / $stdArea) : null;
 
 ob_start();
 ?>
@@ -36,6 +42,37 @@ ob_start();
 
 <div class="row g-3">
   <div class="col-12 col-lg-5">
+    <div class="card app-card p-3 mb-3">
+      <div class="h5 m-0">Detalii placă</div>
+      <div class="text-muted">Dimensiuni standard și prețuri</div>
+      <div class="mt-2">
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <div class="text-muted">Brand</div>
+          <div class="fw-semibold"><?= htmlspecialchars((string)($board['brand'] ?? '')) ?></div>
+        </div>
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <div class="text-muted">Grosime</div>
+          <div class="fw-semibold"><?= (int)($board['thickness_mm'] ?? 0) ?> mm</div>
+        </div>
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <div class="text-muted">Standard</div>
+          <div class="fw-semibold"><?= $stdW ?> × <?= $stdH ?> mm</div>
+        </div>
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <div class="text-muted">Suprafață standard</div>
+          <div class="fw-semibold"><?= number_format((float)$stdArea, 2, '.', '') ?> mp</div>
+        </div>
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <div class="text-muted">Preț vânzare (placă)</div>
+          <div class="fw-semibold"><?= $salePriceNum !== null ? number_format((float)$salePriceNum, 2, '.', '') . ' lei' : '—' ?></div>
+        </div>
+        <div class="d-flex justify-content-between py-2">
+          <div class="text-muted">Preț / mp (calculat)</div>
+          <div class="fw-semibold"><?= $salePerM2 !== null ? number_format((float)$salePerM2, 2, '.', '') . ' lei/mp' : '—' ?></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card app-card p-3">
       <div class="h5 m-0">Adaugă piesă în stoc</div>
       <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>

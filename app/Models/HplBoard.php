@@ -57,9 +57,9 @@ final class HplBoard
         $pdo = DB::pdo();
         $st = $pdo->prepare(
             'INSERT INTO hpl_boards
-              (code,name,brand,thickness_mm,std_width_mm,std_height_mm,face_color_id,face_texture_id,back_color_id,back_texture_id,notes)
+              (code,name,brand,thickness_mm,std_width_mm,std_height_mm,sale_price,face_color_id,face_texture_id,back_color_id,back_texture_id,notes)
              VALUES
-              (:code,:name,:brand,:thickness_mm,:std_width_mm,:std_height_mm,:face_color_id,:face_texture_id,:back_color_id,:back_texture_id,:notes)'
+              (:code,:name,:brand,:thickness_mm,:std_width_mm,:std_height_mm,:sale_price,:face_color_id,:face_texture_id,:back_color_id,:back_texture_id,:notes)'
         );
         $st->execute([
             ':code' => $data['code'],
@@ -68,6 +68,7 @@ final class HplBoard
             ':thickness_mm' => (int)$data['thickness_mm'],
             ':std_width_mm' => (int)$data['std_width_mm'],
             ':std_height_mm' => (int)$data['std_height_mm'],
+            ':sale_price' => $data['sale_price'] !== null ? (float)$data['sale_price'] : null,
             ':face_color_id' => (int)$data['face_color_id'],
             ':face_texture_id' => (int)$data['face_texture_id'],
             ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,
@@ -85,7 +86,7 @@ final class HplBoard
         $st = $pdo->prepare(
             'UPDATE hpl_boards
              SET code=:code,name=:name,brand=:brand,thickness_mm=:thickness_mm,std_width_mm=:std_width_mm,std_height_mm=:std_height_mm,
-                 face_color_id=:face_color_id,face_texture_id=:face_texture_id,back_color_id=:back_color_id,back_texture_id=:back_texture_id,notes=:notes
+                 sale_price=:sale_price,face_color_id=:face_color_id,face_texture_id=:face_texture_id,back_color_id=:back_color_id,back_texture_id=:back_texture_id,notes=:notes
              WHERE id=:id'
         );
         $st->execute([
@@ -96,6 +97,7 @@ final class HplBoard
             ':thickness_mm' => (int)$data['thickness_mm'],
             ':std_width_mm' => (int)$data['std_width_mm'],
             ':std_height_mm' => (int)$data['std_height_mm'],
+            ':sale_price' => $data['sale_price'] !== null ? (float)$data['sale_price'] : null,
             ':face_color_id' => (int)$data['face_color_id'],
             ':face_texture_id' => (int)$data['face_texture_id'],
             ':back_color_id' => $data['back_color_id'] !== null ? (int)$data['back_color_id'] : null,

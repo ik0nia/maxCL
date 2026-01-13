@@ -37,6 +37,75 @@ CREATE TABLE IF NOT EXISTS finishes (
   KEY idx_finishes_texture (texture_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS textures (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code VARCHAR(64) NULL,
+  name VARCHAR(190) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_textures_code (code),
+  KEY idx_textures_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hpl_boards (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code VARCHAR(64) NOT NULL,
+  name VARCHAR(190) NOT NULL,
+  brand VARCHAR(190) NOT NULL,
+  thickness_mm INT NOT NULL,
+  std_width_mm INT NOT NULL,
+  std_height_mm INT NOT NULL,
+  sale_price DECIMAL(12,2) NULL,
+  sale_price_per_m2 DECIMAL(12,2) AS (
+    CASE
+      WHEN sale_price IS NULL OR std_width_mm <= 0 OR std_height_mm <= 0 THEN NULL
+      ELSE CAST(ROUND((sale_price / ((std_width_mm * std_height_mm) / 1000000.0)), 2) AS DECIMAL(12,2))
+    END
+  ) STORED,
+  face_color_id INT UNSIGNED NOT NULL,
+  face_texture_id INT UNSIGNED NOT NULL,
+  back_color_id INT UNSIGNED NULL,
+  back_texture_id INT UNSIGNED NULL,
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hpl_boards_code (code),
+  KEY idx_hpl_brand (brand),
+  KEY idx_hpl_thickness (thickness_mm),
+  KEY idx_hpl_face_color (face_color_id),
+  KEY idx_hpl_face_texture (face_texture_id),
+  KEY idx_hpl_back_color (back_color_id),
+  KEY idx_hpl_back_texture (back_texture_id),
+  CONSTRAINT fk_hpl_face_color FOREIGN KEY (face_color_id) REFERENCES finishes(id),
+  CONSTRAINT fk_hpl_face_texture FOREIGN KEY (face_texture_id) REFERENCES textures(id),
+  CONSTRAINT fk_hpl_back_color FOREIGN KEY (back_color_id) REFERENCES finishes(id),
+  CONSTRAINT fk_hpl_back_texture FOREIGN KEY (back_texture_id) REFERENCES textures(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  board_id INT UNSIGNED NOT NULL,
+  piece_type ENUM('FULL','OFFCUT') NOT NULL,
+  status ENUM('AVAILABLE','RESERVED','CONSUMED','SCRAP') NOT NULL DEFAULT 'AVAILABLE',
+  width_mm INT NOT NULL,
+  height_mm INT NOT NULL,
+  qty INT NOT NULL DEFAULT 1,
+  location VARCHAR(190) NOT NULL DEFAULT '',
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  area_per_piece_m2 DECIMAL(12,4) AS ((width_mm * height_mm) / 1000000.0) STORED,
+  area_total_m2 DECIMAL(12,4) AS (((width_mm * height_mm) / 1000000.0) * qty) STORED,
+  PRIMARY KEY (id),
+  KEY idx_hpl_stock_board (board_id),
+  KEY idx_hpl_stock_status (status),
+  KEY idx_hpl_stock_piece_type (piece_type),
+  KEY idx_hpl_stock_location (location),
+  CONSTRAINT fk_hpl_stock_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS materials (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   code VARCHAR(64) NOT NULL,

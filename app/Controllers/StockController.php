@@ -54,6 +54,19 @@ final class StockController
         } else {
             $label .= " · Față: {$face}";
         }
+
+        $salePrice = $board['sale_price'] ?? null;
+        if ($salePrice !== null && $salePrice !== '' && is_numeric($salePrice)) {
+            $sp = (float)$salePrice;
+            if ($sp >= 0) {
+                $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+                $perM2 = ($area > 0) ? ($sp / $area) : null;
+                $label .= ' · Preț: ' . number_format($sp, 2, '.', '') . ' lei/placă';
+                if ($perM2 !== null && is_finite($perM2)) {
+                    $label .= ' (' . number_format($perM2, 2, '.', '') . ' lei/mp)';
+                }
+            }
+        }
         return $label;
     }
 
@@ -142,6 +155,15 @@ final class StockController
             }
         }
 
+        $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
+        $salePrice = null;
+        if ($salePriceRaw !== '') {
+            $salePrice = Validator::dec($salePriceRaw);
+            if ($salePrice === null || $salePrice < 0 || $salePrice > 100000000) {
+                $errors['sale_price'] = 'Preț invalid.';
+            }
+        }
+
         $faceColor = Validator::int((string)($_POST['face_color_id'] ?? ''), 1) ?? null;
         $faceTex = Validator::int((string)($_POST['face_texture_id'] ?? ''), 1) ?? null;
         $backColorRaw = trim((string)($_POST['back_color_id'] ?? ''));
@@ -175,6 +197,7 @@ final class StockController
                 'thickness_mm' => (int)$_POST['thickness_mm'],
                 'std_width_mm' => (int)$_POST['std_width_mm'],
                 'std_height_mm' => (int)$_POST['std_height_mm'],
+                'sale_price' => $salePrice,
                 'face_color_id' => $faceColor,
                 'face_texture_id' => $faceTex,
                 'back_color_id' => $backColor,
@@ -241,6 +264,15 @@ final class StockController
             }
         }
 
+        $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
+        $salePrice = null;
+        if ($salePriceRaw !== '') {
+            $salePrice = Validator::dec($salePriceRaw);
+            if ($salePrice === null || $salePrice < 0 || $salePrice > 100000000) {
+                $errors['sale_price'] = 'Preț invalid.';
+            }
+        }
+
         $faceColor = Validator::int((string)($_POST['face_color_id'] ?? ''), 1) ?? null;
         $faceTex = Validator::int((string)($_POST['face_texture_id'] ?? ''), 1) ?? null;
         $backColorRaw = trim((string)($_POST['back_color_id'] ?? ''));
@@ -273,6 +305,7 @@ final class StockController
                 'thickness_mm' => (int)$_POST['thickness_mm'],
                 'std_width_mm' => (int)$_POST['std_width_mm'],
                 'std_height_mm' => (int)$_POST['std_height_mm'],
+                'sale_price' => $salePrice,
                 'face_color_id' => $faceColor,
                 'face_texture_id' => $faceTex,
                 'back_color_id' => $backColor,
