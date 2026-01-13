@@ -10,6 +10,8 @@ final class HplBoard
 {
     /** @var array<string,bool> */
     private static array $colCache = [];
+    /** @var array<string,bool> */
+    private static array $tableCache = [];
 
     private static function hasColumn(string $name): bool
     {
@@ -32,6 +34,26 @@ final class HplBoard
         return $ok;
     }
 
+    private static function hasTable(string $name): bool
+    {
+        if (array_key_exists($name, self::$tableCache)) {
+            return self::$tableCache[$name];
+        }
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare("
+            SELECT COUNT(*) AS c
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+        ");
+        $st->execute([$name]);
+        $row = $st->fetch();
+        $ok = ((int)($row['c'] ?? 0)) > 0;
+        self::$tableCache[$name] = $ok;
+        return $ok;
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function allWithTotals(?int $colorId = null): array
     {
@@ -43,6 +65,17 @@ final class HplBoard
             $where = 'WHERE (b.face_color_id = :cid OR b.back_color_id = :cid)';
             $params[':cid'] = $colorId;
         }
+        $hasTextures = self::hasTable('textures');
+        $joinTextures = $hasTextures
+            ? "JOIN textures ft ON ft.id = b.face_texture_id
+               LEFT JOIN textures bt ON bt.id = b.back_texture_id"
+            : "";
+        $selTextures = $hasTextures
+            ? "ft.name AS face_texture_name,
+               bt.name AS back_texture_name,"
+            : "NULL AS face_texture_name,
+               NULL AS back_texture_name,";
+
         $sql = "
             SELECT
               b.*,
@@ -50,19 +83,17 @@ final class HplBoard
               fc.code AS face_color_code,
               fc.thumb_path AS face_thumb_path,
               fc.image_path AS face_image_path,
-              ft.name AS face_texture_name,
+              $selTextures
               bc.color_name AS back_color_name,
               bc.code AS back_color_code,
               bc.thumb_path AS back_thumb_path,
               bc.image_path AS back_image_path,
-              bt.name AS back_texture_name,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS stock_qty_available,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS stock_m2_available
             FROM hpl_boards b
             JOIN finishes fc ON fc.id = b.face_color_id
-            JOIN textures ft ON ft.id = b.face_texture_id
             LEFT JOIN finishes bc ON bc.id = b.back_color_id
-            LEFT JOIN textures bt ON bt.id = b.back_texture_id
+            $joinTextures
             LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
             $where
             GROUP BY b.id
