@@ -60,8 +60,12 @@ final class StockStats
         $where = '';
         $params = [];
         if ($q !== null && $q !== '') {
-            $where = 'WHERE (f.code LIKE :q OR f.color_name LIKE :q OR f.color_code LIKE :q)';
-            $params[':q'] = '%' . $q . '%';
+            // IMPORTANT: evităm placeholder-e nominale repetate (pot produce HY093 pe unele drivere PDO)
+            $where = 'WHERE (f.code LIKE :q1 OR f.color_name LIKE :q2 OR f.color_code LIKE :q3)';
+            $like = '%' . $q . '%';
+            $params[':q1'] = $like;
+            $params[':q2'] = $like;
+            $params[':q3'] = $like;
         }
 
         $sql = "
@@ -129,8 +133,12 @@ final class StockStats
         $where = '';
         $params = [];
         if ($q !== null && $q !== '') {
-            $where = 'WHERE (f.code LIKE :q OR f.color_name LIKE :q OR f.color_code LIKE :q)';
-            $params[':q'] = '%' . $q . '%';
+            // IMPORTANT: evităm placeholder-e nominale repetate (pot produce HY093 pe unele drivere PDO)
+            $where = 'WHERE (f.code LIKE :q1 OR f.color_name LIKE :q2 OR f.color_code LIKE :q3)';
+            $like = '%' . $q . '%';
+            $params[':q1'] = $like;
+            $params[':q2'] = $like;
+            $params[':q3'] = $like;
         }
 
         $sql = "
