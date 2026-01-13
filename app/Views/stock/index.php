@@ -161,7 +161,7 @@ ob_start();
     <thead>
       <tr>
         <th style="width:110px">Preview</th>
-        <th class="js-wmcode-col d-none">Cod WinMentor</th>
+        <th class="js-wmcode-col">Cod WinMentor</th>
         <th>Denumire</th>
         <th>Grosime</th>
         <th>Dim. standard</th>
@@ -169,8 +169,8 @@ ob_start();
         <th class="text-end">Stoc OFFCUT (buc)</th>
         <th class="text-end">Stoc (mp)</th>
         <?php if ($canSeePrices): ?>
-          <th class="text-end js-price-col d-none">Preț/mp</th>
-          <th class="text-end js-price-col d-none">Valoare (lei)</th>
+          <th class="text-end js-price-col">Preț/mp</th>
+          <th class="text-end js-price-col">Valoare (lei)</th>
         <?php endif; ?>
         <th class="text-end" style="width:220px">Acțiuni</th>
       </tr>
@@ -227,7 +227,7 @@ ob_start();
               <?php endif; ?>
             </div>
           </td>
-          <td class="fw-semibold js-wmcode-col d-none"><?= htmlspecialchars((string)$r['code']) ?></td>
+          <td class="fw-semibold js-wmcode-col"><?= htmlspecialchars((string)$r['code']) ?></td>
           <td><?= htmlspecialchars((string)$r['name']) ?></td>
           <td><?= (int)$r['thickness_mm'] ?> mm</td>
           <td><?= (int)$r['std_width_mm'] ?> × <?= (int)$r['std_height_mm'] ?> mm</td>
@@ -248,8 +248,8 @@ ob_start();
               }
               $val = ($ppm !== null && $ppm >= 0 && is_finite($ppm) && $m2 > 0) ? ($m2 * $ppm) : null;
             ?>
-            <td class="text-end js-price-col d-none"><?= $ppm !== null ? number_format((float)$ppm, 2, '.', '') : '—' ?></td>
-            <td class="text-end fw-semibold js-price-col d-none"><?= $val !== null ? number_format((float)$val, 2, '.', '') : '—' ?></td>
+            <td class="text-end js-price-col"><?= $ppm !== null ? number_format((float)$ppm, 2, '.', '') : '—' ?></td>
+            <td class="text-end fw-semibold js-price-col"><?= $val !== null ? number_format((float)$val, 2, '.', '') : '—' ?></td>
           <?php endif; ?>
           <td class="text-end">
             <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'])) ?>">
@@ -327,27 +327,47 @@ ob_start();
     const tWm = document.getElementById('stockToggleWmCode');
     const tPrices = document.getElementById('stockTogglePrices');
     const tAdmin = document.getElementById('stockToggleAdmin');
-    const priceCells = Array.from(document.querySelectorAll('.js-price-col'));
-    const wmCells = Array.from(document.querySelectorAll('.js-wmcode-col'));
     const adminCells = Array.from(document.querySelectorAll('.js-admin-actions'));
     const valueCard = document.getElementById('stockValueCard');
     const dt = window.__stockBoardsDT || null;
 
-    function setVisible(list, on){
-      list.forEach(el => {
-        if (!el) return;
-        el.classList.toggle('d-none', !on);
-      });
-    }
+    // Column indices (DataTables)
+    // 0 Preview
+    // 1 Cod WinMentor
+    // 2 Denumire
+    // 3 Grosime
+    // 4 Dim. standard
+    // 5 Stoc FULL
+    // 6 Stoc OFFCUT
+    // 7 Stoc (mp)
+    // 8 Preț/mp (optional)
+    // 9 Valoare (lei) (optional)
+    // last Acțiuni
+    const IDX_WM = 1;
+    const IDX_PRICE_1 = 8;
+    const IDX_PRICE_2 = 9;
 
     function apply(){
       const showWm = !!(tWm && tWm.checked);
       const showPrices = !!(tPrices && tPrices.checked);
       const showAdmin = !!(tAdmin && tAdmin.checked);
-      setVisible(wmCells, showWm);
-      setVisible(priceCells, showPrices);
+
+      // Prefer DataTables visibility so columns reflow nicely.
+      if (dt && dt.column) {
+        try { dt.column(IDX_WM).visible(showWm, false); } catch (e) {}
+        try {
+          // price columns exist only for Admin/Gestionar (canSeePrices=true)
+          dt.column(IDX_PRICE_1).visible(showPrices, false);
+          dt.column(IDX_PRICE_2).visible(showPrices, false);
+        } catch (e) {}
+      } else {
+        // Fallback without DataTables
+        document.querySelectorAll('.js-wmcode-col').forEach(el => el.classList.toggle('d-none', !showWm));
+        document.querySelectorAll('.js-price-col').forEach(el => el.classList.toggle('d-none', !showPrices));
+      }
+
       if (valueCard) valueCard.classList.toggle('d-none', !showPrices);
-      setVisible(adminCells, showAdmin);
+      adminCells.forEach(el => el.classList.toggle('d-none', !showAdmin));
       try {
         localStorage.setItem('stock_show_wmcode', showWm ? '1' : '0');
         localStorage.setItem('stock_show_prices', showPrices ? '1' : '0');
@@ -355,7 +375,7 @@ ob_start();
       } catch (e) {}
 
       try {
-        if (dt && dt.columns && dt.columns.adjust) dt.columns.adjust();
+        if (dt && dt.columns && dt.columns.adjust) dt.columns.adjust().draw(false);
       } catch (e) {}
     }
 
