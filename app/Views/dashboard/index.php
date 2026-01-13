@@ -93,15 +93,17 @@ $stockError = $stockError ?? null;
                        data-bs-toggle="modal" data-bs-target="#appLightbox"
                        data-lightbox-src="<?= htmlspecialchars($big) ?>"
                        data-lightbox-fallback="<?= htmlspecialchars($thumb) ?>"
-                       data-lightbox-title="<?= htmlspecialchars((string)$c['color_name']) ?>"
+                       data-lightbox-title="<?= htmlspecialchars((string)($c['color_code'] ?? $c['color_name'] ?? 'Imagine')) ?>"
                        style="display:inline-block;cursor:zoom-in">
-                      <img src="<?= htmlspecialchars($thumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+                      <img src="<?= htmlspecialchars($thumb) ?>" style="width:82px;height:82px;object-fit:cover;border-radius:16px;border:1px solid #D9E3E6;">
                     </a>
                   <?php endif; ?>
                 </div>
                 <div class="flex-grow-1">
-                  <div class="fw-semibold"><?= htmlspecialchars((string)$c['color_name']) ?></div>
-                  <div class="text-muted small"><?= htmlspecialchars((string)($c['color_code'] ?? '')) ?></div>
+                  <div class="fw-semibold" style="font-size:1.15rem;line-height:1.1">
+                    <?= htmlspecialchars((string)($c['color_code'] ?? '—')) ?>
+                  </div>
+                  <div class="text-muted" style="font-weight:600"><?= htmlspecialchars((string)$c['color_name']) ?></div>
                   <div class="text-muted small">Suprafața totală: <span class="fw-semibold"><?= number_format((float)$c['total_m2'], 2, '.', '') ?></span> mp</div>
                   <div class="mt-1 d-flex flex-wrap gap-1">
                     <?php foreach (($c['by_thickness'] ?? []) as $t => $m2): ?>
