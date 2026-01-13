@@ -17,6 +17,7 @@ use App\Controllers\Catalog\VariantsController;
 use App\Controllers\StockController;
 use App\Controllers\Hpl\InlineTexturesController;
 use App\Controllers\DashboardController;
+use App\Controllers\UsersController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -156,9 +157,14 @@ $router->get('/catalog/materials', fn() => Response::redirect('/stock'), $catalo
 $router->get('/catalog/variants', fn() => Response::redirect('/stock'), $catalogMW);
 
 // ---- Rute cu middleware pe roluri (placeholder până implementăm modulele)
-$router->get('/users', fn() => print View::render('system/placeholder', ['title' => 'Utilizatori']), [
-    Auth::requireRole([Auth::ROLE_ADMIN])
-]);
+
+// ---- Utilizatori (doar ADMIN)
+$usersMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
+$router->get('/users', fn() => UsersController::index(), $usersMW);
+$router->get('/users/create', fn() => UsersController::createForm(), $usersMW);
+$router->post('/users/create', fn() => UsersController::create(), $usersMW);
+$router->get('/users/{id}/edit', fn($p) => UsersController::editForm($p), $usersMW);
+$router->post('/users/{id}/edit', fn($p) => UsersController::update($p), $usersMW);
 
 $router->get('/audit', fn() => print View::render('system/placeholder', ['title' => 'Jurnal activitate']), [
     Auth::requireRole([Auth::ROLE_ADMIN])
