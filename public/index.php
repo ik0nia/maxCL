@@ -18,6 +18,7 @@ use App\Controllers\StockController;
 use App\Controllers\Hpl\InlineTexturesController;
 use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
+use App\Controllers\AuditController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -95,6 +96,7 @@ $router->post('/setup/run', function () {
 
         $pdo->commit();
         Session::flash('toast_success', 'Instalare finalizată. Poți face login cu admin@local / admin123 (schimbă parola!).');
+        \App\Core\Audit::log('SETUP_RUN', 'system', null, null, null, ['statements' => $res['statements'] ?? null]);
     } catch (\Throwable $e) {
         try { if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
         Session::flash('toast_error', 'Eroare la instalare: ' . $e->getMessage());
@@ -166,9 +168,9 @@ $router->post('/users/create', fn() => UsersController::create(), $usersMW);
 $router->get('/users/{id}/edit', fn($p) => UsersController::editForm($p), $usersMW);
 $router->post('/users/{id}/edit', fn($p) => UsersController::update($p), $usersMW);
 
-$router->get('/audit', fn() => print View::render('system/placeholder', ['title' => 'Jurnal activitate']), [
-    Auth::requireRole([Auth::ROLE_ADMIN])
-]);
+$auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
+$router->get('/audit', fn() => AuditController::index(), $auditMW);
+$router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW);
 
 $router->get('/projects', fn() => print View::render('system/placeholder', ['title' => 'Proiecte']), [
     Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])

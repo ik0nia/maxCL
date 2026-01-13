@@ -304,6 +304,7 @@ final class StockController
         $height = (int)$_POST['height_mm'];
         $stdW = (int)($board['std_width_mm'] ?? 0);
         $stdH = (int)($board['std_height_mm'] ?? 0);
+        $requestedType = $type;
 
         // Regula: FULL = doar dimensiuni standard. Dacă diferă -> OFFCUT automat.
         if ($type === 'FULL' && ($width !== $stdW || $height !== $stdH)) {
@@ -323,7 +324,12 @@ final class StockController
         ];
 
         $pieceId = HplStockPiece::create($data);
-        Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, null, $data);
+        Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, null, $data, [
+            'requested_type' => $requestedType,
+            'final_type' => $type,
+            'std_width_mm' => $stdW,
+            'std_height_mm' => $stdH,
+        ]);
         Session::flash('toast_success', 'Piesă adăugată în stoc.');
         Response::redirect('/stock/boards/' . $boardId);
     }
