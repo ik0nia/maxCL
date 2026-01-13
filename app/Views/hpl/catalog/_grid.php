@@ -16,6 +16,7 @@ $totalByFinish = $totalByFinish ?? [];
       $name = (string)($f['color_name'] ?? '');
       $byT = $stockByFinish[$id] ?? [];
       $tot = (float)($totalByFinish[$id] ?? 0.0);
+      $href = Url::to('/stock') . ($id > 0 ? ('?color_id=' . $id) : '');
     ?>
     <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xxl-2">
       <div class="card app-card p-3 h-100">
@@ -33,8 +34,10 @@ $totalByFinish = $totalByFinish ?? [];
         </div>
 
         <div class="mt-2 text-center">
-          <div class="fw-semibold" style="font-size:1.25rem;line-height:1.1"><?= htmlspecialchars($code) ?></div>
-          <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($name) ?></div>
+          <a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none">
+            <div class="fw-semibold" style="font-size:1.25rem;line-height:1.1;color:#111"><?= htmlspecialchars($code) ?></div>
+            <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($name) ?></div>
+          </a>
           <div class="text-muted small mt-1">Total disponibil: <span class="fw-semibold"><?= number_format((float)$tot, 2, '.', '') ?></span> mp</div>
         </div>
 

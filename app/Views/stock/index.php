@@ -8,6 +8,7 @@ $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 $isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 $rows = $rows ?? [];
+$filterColor = $filterColor ?? null;
 
 // Admin-only: calculează valoarea stocului disponibil (lei)
 $totalValueLei = 0.0;
@@ -45,6 +46,23 @@ ob_start();
     <?php endif; ?>
   </div>
 </div>
+
+<?php if (is_array($filterColor)): ?>
+  <div class="card app-card p-3 mb-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <div class="fw-semibold">Filtru culoare (față sau verso)</div>
+        <div class="text-muted">
+          <?= htmlspecialchars((string)($filterColor['code'] ?? '—')) ?> · <?= htmlspecialchars((string)($filterColor['color_name'] ?? '')) ?>
+          <?php if (!empty($filterColor['color_code'])): ?> (<?= htmlspecialchars((string)$filterColor['color_code']) ?>)<?php endif; ?>
+        </div>
+      </div>
+      <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x-lg me-1"></i> Șterge filtru
+      </a>
+    </div>
+  </div>
+<?php endif; ?>
 
 <?php if ($isAdmin): ?>
   <div class="row g-3 mb-3">

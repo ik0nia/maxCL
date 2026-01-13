@@ -33,10 +33,16 @@ final class HplBoard
     }
 
     /** @return array<int, array<string,mixed>> */
-    public static function allWithTotals(): array
+    public static function allWithTotals(?int $colorId = null): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        $where = '';
+        $params = [];
+        if ($colorId !== null && $colorId > 0) {
+            $where = 'WHERE (b.face_color_id = :cid OR b.back_color_id = :cid)';
+            $params[':cid'] = $colorId;
+        }
         $sql = "
             SELECT
               b.*,
@@ -58,10 +64,13 @@ final class HplBoard
             LEFT JOIN finishes bc ON bc.id = b.back_color_id
             LEFT JOIN textures bt ON bt.id = b.back_texture_id
             LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+            $where
             GROUP BY b.id
             ORDER BY b.brand ASC, b.name ASC
         ";
-        return $pdo->query($sql)->fetchAll();
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
     }
 
     public static function find(int $id): ?array

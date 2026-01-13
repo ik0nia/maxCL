@@ -73,10 +73,16 @@ final class StockController
     public static function index(): void
     {
         try {
-            $rows = HplBoard::allWithTotals();
+            $colorId = null;
+            if (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
+                $colorId = Validator::int((string)$_GET['color_id'], 1);
+            }
+            $color = $colorId ? Finish::find($colorId) : null;
+            $rows = HplBoard::allWithTotals($colorId ?: null);
             echo View::render('stock/index', [
                 'title' => 'Stoc',
                 'rows' => $rows,
+                'filterColor' => $color,
             ]);
         } catch (\Throwable $e) {
             // Cel mai des: tabelele noi nu există încă (nu s-a rulat setup după update).
