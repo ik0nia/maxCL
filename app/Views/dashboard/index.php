@@ -25,7 +25,7 @@ $stockError = $stockError ?? null;
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
           <div class="h5 m-0">Culori cu cea mai mare cantitate</div>
-          <div class="text-muted">Agregat pe Tip culoare (față), indiferent de textură · evidențiere pe grosimi</div>
+          <div class="text-muted">Agregat pe Tip culoare (față + verso), indiferent de textură · evidențiere pe grosimi</div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
           <div class="input-group input-group-sm" style="max-width:360px">

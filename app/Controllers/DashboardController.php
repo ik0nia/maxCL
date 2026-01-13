@@ -22,7 +22,7 @@ final class DashboardController
      */
     private static function buildTopColors(?string $q, int $limit): array
     {
-        $rows = StockStats::availableByColorAndThickness($q);
+        $rows = StockStats::availableByAnySideColorAndThickness($q);
 
         // Aggregate per color_id: totals + per-thickness mp
         $tmp = [];
