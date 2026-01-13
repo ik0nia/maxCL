@@ -14,16 +14,20 @@ try { $textures = Texture::all(); } catch (\Throwable $e) { $textures = []; $tex
     <h1 class="m-0">Tip culoare</h1>
     <div class="text-muted">Culoare (fără textură). Texturile se gestionează separat.</div>
   </div>
-  <div class="d-flex gap-2">
-    <a href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare/create')) ?>" class="btn btn-primary">
-      <i class="bi bi-plus-lg me-1"></i> Tip culoare nou
-    </a>
-  </div>
 </div>
 
 <div class="row g-3">
   <div class="col-12 col-lg-7">
     <div class="card app-card p-3">
+      <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+        <div>
+          <div class="h5 m-0">Tipuri de culori</div>
+          <div class="text-muted">Listă cu thumbnails</div>
+        </div>
+        <a href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare/create')) ?>" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i> Tip culoare nou
+        </a>
+      </div>
       <table class="table table-hover align-middle mb-0" id="finishesTable">
         <thead>
           <tr>
