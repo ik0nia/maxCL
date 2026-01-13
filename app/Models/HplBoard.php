@@ -20,16 +20,15 @@ final class HplBoard
         }
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare("
-            SELECT COUNT(*) AS c
-            FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'hpl_boards'
-              AND COLUMN_NAME = ?
-        ");
-        $st->execute([$name]);
-        $row = $st->fetch();
-        $ok = ((int)($row['c'] ?? 0)) > 0;
+        // Compat hosting: unele conturi nu au acces la information_schema.
+        // Folosim SHOW COLUMNS (mai permisiv).
+        try {
+            $st = $pdo->prepare("SHOW COLUMNS FROM hpl_boards LIKE ?");
+            $st->execute([$name]);
+            $ok = (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
         self::$colCache[$name] = $ok;
         return $ok;
     }
@@ -41,15 +40,14 @@ final class HplBoard
         }
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare("
-            SELECT COUNT(*) AS c
-            FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = ?
-        ");
-        $st->execute([$name]);
-        $row = $st->fetch();
-        $ok = ((int)($row['c'] ?? 0)) > 0;
+        // Compat hosting: SHOW TABLES nu depinde de information_schema.
+        try {
+            $st = $pdo->prepare("SHOW TABLES LIKE ?");
+            $st->execute([$name]);
+            $ok = (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
         self::$tableCache[$name] = $ok;
         return $ok;
     }
