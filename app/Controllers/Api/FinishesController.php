@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api;
 
+use App\Core\Env;
 use App\Core\Response;
 use App\Models\Finish;
 
@@ -16,7 +17,13 @@ final class FinishesController
             $items = Finish::searchForSelect($q, 25);
             Response::json(['ok' => true, 'q' => $q, 'count' => count($items), 'items' => $items]);
         } catch (\Throwable $e) {
-            Response::json(['ok' => false, 'error' => 'Nu pot încărca sugestiile. (API)'], 500);
+            $env = strtolower((string)Env::get('APP_ENV', 'prod'));
+            $debug = ($env !== 'prod' && $env !== 'production');
+            Response::json([
+                'ok' => false,
+                'error' => 'Nu pot încărca sugestiile. (API)',
+                'debug' => $debug ? mb_substr($e->getMessage(), 0, 400) : null,
+            ], 500);
         }
     }
 }
