@@ -41,7 +41,42 @@ final class Validator
     public static function dec(?string $val): ?float
     {
         if ($val === null) return null;
-        $v = str_replace(',', '.', trim($val));
+        $v = trim($val);
+        if ($v === '') return null;
+
+        // Permite formate uzuale RO/EN:
+        // - 350,00
+        // - 1.234,50
+        // - 1 234,50
+        // - 1234.56
+        // - 1,234.56
+        $v = str_replace(["\xC2\xA0", ' '], '', $v); // NBSP + spații
+
+        $hasComma = str_contains($v, ',');
+        $hasDot = str_contains($v, '.');
+
+        if ($hasComma && $hasDot) {
+            // Avem ambele: decidem separatorul zecimal după ultimul separator.
+            $lastComma = strrpos($v, ',');
+            $lastDot = strrpos($v, '.');
+            if ($lastComma !== false && $lastDot !== false) {
+                if ($lastComma > $lastDot) {
+                    // 1.234,56 -> '.' mii, ',' zecimal
+                    $v = str_replace('.', '', $v);
+                    $v = str_replace(',', '.', $v);
+                } else {
+                    // 1,234.56 -> ',' mii, '.' zecimal
+                    $v = str_replace(',', '', $v);
+                    // '.' rămâne zecimal
+                }
+            }
+        } elseif ($hasComma) {
+            // 1234,56 -> ',' zecimal
+            $v = str_replace(',', '.', $v);
+        } else {
+            // doar '.' sau nimic -> '.' zecimal (sau întreg)
+        }
+
         if ($v === '' || !is_numeric($v)) return null;
         return (float)$v;
     }
