@@ -21,6 +21,7 @@ use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
+use App\Controllers\Api\FinishesController as ApiFinishesController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -215,6 +216,8 @@ $router->post('/stock/boards/{boardId}/pieces/{pieceId}/delete', fn($p) => Stock
 $router->get('/api/health', function () {
     Response::json(['ok' => true, 'env' => Env::get('APP_ENV', 'local')]);
 });
+
+$router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/', $basePath);
 

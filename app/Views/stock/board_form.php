@@ -17,6 +17,14 @@ $area0 = ($stdW0 > 0 && $stdH0 > 0) ? (($stdW0 * $stdH0) / 1000000.0) : 0.0;
 $sale0 = $v['sale_price'] ?? '';
 $sale0num = is_numeric(str_replace(',', '.', (string)$sale0)) ? (float)str_replace(',', '.', (string)$sale0) : null;
 $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
+$finishMap = [];
+foreach ($colors as $c) {
+  $finishMap[(int)$c['id']] = $c;
+}
+$faceColorId0 = (int)($v['face_color_id'] ?? 0);
+$backColorId0 = (int)($v['back_color_id'] ?? 0);
+$faceOpt = $faceColorId0 && isset($finishMap[$faceColorId0]) ? $finishMap[$faceColorId0] : null;
+$backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backColorId0] : null;
 ?>
 <div class="app-page-title">
   <div>
@@ -50,7 +58,7 @@ $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
       <?php if (isset($errors['brand'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['brand']) ?></div><?php endif; ?>
     </div>
 
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-2">
       <label class="form-label">Grosime (mm) *</label>
       <input type="number" min="1" class="form-control <?= isset($errors['thickness_mm']) ? 'is-invalid' : '' ?>" name="thickness_mm"
              value="<?= htmlspecialchars((string)($v['thickness_mm'] ?? '')) ?>" required>
@@ -71,7 +79,7 @@ $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
       <?php if (isset($errors['std_height_mm'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['std_height_mm']) ?></div><?php endif; ?>
     </div>
 
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-2">
       <label class="form-label">Preț vânzare (placă standard) (lei)</label>
       <input type="text"
              inputmode="decimal"
@@ -84,29 +92,29 @@ $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
       <div class="form-text">Poți folosi și virgulă (ex: 350,00).</div>
     </div>
 
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-2">
       <label class="form-label">Preț / mp (calculat)</label>
       <input type="text" class="form-control" id="sale_price_per_m2" value="<?= $ppm0 !== null ? htmlspecialchars(number_format((float)$ppm0, 2, '.', '')) : '' ?>" readonly>
       <div class="form-text">Calculat automat din dimensiunea standard.</div>
     </div>
 
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-8">
       <label class="form-label">Culoare față *</label>
-      <select class="form-select <?= isset($errors['face_color_id']) ? 'is-invalid' : '' ?>" name="face_color_id" id="face_color_id" required>
-        <option value="">Alege culoare...</option>
-        <?php foreach ($colors as $c): ?>
-          <?php
-            $id = (int)$c['id'];
-            $sel = ((string)$id === (string)($v['face_color_id'] ?? '')) ? 'selected' : '';
-            $label = (string)$c['color_name'] . ' (' . (string)$c['code'] . ')';
-          ?>
-          <option value="<?= $id ?>" data-thumb="<?= htmlspecialchars((string)$c['thumb_path']) ?>" <?= $sel ?>><?= htmlspecialchars($label) ?></option>
-        <?php endforeach; ?>
+      <select class="form-select <?= isset($errors['face_color_id']) ? 'is-invalid' : '' ?>"
+              name="face_color_id"
+              id="face_color_id"
+              data-endpoint="<?= htmlspecialchars(Url::to('/api/finishes/search')) ?>"
+              required>
+        <?php if ($faceOpt): ?>
+          <option value="<?= (int)$faceOpt['id'] ?>" selected data-thumb="<?= htmlspecialchars((string)$faceOpt['thumb_path']) ?>">
+            <?= htmlspecialchars((string)$faceOpt['color_name'] . ' (' . (string)$faceOpt['code'] . ')') ?>
+          </option>
+        <?php endif; ?>
       </select>
       <?php if (isset($errors['face_color_id'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['face_color_id']) ?></div><?php endif; ?>
     </div>
 
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-4">
       <label class="form-label">Textură față *</label>
       <select class="form-select <?= isset($errors['face_texture_id']) ? 'is-invalid' : '' ?>" name="face_texture_id" id="face_texture_id" required>
         <option value="">Alege textură...</option>
@@ -122,23 +130,22 @@ $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
       <?php if (isset($errors['face_texture_id'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['face_texture_id']) ?></div><?php endif; ?>
     </div>
 
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-8">
       <label class="form-label">Culoare verso (opțional)</label>
-      <select class="form-select <?= isset($errors['back_color_id']) ? 'is-invalid' : '' ?>" name="back_color_id" id="back_color_id">
-        <option value="">Aceeași față/verso</option>
-        <?php foreach ($colors as $c): ?>
-          <?php
-            $id = (int)$c['id'];
-            $sel = ((string)$id === (string)($v['back_color_id'] ?? '')) ? 'selected' : '';
-            $label = (string)$c['color_name'] . ' (' . (string)$c['code'] . ')';
-          ?>
-          <option value="<?= $id ?>" data-thumb="<?= htmlspecialchars((string)$c['thumb_path']) ?>" <?= $sel ?>><?= htmlspecialchars($label) ?></option>
-        <?php endforeach; ?>
+      <select class="form-select <?= isset($errors['back_color_id']) ? 'is-invalid' : '' ?>"
+              name="back_color_id"
+              id="back_color_id"
+              data-endpoint="<?= htmlspecialchars(Url::to('/api/finishes/search')) ?>">
+        <?php if ($backOpt): ?>
+          <option value="<?= (int)$backOpt['id'] ?>" selected data-thumb="<?= htmlspecialchars((string)$backOpt['thumb_path']) ?>">
+            <?= htmlspecialchars((string)$backOpt['color_name'] . ' (' . (string)$backOpt['code'] . ')') ?>
+          </option>
+        <?php endif; ?>
       </select>
       <?php if (isset($errors['back_color_id'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['back_color_id']) ?></div><?php endif; ?>
     </div>
 
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-4">
       <label class="form-label">Textură verso (opțional)</label>
       <select class="form-select <?= isset($errors['back_texture_id']) ? 'is-invalid' : '' ?>" name="back_texture_id" id="back_texture_id">
         <option value="">Aceeași față/verso</option>
@@ -174,9 +181,9 @@ $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
 </style>
 <script>
   function fmtColor(opt){
-    if (!opt.id) return opt.text;
+    if (!opt || !opt.id) return opt && opt.text ? opt.text : '';
     const el = opt.element;
-    const thumb = el ? el.getAttribute('data-thumb') : null;
+    const thumb = (opt.thumb || (el ? el.getAttribute('data-thumb') : null)) || null;
     if (!thumb) return opt.text;
     const $row = $('<span class="s2-row"></span>');
     $row.append($('<img class="s2-thumb" />').attr('src', thumb));
@@ -184,10 +191,37 @@ $ppm0 = ($sale0num !== null && $area0 > 0) ? ($sale0num / $area0) : null;
     return $row;
   }
   $(function(){
-    $('#face_color_id').select2({ width: '100%', templateResult: fmtColor, templateSelection: fmtColor, escapeMarkup: m => m });
-    $('#back_color_id').select2({ width: '100%', templateResult: fmtColor, templateSelection: fmtColor, escapeMarkup: m => m });
+    const finishesEndpoint = $('#face_color_id').data('endpoint') || <?= json_encode(Url::to('/api/finishes/search')) ?>;
+    function initColorSelect($el, opts){
+      const cfg = Object.assign({
+        width: '100%',
+        templateResult: fmtColor,
+        templateSelection: fmtColor,
+        escapeMarkup: m => m,
+        minimumInputLength: 1,
+        ajax: {
+          url: finishesEndpoint,
+          dataType: 'json',
+          delay: 200,
+          data: function (params) { return { q: params.term || '' }; },
+          processResults: function (res) {
+            if (!res || res.ok !== true) return { results: [] };
+            return { results: res.items || [] };
+          }
+        }
+      }, opts || {});
+      $el.select2(cfg);
+    }
+
+    initColorSelect($('#face_color_id'), { placeholder: 'Caută după cod…' });
+    initColorSelect($('#back_color_id'), { placeholder: 'Aceeași față/verso', allowClear: true });
     $('#face_texture_id').select2({ width: '100%' });
     $('#back_texture_id').select2({ width: '100%' });
+
+    // Dacă se golește culoarea verso, golește și textura verso (rămâne "Aceeași față/verso")
+    $('#back_color_id').on('select2:clear', function(){
+      $('#back_texture_id').val('').trigger('change');
+    });
 
     function parseDec(v){
       v = String(v || '').trim().replace(',', '.');

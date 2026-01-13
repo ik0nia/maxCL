@@ -55,6 +55,58 @@ final class Finish
         return $st->fetchAll();
     }
 
+    /** @param array<int,int> $ids @return array<int, array<string,mixed>> */
+    public static function forSelectByIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($v) => $v > 0)));
+        if (!$ids) return [];
+
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $st = $pdo->prepare("SELECT id, code, color_name, thumb_path FROM finishes WHERE id IN ($in)");
+        $st->execute($ids);
+        return $st->fetchAll();
+    }
+
+    /** @return array<int, array{id:int, text:string, thumb:string}> */
+    public static function searchForSelect(?string $q, int $limit = 20): array
+    {
+        $q = $q !== null ? trim($q) : '';
+        if ($q === '') return [];
+        $limit = max(1, min(50, $limit));
+
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $like = '%' . $q . '%';
+        $prefix = $q . '%';
+        $sql = "
+          SELECT id, code, color_name, thumb_path
+          FROM finishes
+          WHERE code LIKE :like OR color_name LIKE :like OR color_code LIKE :like
+          ORDER BY
+            CASE WHEN code LIKE :prefix THEN 0 ELSE 1 END,
+            code ASC,
+            color_name ASC
+          LIMIT $limit
+        ";
+        $st = $pdo->prepare($sql);
+        $st->execute([':like' => $like, ':prefix' => $prefix]);
+        $rows = $st->fetchAll();
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int)$r['id'];
+            $code = (string)($r['code'] ?? '');
+            $name = (string)($r['color_name'] ?? '');
+            $out[] = [
+                'id' => $id,
+                'text' => trim($name . ' (' . $code . ')'),
+                'thumb' => (string)($r['thumb_path'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
     /** @param array<string,mixed> $data */
     public static function create(array $data): int
     {

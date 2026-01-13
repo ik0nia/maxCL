@@ -95,7 +95,7 @@ final class StockController
                 'mode' => 'create',
                 'row' => null,
                 'errors' => [],
-                'colors' => Finish::forSelect(),
+                'colors' => [],
                 'textures' => Texture::forSelect(),
             ]);
         } catch (\Throwable $e) {
@@ -113,12 +113,13 @@ final class StockController
                 Session::flash('toast_error', 'Placă inexistentă.');
                 Response::redirect('/stock');
             }
+            $colorIds = [(int)($board['face_color_id'] ?? 0), (int)($board['back_color_id'] ?? 0)];
             echo View::render('stock/board_form', [
                 'title' => 'Editează placă',
                 'mode' => 'edit',
                 'row' => $board,
                 'errors' => [],
-                'colors' => Finish::forSelect(),
+                'colors' => Finish::forSelectByIds($colorIds),
                 'textures' => Texture::forSelect(),
             ]);
         } catch (\Throwable $e) {
@@ -178,12 +179,16 @@ final class StockController
 
         if ($errors) {
             $row = array_merge($before, $_POST);
+            $colorIds = [
+                (int)($row['face_color_id'] ?? 0),
+                (int)($row['back_color_id'] ?? 0),
+            ];
             echo View::render('stock/board_form', [
                 'title' => 'Editează placă',
                 'mode' => 'edit',
                 'row' => $row,
                 'errors' => $errors,
-                'colors' => Finish::forSelect(),
+                'colors' => Finish::forSelectByIds($colorIds),
                 'textures' => Texture::forSelect(),
             ]);
             return;
@@ -291,7 +296,10 @@ final class StockController
                 'mode' => 'create',
                 'row' => $_POST,
                 'errors' => $errors,
-                'colors' => Finish::forSelect(),
+                'colors' => Finish::forSelectByIds([
+                    (int)($_POST['face_color_id'] ?? 0),
+                    (int)($_POST['back_color_id'] ?? 0),
+                ]),
                 'textures' => Texture::forSelect(),
             ]);
             return;
