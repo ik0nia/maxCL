@@ -60,8 +60,10 @@ final class HplBoard
         $whereParts = [];
         $params = [];
         if ($colorId !== null && $colorId > 0) {
-            $whereParts[] = '(b.face_color_id = :cid OR b.back_color_id = :cid)';
-            $params[':cid'] = $colorId;
+            // IMPORTANT: evităm placeholder-e nominale repetate (pot produce HY093 pe unele drivere PDO)
+            $whereParts[] = '(b.face_color_id = :cid1 OR b.back_color_id = :cid2)';
+            $params[':cid1'] = $colorId;
+            $params[':cid2'] = $colorId;
         }
         if ($thicknessMm !== null && $thicknessMm > 0) {
             $whereParts[] = 'b.thickness_mm = :th';
