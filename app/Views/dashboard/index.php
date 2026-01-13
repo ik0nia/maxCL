@@ -4,7 +4,7 @@ use App\Core\Url;
 
 ob_start();
 $byThickness = $byThickness ?? [];
-$topBoards = $topBoards ?? [];
+$topColors = $topColors ?? [];
 $stockError = $stockError ?? null;
 ?>
 <div class="row g-3">
@@ -67,8 +67,8 @@ $stockError = $stockError ?? null;
     <div class="card app-card p-3">
       <div class="d-flex align-items-center justify-content-between">
         <div>
-          <div class="h5 m-0">Plăci cu cea mai mare cantitate</div>
-          <div class="text-muted">Top după mp disponibili (AVAILABLE)</div>
+          <div class="h5 m-0">Culori cu cea mai mare cantitate</div>
+          <div class="text-muted">Agregat pe Tip culoare (față), indiferent de textură</div>
         </div>
         <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
       </div>
@@ -80,49 +80,40 @@ $stockError = $stockError ?? null;
         </div>
       <?php else: ?>
         <div class="row g-2 mt-2">
-          <?php foreach ($topBoards as $b): ?>
+          <?php foreach ($topColors as $c): ?>
             <?php
-              $faceThumb = (string)($b['face_thumb_path'] ?? '');
-              $faceBig = (string)($b['face_image_path'] ?? '') ?: $faceThumb;
-              $backThumb = (string)($b['back_thumb_path'] ?? '');
-              $backBig = (string)($b['back_image_path'] ?? '') ?: $backThumb;
+              $thumb = (string)($c['thumb_path'] ?? '');
+              $big = (string)($c['image_path'] ?? '') ?: $thumb;
             ?>
             <div class="col-12 col-md-6">
-              <a href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$b['id'])) ?>" class="text-decoration-none">
-                <div class="border rounded-4 p-2 d-flex gap-2 align-items-center" style="border-color:#D9E3E6;background:#fff">
-                  <div class="d-flex gap-1">
-                    <?php if ($faceThumb): ?>
-                      <a href="#"
-                         data-bs-toggle="modal" data-bs-target="#appLightbox"
-                         data-lightbox-src="<?= htmlspecialchars($faceBig) ?>"
-                         data-lightbox-fallback="<?= htmlspecialchars($faceThumb) ?>"
-                         data-lightbox-title="<?= htmlspecialchars((string)$b['code']) ?>"
-                         style="display:inline-block;cursor:zoom-in">
-                        <img src="<?= htmlspecialchars($faceThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
-                      </a>
-                    <?php endif; ?>
-                    <?php if ($backThumb): ?>
-                      <a href="#"
-                         data-bs-toggle="modal" data-bs-target="#appLightbox"
-                         data-lightbox-src="<?= htmlspecialchars($backBig) ?>"
-                         data-lightbox-fallback="<?= htmlspecialchars($backThumb) ?>"
-                         data-lightbox-title="<?= htmlspecialchars((string)$b['code']) ?>"
-                         style="display:inline-block;cursor:zoom-in">
-                        <img src="<?= htmlspecialchars($backThumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
-                      </a>
-                    <?php endif; ?>
-                  </div>
-                  <div class="flex-grow-1">
-                    <div class="fw-semibold"><?= htmlspecialchars((string)$b['code']) ?></div>
-                    <div class="text-muted small"><?= htmlspecialchars((string)$b['brand']) ?> · <?= (int)$b['thickness_mm'] ?> mm</div>
-                    <div class="text-muted small">Suprafața totală: <span class="fw-semibold"><?= number_format((float)$b['m2_available'], 2, '.', '') ?></span> mp</div>
+              <div class="border rounded-4 p-2 d-flex gap-2 align-items-center" style="border-color:#D9E3E6;background:#fff">
+                <div class="d-flex gap-1">
+                  <?php if ($thumb): ?>
+                    <a href="#"
+                       data-bs-toggle="modal" data-bs-target="#appLightbox"
+                       data-lightbox-src="<?= htmlspecialchars($big) ?>"
+                       data-lightbox-fallback="<?= htmlspecialchars($thumb) ?>"
+                       data-lightbox-title="<?= htmlspecialchars((string)$c['color_name']) ?>"
+                       style="display:inline-block;cursor:zoom-in">
+                      <img src="<?= htmlspecialchars($thumb) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
+                    </a>
+                  <?php endif; ?>
+                </div>
+                <div class="flex-grow-1">
+                  <div class="fw-semibold"><?= htmlspecialchars((string)$c['color_name']) ?></div>
+                  <div class="text-muted small"><?= htmlspecialchars((string)($c['color_code'] ?? '')) ?></div>
+                  <div class="text-muted small">Suprafața totală: <span class="fw-semibold"><?= number_format((float)$c['total_m2'], 2, '.', '') ?></span> mp</div>
+                  <div class="mt-1 d-flex flex-wrap gap-1">
+                    <?php foreach (($c['by_thickness'] ?? []) as $t => $m2): ?>
+                      <span class="badge app-badge"><?= (int)$t ?>mm: <?= number_format((float)$m2, 2, '.', '') ?> mp</span>
+                    <?php endforeach; ?>
                   </div>
                 </div>
-              </a>
+              </div>
             </div>
           <?php endforeach; ?>
 
-          <?php if (!$topBoards): ?>
+          <?php if (!$topColors): ?>
             <div class="col-12 text-muted">Nu există date încă.</div>
           <?php endif; ?>
         </div>

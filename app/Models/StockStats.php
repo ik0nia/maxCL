@@ -36,35 +36,55 @@ final class StockStats
     }
 
     /**
-     * Top plăci după suprafața disponibilă (AVAILABLE).
-     * @return array<int, array<string,mixed>>
+     * Returnează stocul disponibil agregat pe Tip culoare (față) și grosime.
+     * Texturile sunt ignorate (se cumulează).
+     *
+     * @return array<int, array{
+     *   face_color_id:int,
+     *   color_name:string,
+     *   color_code:?string,
+     *   thumb_path:string,
+     *   image_path:?string,
+     *   thickness_mm:int,
+     *   qty:int,
+     *   m2:float
+     * }>
      */
-    public static function topBoardsByAvailableM2(int $limit = 6): array
+    public static function availableByColorAndThickness(): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         $sql = "
             SELECT
-              b.id,
-              b.code,
-              b.name,
-              b.brand,
-              b.thickness_mm,
-              fc.thumb_path AS face_thumb_path,
-              fc.image_path AS face_image_path,
-              bc.thumb_path AS back_thumb_path,
-              bc.image_path AS back_image_path,
-              COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty_available,
-              COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS m2_available
+              b.face_color_id AS face_color_id,
+              f.color_name AS color_name,
+              f.code AS color_code,
+              f.thumb_path AS thumb_path,
+              f.image_path AS image_path,
+              b.thickness_mm AS thickness_mm,
+              COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty,
+              COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS m2
             FROM hpl_boards b
-            JOIN finishes fc ON fc.id = b.face_color_id
-            LEFT JOIN finishes bc ON bc.id = b.back_color_id
+            JOIN finishes f ON f.id = b.face_color_id
             LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
-            GROUP BY b.id
-            ORDER BY m2_available DESC
-            LIMIT " . (int)$limit . "
+            GROUP BY b.face_color_id, b.thickness_mm
+            ORDER BY m2 DESC
         ";
-        return $pdo->query($sql)->fetchAll();
+        $rows = $pdo->query($sql)->fetchAll();
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'face_color_id' => (int)$r['face_color_id'],
+                'color_name' => (string)$r['color_name'],
+                'color_code' => (string)($r['color_code'] ?? ''),
+                'thumb_path' => (string)$r['thumb_path'],
+                'image_path' => $r['image_path'] ? (string)$r['image_path'] : null,
+                'thickness_mm' => (int)$r['thickness_mm'],
+                'qty' => (int)$r['qty'],
+                'm2' => (float)$r['m2'],
+            ];
+        }
+        return $out;
     }
 }
 
