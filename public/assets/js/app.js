@@ -81,6 +81,25 @@
     modal.show();
   }
 
+  // Bootstrap-native: when modal opens, read src/title from the clicked element
+  document.addEventListener('show.bs.modal', function (ev) {
+    const modal = ev.target;
+    if (!modal || modal.id !== 'appLightbox') return;
+    const trigger = ev.relatedTarget;
+    if (!trigger || !trigger.getAttribute) return;
+    const src = trigger.getAttribute('data-lightbox-src') || trigger.getAttribute('data-src');
+    if (!src) return;
+    const title = trigger.getAttribute('data-lightbox-title') || trigger.getAttribute('data-title') || 'Imagine';
+
+    const img = document.getElementById('appLightboxImg');
+    const ttl = document.getElementById('appLightboxTitle');
+    if (img) {
+      img.src = src;
+      img.alt = title;
+    }
+    if (ttl) ttl.textContent = title;
+  });
+
   // Native delegation
   document.addEventListener('click', function (e) {
     const el = e.target && e.target.closest ? e.target.closest('[data-lightbox-src]') : null;

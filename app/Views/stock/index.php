@@ -47,11 +47,19 @@ ob_start();
                 $faceBig = (string)($r['face_image_path'] ?? '') ?: (string)$r['face_thumb_path'];
                 $backBig = (string)($r['back_image_path'] ?? '') ?: (string)($r['back_thumb_path'] ?? '');
               ?>
-              <a href="#" data-lightbox-src="<?= htmlspecialchars($faceBig) ?>" data-lightbox-title="<?= htmlspecialchars((string)$r['face_color_name']) ?>" style="display:inline-block;cursor:zoom-in">
+              <a href="#"
+                 data-bs-toggle="modal" data-bs-target="#appLightbox"
+                 data-lightbox-src="<?= htmlspecialchars($faceBig) ?>"
+                 data-lightbox-title="<?= htmlspecialchars((string)$r['face_color_name']) ?>"
+                 style="display:inline-block;cursor:zoom-in">
                 <img src="<?= htmlspecialchars((string)$r['face_thumb_path']) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
               </a>
               <?php if (!empty($r['back_thumb_path'])): ?>
-                <a href="#" data-lightbox-src="<?= htmlspecialchars($backBig) ?>" data-lightbox-title="<?= htmlspecialchars((string)$r['back_color_name']) ?>" style="display:inline-block;cursor:zoom-in">
+                <a href="#"
+                   data-bs-toggle="modal" data-bs-target="#appLightbox"
+                   data-lightbox-src="<?= htmlspecialchars($backBig) ?>"
+                   data-lightbox-title="<?= htmlspecialchars((string)$r['back_color_name']) ?>"
+                   style="display:inline-block;cursor:zoom-in">
                   <img src="<?= htmlspecialchars((string)$r['back_thumb_path']) ?>" style="width:44px;height:44px;object-fit:cover;border-radius:12px;border:1px solid #D9E3E6;">
                 </a>
               <?php endif; ?>
