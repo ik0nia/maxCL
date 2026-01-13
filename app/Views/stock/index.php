@@ -399,6 +399,50 @@ ob_start();
 <?php endif; ?>
 
 <script>
+  // Search doar în coloanele vizibile (DataTables).
+  document.addEventListener('DOMContentLoaded', function(){
+    const dt = window.__stockBoardsDT || null;
+    const table = document.getElementById('boardsTable');
+    if (!dt || !table) return;
+
+    // Avoid double-install if this view is ever re-rendered.
+    if (window.__stockVisibleColsSearchInstalled) return;
+    window.__stockVisibleColsSearchInstalled = true;
+
+    const extSearch = (window.DataTable && window.DataTable.ext && window.DataTable.ext.search)
+      ? window.DataTable.ext.search
+      : null;
+    if (!extSearch || !Array.isArray(extSearch)) return;
+
+    extSearch.push(function(settings, data){
+      // Scope to this table only
+      try {
+        if (!settings || settings.nTable !== table) return true;
+      } catch (e) {}
+
+      let term = '';
+      try { term = String(dt.search() || '').trim().toLowerCase(); } catch (e) { term = ''; }
+      if (!term) return true;
+
+      const colCount = (dt.columns && dt.columns().count) ? dt.columns().count() : (Array.isArray(data) ? data.length : 0);
+      const lastIdx = Math.max(0, colCount - 1); // Acțiuni
+      // Excludem Preview (0) și Acțiuni (last) din căutarea “logică”
+      for (let i = 1; i < lastIdx; i++) {
+        try {
+          if (dt.column && dt.column(i) && dt.column(i).visible && dt.column(i).visible() !== true) continue;
+        } catch (e) {}
+        const cell = String((Array.isArray(data) && data[i] !== undefined) ? data[i] : '');
+        if (cell.toLowerCase().includes(term)) return true;
+      }
+      return false;
+    });
+
+    // Ensure filter runs on first draw
+    try { dt.draw(false); } catch (e) {}
+  });
+</script>
+
+<script>
   document.addEventListener('DOMContentLoaded', function(){
     const finishesEndpoint = <?= json_encode(Url::to('/api/finishes/search')) ?>;
     const qEl = document.getElementById('stock_filter_color_q');
