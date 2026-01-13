@@ -15,6 +15,7 @@ use App\Controllers\Catalog\FinishesController;
 use App\Controllers\Catalog\MaterialsController;
 use App\Controllers\Catalog\VariantsController;
 use App\Controllers\Hpl\TexturesController;
+use App\Controllers\StockController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -150,8 +151,7 @@ $router->get('/hpl/texturi/{id}/edit', fn($p) => TexturesController::editForm($p
 $router->post('/hpl/texturi/{id}/edit', fn($p) => TexturesController::update($p), $catalogMW);
 $router->post('/hpl/texturi/{id}/delete', fn($p) => TexturesController::delete($p), $catalogMW);
 
-// (Materiale + Variante) vor fi înlocuite de modulul Stoc (plăci + piese)
-// Păstrăm temporar rutele vechi ca redirect la /stock
+// (Materiale + Variante) au fost înlocuite de modulul Stoc (plăci + piese)
 $router->get('/catalog/materials', fn() => Response::redirect('/stock'), $catalogMW);
 $router->get('/catalog/variants', fn() => Response::redirect('/stock'), $catalogMW);
 
@@ -168,9 +168,15 @@ $router->get('/projects', fn() => print View::render('system/placeholder', ['tit
     Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
 ]);
 
-$router->get('/stock', fn() => print View::render('system/placeholder', ['title' => 'Stoc (Plăci HPL)']), [
-    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
-]);
+// ---- Stoc (Admin/Gestionar/Operator). Operator = read-only (nu poate crea plăci/piese)
+$stockReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$stockWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+
+$router->get('/stock', fn() => StockController::index(), $stockReadMW);
+$router->get('/stock/boards/create', fn() => StockController::createBoardForm(), $stockWriteMW);
+$router->post('/stock/boards/create', fn() => StockController::createBoard(), $stockWriteMW);
+$router->get('/stock/boards/{id}', fn($p) => StockController::boardDetails($p), $stockReadMW);
+$router->post('/stock/boards/{id}/pieces/add', fn($p) => StockController::addPiece($p), $stockWriteMW);
 
 // API placeholder
 $router->get('/api/health', function () {

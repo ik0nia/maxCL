@@ -1,0 +1,106 @@
+<?php
+use App\Core\Csrf;
+use App\Core\Url;
+use App\Core\View;
+
+$board = $board ?? [];
+$pieces = $pieces ?? [];
+
+ob_start();
+?>
+<div class="app-page-title">
+  <div>
+    <h1 class="m-0">Stoc · Placă</h1>
+    <div class="text-muted"><?= htmlspecialchars((string)($board['code'] ?? '')) ?> · <?= htmlspecialchars((string)($board['name'] ?? '')) ?></div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary">Înapoi</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-5">
+    <div class="card app-card p-3">
+      <div class="h5 m-0">Adaugă piesă în stoc</div>
+      <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>
+      <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/add')) ?>">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Tip</label>
+          <select class="form-select" name="piece_type" required>
+            <option value="FULL">Placă (FULL)</option>
+            <option value="OFFCUT">Rest (OFFCUT)</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small">Lățime (mm)</label>
+          <input type="number" min="1" class="form-control" name="width_mm" value="<?= (int)($board['std_width_mm'] ?? 0) ?>" required>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small">Lungime (mm)</label>
+          <input type="number" min="1" class="form-control" name="height_mm" value="<?= (int)($board['std_height_mm'] ?? 0) ?>" required>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small">Buc</label>
+          <input type="number" min="1" class="form-control" name="qty" value="1" required>
+        </div>
+        <div class="col-6 col-md-8">
+          <label class="form-label small">Locație</label>
+          <input class="form-control" name="location" placeholder="Ex: R1-S2" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label small">Note</label>
+          <input class="form-control" name="notes">
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-plus-lg me-1"></i> Adaugă piesă
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card app-card p-3">
+      <div class="h5 m-0">Piese asociate</div>
+      <div class="text-muted">Lista pieselor pentru această placă</div>
+      <table class="table table-hover align-middle mb-0 mt-2" id="piecesTable">
+        <thead>
+          <tr>
+            <th>Tip</th>
+            <th>Status</th>
+            <th>Dimensiuni</th>
+            <th class="text-end">Buc</th>
+            <th>Locație</th>
+            <th class="text-end">mp</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($pieces as $p): ?>
+            <tr>
+              <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
+              <td><?= htmlspecialchars((string)$p['status']) ?></td>
+              <td><?= (int)$p['width_mm'] ?> × <?= (int)$p['height_mm'] ?> mm</td>
+              <td class="text-end"><?= (int)$p['qty'] ?></td>
+              <td><?= htmlspecialchars((string)$p['location']) ?></td>
+              <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    const el = document.getElementById('piecesTable');
+    if (el && window.DataTable) new DataTable(el, { pageLength: 25 });
+  });
+</script>
+<?php
+$content = ob_get_clean();
+echo View::render('layout/app', compact('title', 'content'));
+

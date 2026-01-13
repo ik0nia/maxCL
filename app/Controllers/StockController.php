@@ -1,0 +1,176 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Controllers;
+
+use App\Core\Audit;
+use App\Core\Csrf;
+use App\Core\Response;
+use App\Core\Session;
+use App\Core\Validator;
+use App\Core\View;
+use App\Models\Finish;
+use App\Models\HplBoard;
+use App\Models\HplStockPiece;
+use App\Models\Texture;
+
+final class StockController
+{
+    public static function index(): void
+    {
+        $rows = HplBoard::allWithTotals();
+        echo View::render('stock/index', [
+            'title' => 'Stoc',
+            'rows' => $rows,
+        ]);
+    }
+
+    public static function createBoardForm(): void
+    {
+        echo View::render('stock/board_form', [
+            'title' => 'Placă nouă',
+            'mode' => 'create',
+            'row' => null,
+            'errors' => [],
+            'colors' => Finish::forSelect(),
+            'textures' => Texture::forSelect(),
+        ]);
+    }
+
+    public static function createBoard(): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+
+        $check = Validator::required($_POST, [
+            'code' => 'Cod',
+            'name' => 'Denumire',
+            'brand' => 'Brand',
+            'thickness_mm' => 'Grosime (mm)',
+            'std_width_mm' => 'Lățime standard (mm)',
+            'std_height_mm' => 'Lungime standard (mm)',
+            'face_color_id' => 'Culoare față',
+            'face_texture_id' => 'Textură față',
+        ]);
+        $errors = $check['errors'];
+
+        foreach (['thickness_mm' => 1, 'std_width_mm' => 1, 'std_height_mm' => 1] as $k => $min) {
+            if (!empty($_POST[$k] ?? '') && Validator::int((string)$_POST[$k], $min, 100000) === null) {
+                $errors[$k] = 'Valoare invalidă.';
+            }
+        }
+
+        $faceColor = Validator::int((string)($_POST['face_color_id'] ?? ''), 1) ?? null;
+        $faceTex = Validator::int((string)($_POST['face_texture_id'] ?? ''), 1) ?? null;
+        $backColorRaw = trim((string)($_POST['back_color_id'] ?? ''));
+        $backTexRaw = trim((string)($_POST['back_texture_id'] ?? ''));
+        $backColor = $backColorRaw === '' ? null : (Validator::int($backColorRaw, 1) ?? null);
+        $backTex = $backTexRaw === '' ? null : (Validator::int($backTexRaw, 1) ?? null);
+
+        if ($faceColor === null) $errors['face_color_id'] = 'Selectează culoarea feței.';
+        if ($faceTex === null) $errors['face_texture_id'] = 'Selectează textura feței.';
+        if ($backColorRaw !== '' && $backColor === null) $errors['back_color_id'] = 'Culoarea verso este invalidă.';
+        if ($backTexRaw !== '' && $backTex === null) $errors['back_texture_id'] = 'Textura verso este invalidă.';
+
+        if ($errors) {
+            echo View::render('stock/board_form', [
+                'title' => 'Placă nouă',
+                'mode' => 'create',
+                'row' => $_POST,
+                'errors' => $errors,
+                'colors' => Finish::forSelect(),
+                'textures' => Texture::forSelect(),
+            ]);
+            return;
+        }
+
+        try {
+            $data = [
+                'code' => trim((string)$_POST['code']),
+                'name' => trim((string)$_POST['name']),
+                'brand' => trim((string)$_POST['brand']),
+                'thickness_mm' => (int)$_POST['thickness_mm'],
+                'std_width_mm' => (int)$_POST['std_width_mm'],
+                'std_height_mm' => (int)$_POST['std_height_mm'],
+                'face_color_id' => $faceColor,
+                'face_texture_id' => $faceTex,
+                'back_color_id' => $backColor,
+                'back_texture_id' => $backTex,
+                'notes' => trim((string)($_POST['notes'] ?? '')),
+            ];
+            $id = HplBoard::create($data);
+            Audit::log('BOARD_CREATE', 'hpl_boards', $id, null, $data);
+            Session::flash('toast_success', 'Placă creată.');
+            Response::redirect('/stock');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Eroare: ' . $e->getMessage());
+            Response::redirect('/stock/boards/create');
+        }
+    }
+
+    public static function boardDetails(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $board = HplBoard::find($id);
+        if (!$board) {
+            Session::flash('toast_error', 'Placă inexistentă.');
+            Response::redirect('/stock');
+        }
+        $pieces = HplStockPiece::forBoard($id);
+        echo View::render('stock/board_details', [
+            'title' => 'Stoc · Placă',
+            'board' => $board,
+            'pieces' => $pieces,
+        ]);
+    }
+
+    public static function addPiece(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $boardId = (int)($params['id'] ?? 0);
+        $board = HplBoard::find($boardId);
+        if (!$board) {
+            Session::flash('toast_error', 'Placă inexistentă.');
+            Response::redirect('/stock');
+        }
+
+        $check = Validator::required($_POST, [
+            'piece_type' => 'Tip piesă',
+            'width_mm' => 'Lățime (mm)',
+            'height_mm' => 'Lungime (mm)',
+            'qty' => 'Bucăți',
+            'location' => 'Locație',
+        ]);
+        $errors = $check['errors'];
+
+        $type = (string)($_POST['piece_type'] ?? '');
+        if (!in_array($type, ['FULL', 'OFFCUT'], true)) $errors['piece_type'] = 'Tip piesă invalid.';
+
+        foreach (['width_mm','height_mm','qty'] as $k) {
+            if (!empty($_POST[$k] ?? '') && Validator::int((string)$_POST[$k], 1, 100000) === null) {
+                $errors[$k] = 'Valoare invalidă.';
+            }
+        }
+
+        if ($errors) {
+            Session::flash('toast_error', 'Completează corect câmpurile piesei.');
+            Response::redirect('/stock/boards/' . $boardId);
+        }
+
+        $data = [
+            'board_id' => $boardId,
+            'piece_type' => $type,
+            'status' => 'AVAILABLE',
+            'width_mm' => (int)$_POST['width_mm'],
+            'height_mm' => (int)$_POST['height_mm'],
+            'qty' => (int)$_POST['qty'],
+            'location' => trim((string)$_POST['location']),
+            'notes' => trim((string)($_POST['notes'] ?? '')),
+        ];
+
+        $pieceId = HplStockPiece::create($data);
+        Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, null, $data);
+        Session::flash('toast_success', 'Piesă adăugată în stoc.');
+        Response::redirect('/stock/boards/' . $boardId);
+    }
+}
+
