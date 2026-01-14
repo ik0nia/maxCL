@@ -467,7 +467,7 @@ final class StockController
         Response::redirect('/stock/boards/' . $boardId);
     }
 
-    // Ștergere piesă (doar ADMIN)
+    // Ștergere piesă (ADMIN/GESTIONAR)
     public static function deletePiece(array $params): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);

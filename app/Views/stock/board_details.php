@@ -23,7 +23,7 @@ foreach ($pieces as $p) {
   if ((string)($p['status'] ?? '') !== 'AVAILABLE') continue;
   $availableM2 += (float)($p['area_total_m2'] ?? 0);
 }
-$availableValueLei = ($isAdmin && $salePerM2 !== null && is_finite($salePerM2) && $salePerM2 >= 0)
+$availableValueLei = ($canWrite && $salePerM2 !== null && is_finite($salePerM2) && $salePerM2 >= 0)
   ? ($availableM2 * $salePerM2)
   : null;
 
@@ -79,7 +79,7 @@ ob_start();
   <div class="col-12 col-lg-5">
     <div class="card app-card p-3 mb-3">
       <div class="h5 m-0">Detalii placă</div>
-      <div class="text-muted">Dimensiuni standard și prețuri</div>
+      <div class="text-muted"><?= $canWrite ? 'Dimensiuni standard și prețuri' : 'Dimensiuni standard' ?></div>
 
       <div class="mt-3">
         <?php
@@ -161,16 +161,16 @@ ob_start();
           <div class="text-muted">Suprafață standard</div>
           <div class="fw-semibold"><?= number_format((float)$stdArea, 2, '.', '') ?> mp</div>
         </div>
-        <div class="d-flex justify-content-between border-bottom py-2">
-          <div class="text-muted">Preț vânzare (placă)</div>
-          <div class="fw-semibold"><?= $salePriceNum !== null ? number_format((float)$salePriceNum, 2, '.', '') . ' lei' : '—' ?></div>
-        </div>
-        <div class="d-flex justify-content-between py-2">
-          <div class="text-muted">Preț / mp (calculat)</div>
-          <div class="fw-semibold"><?= $salePerM2 !== null ? number_format((float)$salePerM2, 2, '.', '') . ' lei/mp' : '—' ?></div>
-        </div>
+        <?php if ($canWrite): ?>
+          <div class="d-flex justify-content-between border-bottom py-2">
+            <div class="text-muted">Preț vânzare (placă)</div>
+            <div class="fw-semibold"><?= $salePriceNum !== null ? number_format((float)$salePriceNum, 2, '.', '') . ' lei' : '—' ?></div>
+          </div>
+          <div class="d-flex justify-content-between py-2">
+            <div class="text-muted">Preț / mp (calculat)</div>
+            <div class="fw-semibold"><?= $salePerM2 !== null ? number_format((float)$salePerM2, 2, '.', '') . ' lei/mp' : '—' ?></div>
+          </div>
 
-        <?php if ($isAdmin): ?>
           <div class="d-flex justify-content-between border-top pt-2 mt-2">
             <div class="text-muted">Valoare stoc disponibil</div>
             <div class="fw-semibold"><?= $availableValueLei !== null ? number_format((float)$availableValueLei, 2, '.', '') . ' lei' : '—' ?></div>
@@ -237,7 +237,7 @@ ob_start();
             <th class="text-end">Buc</th>
             <th>Locație</th>
             <th class="text-end">mp</th>
-            <?php if ($isAdmin): ?><th class="text-end" style="width:110px">Acțiuni</th><?php endif; ?>
+            <?php if ($canWrite): ?><th class="text-end" style="width:110px">Acțiuni</th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -249,7 +249,7 @@ ob_start();
               <td class="text-end"><?= (int)$p['qty'] ?></td>
               <td><?= htmlspecialchars((string)$p['location']) ?></td>
               <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
-              <?php if ($isAdmin): ?>
+              <?php if ($canWrite): ?>
                 <td class="text-end">
                   <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/' . (int)$p['id'] . '/delete')) ?>"
                         class="d-inline" onsubmit="return confirm('Sigur vrei să ștergi această piesă?');">
@@ -266,56 +266,58 @@ ob_start();
       </table>
     </div>
 
-    <div class="card app-card p-3 mt-3">
-      <div class="h5 m-0">Adaugă piesă în stoc</div>
-      <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>
-      <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/add')) ?>">
-        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+    <?php if ($canWrite): ?>
+      <div class="card app-card p-3 mt-3">
+        <div class="h5 m-0">Adaugă piesă în stoc</div>
+        <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>
+        <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/add')) ?>">
+          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
-        <div class="col-12 col-md-4">
-          <label class="form-label small">Tip</label>
-          <select class="form-select" name="piece_type" required>
-            <option value="FULL">Placă (FULL)</option>
-            <option value="OFFCUT">Rest (OFFCUT)</option>
-          </select>
-        </div>
-        <div class="col-6 col-md-4">
-          <label class="form-label small">Lățime (mm)</label>
-          <input type="number" min="1" class="form-control" name="width_mm" value="<?= (int)($board['std_width_mm'] ?? 0) ?>" required>
-        </div>
-        <div class="col-6 col-md-4">
-          <label class="form-label small">Lungime (mm)</label>
-          <input type="number" min="1" class="form-control" name="height_mm" value="<?= (int)($board['std_height_mm'] ?? 0) ?>" required>
-        </div>
-        <div class="col-6 col-md-4">
-          <label class="form-label small">Buc</label>
-          <input type="number" min="1" class="form-control" name="qty" value="1" required>
-        </div>
-        <div class="col-6 col-md-8">
-          <label class="form-label small">Locație</label>
-          <select class="form-select" name="location" required>
-            <option value="">Alege locație...</option>
-            <option value="Depozit">Depozit</option>
-            <option value="Producție">Producție</option>
-            <option value="Magazin">Magazin</option>
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="form-label small">Note</label>
-          <input class="form-control" name="notes">
-        </div>
-        <div class="col-12">
-          <div class="text-muted small">
-            Notă: dacă dimensiunile diferă de standard, piesa se salvează automat ca <strong>OFFCUT</strong>.
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Tip</label>
+            <select class="form-select" name="piece_type" required>
+              <option value="FULL">Placă (FULL)</option>
+              <option value="OFFCUT">Rest (OFFCUT)</option>
+            </select>
           </div>
-        </div>
-        <div class="col-12">
-          <button class="btn btn-primary w-100" type="submit">
-            <i class="bi bi-plus-lg me-1"></i> Adaugă piesă
-          </button>
-        </div>
-      </form>
-    </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small">Lățime (mm)</label>
+            <input type="number" min="1" class="form-control" name="width_mm" value="<?= (int)($board['std_width_mm'] ?? 0) ?>" required>
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small">Lungime (mm)</label>
+            <input type="number" min="1" class="form-control" name="height_mm" value="<?= (int)($board['std_height_mm'] ?? 0) ?>" required>
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small">Buc</label>
+            <input type="number" min="1" class="form-control" name="qty" value="1" required>
+          </div>
+          <div class="col-6 col-md-8">
+            <label class="form-label small">Locație</label>
+            <select class="form-select" name="location" required>
+              <option value="">Alege locație...</option>
+              <option value="Depozit">Depozit</option>
+              <option value="Producție">Producție</option>
+              <option value="Magazin">Magazin</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small">Note</label>
+            <input class="form-control" name="notes">
+          </div>
+          <div class="col-12">
+            <div class="text-muted small">
+              Notă: dacă dimensiunile diferă de standard, piesa se salvează automat ca <strong>OFFCUT</strong>.
+            </div>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit">
+              <i class="bi bi-plus-lg me-1"></i> Adaugă piesă
+            </button>
+          </div>
+        </form>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
 

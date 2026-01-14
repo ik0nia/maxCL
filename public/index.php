@@ -213,9 +213,7 @@ $router->post('/stock/boards/{id}/pieces/add', fn($p) => StockController::addPie
 $router->get('/stock/boards/{id}/edit', fn($p) => StockController::editBoardForm($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/edit', fn($p) => StockController::updateBoard($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/delete', fn($p) => StockController::deleteBoard($p), $stockWriteMW);
-$router->post('/stock/boards/{boardId}/pieces/{pieceId}/delete', fn($p) => StockController::deletePiece($p), [
-    Auth::requireRole([Auth::ROLE_ADMIN])
-]);
+$router->post('/stock/boards/{boardId}/pieces/{pieceId}/delete', fn($p) => StockController::deletePiece($p), $stockWriteMW);
 
 // API placeholder
 $router->get('/api/health', function () {
