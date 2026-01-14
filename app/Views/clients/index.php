@@ -46,7 +46,7 @@ ob_start();
           $projects = $plist !== '' ? explode('||', $plist) : [];
           $pCount = (int)($r['project_count'] ?? 0);
         ?>
-        <tr>
+        <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/clients/' . (int)$r['id'])) ?>" role="button" tabindex="0">
           <td>
             <span class="badge app-badge"><?= htmlspecialchars($typeLabel) ?></span>
           </td>
@@ -105,6 +105,23 @@ ob_start();
   document.addEventListener('DOMContentLoaded', function(){
     const el = document.getElementById('clientsTable');
     if (el && window.DataTable) new DataTable(el, { pageLength: 25, order: [[1,'asc']] });
+
+    // Click oriunde pe rând -> intră în client (fără să strice butoanele/link-urile).
+    document.querySelectorAll('#clientsTable tbody tr.js-row-link[data-href]').forEach(function (tr) {
+      function go(e) {
+        const t = (e && e.target) ? e.target : null;
+        if (t && t.closest && t.closest('a,button,input,select,textarea,label,form')) return;
+        const href = tr.getAttribute('data-href');
+        if (href) window.location.href = href;
+      }
+      tr.addEventListener('click', go);
+      tr.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          go(e);
+        }
+      });
+    });
   });
 </script>
 <?php
