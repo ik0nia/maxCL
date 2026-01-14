@@ -98,6 +98,14 @@ $toastError = Session::flash('toast_error');
           </a>
         <?php endif; ?>
 
+        <div class="app-nav-section">Magazie</div>
+        <a class="app-nav-link <?= str_starts_with($p, '/magazie/stoc') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>">
+          <i class="bi bi-boxes me-2"></i> Stoc Magazie
+        </a>
+        <a class="app-nav-link <?= str_starts_with($p, '/magazie/receptie') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/receptie')) ?>">
+          <i class="bi bi-truck me-2"></i> Recepție marfă
+        </a>
+
         <div class="app-nav-section">Sistem</div>
         <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
           <i class="bi bi-journal-text me-2"></i> Jurnal activitate

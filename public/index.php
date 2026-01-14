@@ -19,6 +19,8 @@ use App\Controllers\Hpl\InlineTexturesController;
 use App\Controllers\Hpl\CatalogController as HplCatalogController;
 use App\Controllers\Hpl\InternalPiecesController as HplInternalPiecesController;
 use App\Controllers\Hpl\OffcutsController as HplOffcutsController;
+use App\Controllers\Magazie\StockController as MagazieStockController;
+use App\Controllers\Magazie\ReceptionController as MagazieReceptionController;
 use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
@@ -229,6 +231,15 @@ $router->get('/stock/boards/{id}/edit', fn($p) => StockController::editBoardForm
 $router->post('/stock/boards/{id}/edit', fn($p) => StockController::updateBoard($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/delete', fn($p) => StockController::deleteBoard($p), $stockWriteMW);
 $router->post('/stock/boards/{boardId}/pieces/{pieceId}/delete', fn($p) => StockController::deletePiece($p), $stockWriteMW);
+
+// ---- Magazie (accesorii)
+$magReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$magWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+
+$router->get('/magazie/stoc', fn() => MagazieStockController::index(), $magReadMW);
+$router->post('/magazie/stoc/{id}/consume', fn($p) => MagazieStockController::consume($p), $magReadMW);
+$router->get('/magazie/receptie', fn() => MagazieReceptionController::index(), $magWriteMW);
+$router->post('/magazie/receptie/create', fn() => MagazieReceptionController::create(), $magWriteMW);
 
 // API placeholder
 $router->get('/api/health', function () {

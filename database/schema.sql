@@ -267,6 +267,43 @@ CREATE TABLE IF NOT EXISTS projects (
   CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---- Magazie (accesorii)
+CREATE TABLE IF NOT EXISTS magazie_items (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  winmentor_code VARCHAR(64) NOT NULL,
+  name VARCHAR(190) NOT NULL,
+  unit_price DECIMAL(12,2) NULL,
+  stock_qty INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_magazie_items_winmentor (winmentor_code),
+  KEY idx_magazie_items_name (name),
+  KEY idx_magazie_items_stock (stock_qty)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS magazie_movements (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  item_id INT UNSIGNED NOT NULL,
+  direction ENUM('IN','OUT','ADJUST') NOT NULL,
+  qty INT NOT NULL,
+  unit_price DECIMAL(12,2) NULL,
+  project_id INT UNSIGNED NULL,
+  project_code VARCHAR(64) NULL,
+  note VARCHAR(255) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_mag_mov_item (item_id),
+  KEY idx_mag_mov_dir (direction),
+  KEY idx_mag_mov_created (created_at),
+  KEY idx_mag_mov_project (project_id),
+  KEY idx_mag_mov_project_code (project_code),
+  CONSTRAINT fk_mag_mov_item FOREIGN KEY (item_id) REFERENCES magazie_items(id),
+  CONSTRAINT fk_mag_mov_project FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_mag_mov_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS project_stock_inputs (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   project_id INT UNSIGNED NOT NULL,
