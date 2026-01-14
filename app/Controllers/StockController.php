@@ -4,7 +4,10 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Audit;
+use App\Core\Auth;
 use App\Core\Csrf;
+use App\Core\DbMigrations;
+use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
@@ -86,6 +89,7 @@ final class StockController
 
     public static function index(): void
     {
+        $triedMigrate = false;
         try {
             // Filtru culoare: acceptă atât cod (ex: 617) cât și id intern (compat)
             $colorId = null;
@@ -117,10 +121,56 @@ final class StockController
                 'thicknessOptions' => HplBoard::thicknessOptions(),
             ]);
         } catch (\Throwable $e) {
-            // Cel mai des: tabelele noi nu există încă (nu s-a rulat setup după update).
+            // Încearcă încă o dată după auto-migrare (hosting poate servi request-ul înainte să se aplice).
+            if (!$triedMigrate) {
+                $triedMigrate = true;
+                try {
+                    DbMigrations::runAuto();
+                    $colorId = null;
+                    $color = null;
+                    $colorRaw = isset($_GET['color']) ? trim((string)$_GET['color']) : '';
+                    if ($colorRaw !== '') {
+                        $color = Finish::findByCode($colorRaw);
+                        if (!$color) {
+                            $maybeId = Validator::int($colorRaw, 1);
+                            if ($maybeId) $color = Finish::find($maybeId);
+                        }
+                    } elseif (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
+                        $maybeId = Validator::int((string)$_GET['color_id'], 1);
+                        if ($maybeId) $color = Finish::find($maybeId);
+                    }
+                    if ($color) $colorId = (int)$color['id'];
+
+                    $thicknessMm = null;
+                    if (isset($_GET['thickness_mm']) && (string)$_GET['thickness_mm'] !== '') {
+                        $thicknessMm = Validator::int((string)$_GET['thickness_mm'], 1);
+                    }
+                    $rows = HplBoard::allWithTotals($colorId ?: null, $thicknessMm ?: null);
+                    echo View::render('stock/index', [
+                        'title' => 'Stoc',
+                        'rows' => $rows,
+                        'filterColor' => $color,
+                        'filterColorQuery' => $color ? (string)($color['code'] ?? '') : $colorRaw,
+                        'filterThicknessMm' => $thicknessMm,
+                        'thicknessOptions' => HplBoard::thicknessOptions(),
+                    ]);
+                    return;
+                } catch (\Throwable $e2) {
+                    $e = $e2;
+                }
+            }
+
+            $u = Auth::user();
+            $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro');
+            $msg = 'Stoc indisponibil momentan.';
+            if ($debug) {
+                $msg .= ' Eroare: ' . get_class($e) . ' · ' . $e->getMessage() . ' · ' . basename((string)$e->getFile()) . ':' . (int)$e->getLine();
+            } else {
+                $msg .= ' Rulează din nou Setup (butonul „Instalează acum”) ca să creezi tabelele noi (textures/hpl_boards/hpl_stock_pieces).';
+            }
             echo View::render('system/placeholder', [
                 'title' => 'Stoc',
-                'message' => 'Stoc indisponibil momentan. Rulează din nou Setup (butonul „Instalează acum”) ca să creezi tabelele noi (textures/hpl_boards/hpl_stock_pieces).',
+                'message' => $msg,
             ]);
         }
     }
