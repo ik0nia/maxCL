@@ -253,16 +253,23 @@ ob_start();
                   $noteShort = mb_substr($noteShort, 0, 500) . '…';
                 }
               }
+              $pStatus = (string)($p['status'] ?? '');
+              $pLoc = (string)($p['location'] ?? '');
+              // Cerință: la "Piese asociate" afișăm notița DOAR dacă NU e AVAILABLE și NU e în Depozit.
+              $showNote = ($noteShort !== '') && ($pStatus !== 'AVAILABLE') && ($pLoc !== 'Depozit');
             ?>
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
               <td>
-                <?= htmlspecialchars((string)$p['status']) ?>
-                <?php if ($noteShort !== ''): ?>
-                  <div class="text-muted small mt-1" style="white-space:pre-wrap">
-                    <?= nl2br(htmlspecialchars($noteShort)) ?>
-                  </div>
-                <?php endif; ?>
+                <div class="d-flex flex-column align-items-start">
+                  <div><?= htmlspecialchars($pStatus) ?></div>
+                  <?php if ($showNote): ?>
+                    <div class="small mt-1 px-2 py-1 rounded"
+                         style="white-space:pre-wrap;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
+                      <?= nl2br(htmlspecialchars($noteShort)) ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
               </td>
               <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
               <td class="text-end"><?= (int)$p['qty'] ?></td>
@@ -312,15 +319,20 @@ ob_start();
                     $noteShort = mb_substr($noteShort, 0, 500) . '…';
                   }
                 }
+                $pStatus = (string)($p['status'] ?? '');
+                // La interne păstrăm notițele vizibile (sunt pentru uz intern).
               ?>
               <tr>
                 <td>
-                  <?= htmlspecialchars((string)$p['status']) ?>
-                  <?php if ($noteShort !== ''): ?>
-                    <div class="text-muted small mt-1" style="white-space:pre-wrap">
-                      <?= nl2br(htmlspecialchars($noteShort)) ?>
-                    </div>
-                  <?php endif; ?>
+                  <div class="d-flex flex-column align-items-start">
+                    <div><?= htmlspecialchars($pStatus) ?></div>
+                    <?php if ($noteShort !== ''): ?>
+                      <div class="small mt-1 px-2 py-1 rounded"
+                           style="white-space:pre-wrap;background:#F3F7F8;border:1px solid #D9E3E6;color:#5F6B72">
+                        <?= nl2br(htmlspecialchars($noteShort)) ?>
+                      </div>
+                    <?php endif; ?>
+                  </div>
                 </td>
                 <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
                 <td class="text-end"><?= (int)$p['qty'] ?></td>
