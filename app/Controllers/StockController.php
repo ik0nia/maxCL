@@ -447,10 +447,16 @@ final class StockController
             Session::flash('toast_error', 'Dimensiunile diferă de standard; piesa a fost salvată automat ca OFFCUT.');
         }
 
+        // Regulă: Producție = indisponibil (RESERVED)
+        $status = ($location === 'Producție') ? 'RESERVED' : 'AVAILABLE';
+        if ($status === 'RESERVED') {
+            Session::flash('toast_error', 'Locația „Producție” setează automat statusul ca Rezervat/Indisponibil.');
+        }
+
         $data = [
             'board_id' => $boardId,
             'piece_type' => $type,
-            'status' => 'AVAILABLE',
+            'status' => $status,
             'width_mm' => $width,
             'height_mm' => $height,
             'qty' => (int)$_POST['qty'],
@@ -559,6 +565,10 @@ final class StockController
         if ($qty === null) $errors['qty'] = 'Cantitate invalidă.';
         if ($toLocation === '' || !in_array($toLocation, self::locations(), true)) $errors['to_location'] = 'Locație invalidă.';
         $allowedStatuses = array_keys(self::statusLabels());
+        // Regulă: dacă destinația este Producție, statusul este forțat pe RESERVED (indisponibil).
+        if ($toLocation === 'Producție') {
+            $toStatus = 'RESERVED';
+        }
         if ($toStatus === '' || !in_array($toStatus, $allowedStatuses, true)) $errors['to_status'] = 'Status invalid.';
         if ($note === '') $errors['note'] = 'Notița este obligatorie.';
 

@@ -270,7 +270,7 @@ ob_start();
     <?php if ($canMove): ?>
       <div class="card app-card p-3 mt-3">
         <div class="h5 m-0">Mutare stoc</div>
-        <div class="text-muted">Mută o cantitate pe altă locație și/sau schimbă statusul (devine indisponibil dacă nu este „Disponibil”).</div>
+        <div class="text-muted">Mută o cantitate pe altă locație și/sau schimbă statusul (devine indisponibil dacă nu este „Disponibil”). <strong>Producție</strong> setează automat statusul pe <strong>Rezervat</strong>.</div>
         <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/move')) ?>">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
@@ -295,9 +295,9 @@ ob_start();
 
           <div class="col-6 col-md-4">
             <label class="form-label small">Status destinație</label>
-            <select class="form-select" name="to_status" required>
+            <select class="form-select" name="to_status" id="move_to_status" required>
               <option value="RESERVED" selected>Rezervat / Indisponibil</option>
-              <option value="AVAILABLE">Disponibil</option>
+              <option value="AVAILABLE" id="opt_move_available">Disponibil</option>
               <option value="SCRAP">Rebut / Stricat</option>
               <option value="CONSUMED">Consumat</option>
             </select>
@@ -305,7 +305,7 @@ ob_start();
 
           <div class="col-12 col-md-4">
             <label class="form-label small">Locație destinație</label>
-            <select class="form-select" name="to_location" required>
+            <select class="form-select" name="to_location" id="move_to_location" required>
               <option value="">Alege locație...</option>
               <option value="Depozit">Depozit</option>
               <option value="Producție">Producție</option>
@@ -388,6 +388,19 @@ ob_start();
   document.addEventListener('DOMContentLoaded', function(){
     const el = document.getElementById('piecesTable');
     if (el && window.DataTable) new DataTable(el, { pageLength: 25 });
+
+    // Regulă UI: Producție => status forțat RESERVED (nu permite AVAILABLE)
+    const loc = document.getElementById('move_to_location');
+    const st = document.getElementById('move_to_status');
+    const optAvail = document.getElementById('opt_move_available');
+    function applyMoveRule(){
+      if (!loc || !st) return;
+      const isProd = String(loc.value || '') === 'Producție';
+      if (optAvail) optAvail.disabled = isProd;
+      if (isProd) st.value = 'RESERVED';
+    }
+    if (loc) loc.addEventListener('change', applyMoveRule);
+    applyMoveRule();
   });
 </script>
 <?php
