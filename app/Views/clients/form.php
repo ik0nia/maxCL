@@ -7,6 +7,7 @@ $isEdit = ($mode ?? '') === 'edit';
 $v = $row ?? [];
 $errors = $errors ?? [];
 $types = $types ?? [];
+$groups = $groups ?? [];
 $action = $isEdit ? Url::to('/clients/' . (int)($v['id'] ?? 0) . '/edit') : Url::to('/clients/create');
 
 ob_start();
@@ -40,6 +41,25 @@ ob_start();
       <label class="form-label">Nume (client/companie) *</label>
       <input class="form-control <?= isset($errors['name']) ? 'is-invalid' : '' ?>" name="name" value="<?= htmlspecialchars((string)($v['name'] ?? '')) ?>" required>
       <?php if (isset($errors['name'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['name']) ?></div><?php endif; ?>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label">Grup de firme (opțional)</label>
+      <select class="form-select" name="client_group_id">
+        <option value="">— Fără grup —</option>
+        <?php foreach ($groups as $g): ?>
+          <?php $sel = ((string)($v['client_group_id'] ?? '') !== '' && (int)($v['client_group_id'] ?? 0) === (int)($g['id'] ?? 0)) ? 'selected' : ''; ?>
+          <option value="<?= (int)($g['id'] ?? 0) ?>" <?= $sel ?>><?= htmlspecialchars((string)($g['name'] ?? '')) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <div class="text-muted small mt-1">Dacă acest client face parte dintr-un grup (ex: holding), îl poți selecta aici.</div>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label">Grup nou (opțional)</label>
+      <input class="form-control <?= isset($errors['client_group_new']) ? 'is-invalid' : '' ?>" name="client_group_new" placeholder="ex: Grup Ikonia" value="<?= htmlspecialchars((string)($v['client_group_new'] ?? '')) ?>">
+      <?php if (isset($errors['client_group_new'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['client_group_new']) ?></div><?php endif; ?>
+      <div class="text-muted small mt-1">Dacă completezi aici, se va crea automat grupul (și se va atribui clientului).</div>
     </div>
 
     <div class="col-12 col-md-4" id="cui_wrap">

@@ -11,6 +11,8 @@ use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
 use App\Models\Client;
+use App\Models\ClientAddress;
+use App\Models\ClientGroup;
 use App\Models\Project;
 
 final class ClientsController
@@ -48,6 +50,7 @@ final class ClientsController
             'row' => ['type' => 'PERSOANA_FIZICA'],
             'errors' => [],
             'types' => self::types(),
+            'groups' => ClientGroup::forSelect(),
         ]);
     }
 
@@ -66,6 +69,8 @@ final class ClientsController
 
         $type = trim((string)($_POST['type'] ?? ''));
         $name = trim((string)($_POST['name'] ?? ''));
+        $groupIdRaw = trim((string)($_POST['client_group_id'] ?? ''));
+        $groupNew = trim((string)($_POST['client_group_new'] ?? ''));
         $cui = trim((string)($_POST['cui'] ?? ''));
         $contact = trim((string)($_POST['contact_person'] ?? ''));
         $phone = trim((string)($_POST['phone'] ?? ''));
@@ -83,6 +88,9 @@ final class ClientsController
         if ($type === 'FIRMA' && $cui === '') {
             $errors['cui'] = 'CUI este obligatoriu pentru firmă.';
         }
+        if ($groupNew !== '' && mb_strlen($groupNew) > 190) {
+            $errors['client_group_new'] = 'Nume grup prea lung.';
+        }
 
         if ($errors) {
             echo View::render('clients/form', [
@@ -91,13 +99,24 @@ final class ClientsController
                 'row' => $_POST,
                 'errors' => $errors,
                 'types' => self::types(),
+                'groups' => ClientGroup::forSelect(),
             ]);
             return;
+        }
+
+        $groupId = null;
+        if ($groupNew !== '') {
+            $gid = ClientGroup::upsertByName($groupNew);
+            if ($gid > 0) $groupId = $gid;
+        } elseif ($groupIdRaw !== '') {
+            $gid = Validator::int($groupIdRaw, 1);
+            if ($gid) $groupId = $gid;
         }
 
         $data = [
             'type' => $type,
             'name' => $name,
+            'client_group_id' => $groupId,
             'cui' => $cui,
             'contact_person' => $contact,
             'phone' => $phone,
@@ -107,6 +126,8 @@ final class ClientsController
         ];
 
         $id = Client::create($data);
+        // Best-effort: creează adresa principală în tabela de adrese (dacă există).
+        ClientAddress::ensureDefaultFromLegacy($id, $address);
         Audit::log('CLIENT_CREATE', 'clients', $id, null, $data, [
             'message' => 'A creat client: ' . $name . ' · ' . ($type === 'FIRMA' ? 'Firmă' : 'Persoană fizică'),
         ]);
@@ -129,11 +150,25 @@ final class ClientsController
         } catch (\Throwable $e) {
             $projects = [];
         }
+        $addresses = ClientAddress::forClient($id);
+        $group = null;
+        $groupMembers = [];
+        try {
+            $gid = (int)($row['client_group_id'] ?? 0);
+            $group = $gid > 0 ? ClientGroup::find($gid) : null;
+            $groupMembers = $gid > 0 ? Client::othersInGroup($id, $gid) : [];
+        } catch (\Throwable $e) {
+            $group = null;
+            $groupMembers = [];
+        }
 
         echo View::render('clients/show', [
             'title' => 'Client',
             'row' => $row,
             'projects' => $projects,
+            'addresses' => $addresses,
+            'group' => $group,
+            'groupMembers' => $groupMembers,
         ]);
     }
 
@@ -151,6 +186,7 @@ final class ClientsController
             'row' => $row,
             'errors' => [],
             'types' => self::types(),
+            'groups' => ClientGroup::forSelect(),
         ]);
     }
 
@@ -175,6 +211,8 @@ final class ClientsController
 
         $type = trim((string)($_POST['type'] ?? ''));
         $name = trim((string)($_POST['name'] ?? ''));
+        $groupIdRaw = trim((string)($_POST['client_group_id'] ?? ''));
+        $groupNew = trim((string)($_POST['client_group_new'] ?? ''));
         $cui = trim((string)($_POST['cui'] ?? ''));
         $contact = trim((string)($_POST['contact_person'] ?? ''));
         $phone = trim((string)($_POST['phone'] ?? ''));
@@ -192,6 +230,9 @@ final class ClientsController
         if ($type === 'FIRMA' && $cui === '') {
             $errors['cui'] = 'CUI este obligatoriu pentru firmă.';
         }
+        if ($groupNew !== '' && mb_strlen($groupNew) > 190) {
+            $errors['client_group_new'] = 'Nume grup prea lung.';
+        }
 
         if ($errors) {
             $row = array_merge($before, $_POST);
@@ -201,13 +242,24 @@ final class ClientsController
                 'row' => $row,
                 'errors' => $errors,
                 'types' => self::types(),
+                'groups' => ClientGroup::forSelect(),
             ]);
             return;
+        }
+
+        $groupId = null;
+        if ($groupNew !== '') {
+            $gid = ClientGroup::upsertByName($groupNew);
+            if ($gid > 0) $groupId = $gid;
+        } elseif ($groupIdRaw !== '') {
+            $gid = Validator::int($groupIdRaw, 1);
+            if ($gid) $groupId = $gid;
         }
 
         $after = [
             'type' => $type,
             'name' => $name,
+            'client_group_id' => $groupId,
             'cui' => $cui,
             'contact_person' => $contact,
             'phone' => $phone,
@@ -217,11 +269,120 @@ final class ClientsController
         ];
 
         Client::update($id, $after);
+        ClientAddress::ensureDefaultFromLegacy($id, $address);
         Audit::log('CLIENT_UPDATE', 'clients', $id, $before, $after, [
             'message' => 'A actualizat client: ' . $name,
         ]);
         Session::flash('toast_success', 'Client actualizat.');
         Response::redirect('/clients/' . $id);
+    }
+
+    public static function createAddress(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $clientId = (int)($params['id'] ?? 0);
+        $client = Client::find($clientId);
+        if (!$client) {
+            Session::flash('toast_error', 'Client inexistent.');
+            Response::redirect('/clients');
+        }
+
+        $address = trim((string)($_POST['address'] ?? ''));
+        if ($address === '') {
+            Session::flash('toast_error', 'Adresa este obligatorie.');
+            Response::redirect('/clients/' . $clientId);
+        }
+        $label = trim((string)($_POST['label'] ?? ''));
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        $isDefault = isset($_POST['is_default']) ? 1 : 0;
+
+        try {
+            $id = ClientAddress::create($clientId, [
+                'label' => $label,
+                'address' => $address,
+                'notes' => $notes,
+                'is_default' => $isDefault,
+            ]);
+            Audit::log('CLIENT_ADDRESS_CREATE', 'client_addresses', $id, null, null, [
+                'message' => 'A adăugat adresă de livrare pentru client: ' . (string)$client['name'],
+                'client_id' => $clientId,
+            ]);
+            Session::flash('toast_success', 'Adresă adăugată.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot adăuga adresa (verifică dacă tabelul a fost actualizat).');
+        }
+        Response::redirect('/clients/' . $clientId);
+    }
+
+    public static function updateAddress(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $clientId = (int)($params['id'] ?? 0);
+        $addrId = (int)($params['addrId'] ?? 0);
+        $client = Client::find($clientId);
+        if (!$client) {
+            Session::flash('toast_error', 'Client inexistent.');
+            Response::redirect('/clients');
+        }
+        $before = ClientAddress::find($addrId);
+        if (!$before || (int)($before['client_id'] ?? 0) !== $clientId) {
+            Session::flash('toast_error', 'Adresă inexistentă.');
+            Response::redirect('/clients/' . $clientId);
+        }
+
+        $address = trim((string)($_POST['address'] ?? ''));
+        if ($address === '') {
+            Session::flash('toast_error', 'Adresa este obligatorie.');
+            Response::redirect('/clients/' . $clientId);
+        }
+        $label = trim((string)($_POST['label'] ?? ''));
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        $isDefault = isset($_POST['is_default']) ? 1 : 0;
+
+        try {
+            ClientAddress::update($addrId, $clientId, [
+                'label' => $label,
+                'address' => $address,
+                'notes' => $notes,
+                'is_default' => $isDefault,
+            ]);
+            Audit::log('CLIENT_ADDRESS_UPDATE', 'client_addresses', $addrId, $before, null, [
+                'message' => 'A actualizat o adresă de livrare pentru client: ' . (string)$client['name'],
+                'client_id' => $clientId,
+            ]);
+            Session::flash('toast_success', 'Adresă actualizată.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot actualiza adresa.');
+        }
+        Response::redirect('/clients/' . $clientId);
+    }
+
+    public static function deleteAddress(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $clientId = (int)($params['id'] ?? 0);
+        $addrId = (int)($params['addrId'] ?? 0);
+        $client = Client::find($clientId);
+        if (!$client) {
+            Session::flash('toast_error', 'Client inexistent.');
+            Response::redirect('/clients');
+        }
+        $before = ClientAddress::find($addrId);
+        if (!$before || (int)($before['client_id'] ?? 0) !== $clientId) {
+            Session::flash('toast_error', 'Adresă inexistentă.');
+            Response::redirect('/clients/' . $clientId);
+        }
+        try {
+            ClientAddress::delete($addrId, $clientId);
+            Audit::log('CLIENT_ADDRESS_DELETE', 'client_addresses', $addrId, $before, null, [
+                'message' => 'A șters o adresă de livrare pentru client: ' . (string)$client['name'],
+                'client_id' => $clientId,
+            ]);
+            Session::flash('toast_success', 'Adresă ștearsă.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge adresa.');
+        }
+        Response::redirect('/clients/' . $clientId);
     }
 
     public static function delete(array $params): void

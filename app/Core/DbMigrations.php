@@ -264,6 +264,62 @@ final class DbMigrations
                     ");
                 },
             ],
+            [
+                'id' => '2026-01-14_02_create_client_groups',
+                'label' => 'CREATE TABLE client_groups',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'client_groups')) return;
+                    $pdo->exec("
+                        CREATE TABLE client_groups (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          name VARCHAR(190) NOT NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          UNIQUE KEY uq_client_groups_name (name),
+                          KEY idx_client_groups_name (name)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_03_add_clients_group_id',
+                'label' => 'ALTER TABLE clients ADD client_group_id',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'clients')) return;
+                    if (!self::tableExists($pdo, 'client_groups')) return;
+                    if (!self::columnExists($pdo, 'clients', 'client_group_id')) {
+                        $pdo->exec("ALTER TABLE clients ADD COLUMN client_group_id INT UNSIGNED NULL");
+                    }
+                    // index + FK best-effort
+                    try { $pdo->exec("ALTER TABLE clients ADD INDEX idx_clients_group (client_group_id)"); } catch (\Throwable $e) {}
+                    try { $pdo->exec("ALTER TABLE clients ADD CONSTRAINT fk_clients_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id)"); } catch (\Throwable $e) {}
+                },
+            ],
+            [
+                'id' => '2026-01-14_04_create_client_addresses',
+                'label' => 'CREATE TABLE client_addresses',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'client_addresses')) return;
+                    if (!self::tableExists($pdo, 'clients')) return;
+                    $pdo->exec("
+                        CREATE TABLE client_addresses (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          client_id INT UNSIGNED NOT NULL,
+                          label VARCHAR(190) NULL,
+                          address TEXT NOT NULL,
+                          notes TEXT NULL,
+                          is_default TINYINT(1) NOT NULL DEFAULT 0,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_client_addr_client (client_id),
+                          KEY idx_client_addr_default (client_id, is_default),
+                          CONSTRAINT fk_client_addr_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
         ];
     }
 

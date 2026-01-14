@@ -184,6 +184,7 @@ CREATE TABLE IF NOT EXISTS clients (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   type ENUM('PERSOANA_FIZICA','FIRMA') NOT NULL DEFAULT 'PERSOANA_FIZICA',
   name VARCHAR(190) NOT NULL,
+  client_group_id INT UNSIGNED NULL,
   cui VARCHAR(32) NULL,
   contact_person VARCHAR(190) NULL,
   phone VARCHAR(64) NULL,
@@ -195,7 +196,33 @@ CREATE TABLE IF NOT EXISTS clients (
   PRIMARY KEY (id),
   KEY idx_clients_type (type),
   KEY idx_clients_name (name),
-  KEY idx_clients_email (email)
+  KEY idx_clients_email (email),
+  KEY idx_clients_group (client_group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS client_groups (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(190) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_client_groups_name (name),
+  KEY idx_client_groups_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS client_addresses (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  client_id INT UNSIGNED NOT NULL,
+  label VARCHAR(190) NULL,
+  address TEXT NOT NULL,
+  notes TEXT NULL,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_client_addr_client (client_id),
+  KEY idx_client_addr_default (client_id, is_default),
+  CONSTRAINT fk_client_addr_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS projects (

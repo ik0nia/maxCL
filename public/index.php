@@ -209,6 +209,9 @@ $router->post('/clients/create', fn() => ClientsController::create(), $clientsWr
 $router->get('/clients/{id}', fn($p) => ClientsController::show($p), $clientsReadMW);
 $router->get('/clients/{id}/edit', fn($p) => ClientsController::editForm($p), $clientsWriteMW);
 $router->post('/clients/{id}/edit', fn($p) => ClientsController::update($p), $clientsWriteMW);
+$router->post('/clients/{id}/addresses/create', fn($p) => ClientsController::createAddress($p), $clientsWriteMW);
+$router->post('/clients/{id}/addresses/{addrId}/edit', fn($p) => ClientsController::updateAddress($p), $clientsWriteMW);
+$router->post('/clients/{id}/addresses/{addrId}/delete', fn($p) => ClientsController::deleteAddress($p), $clientsWriteMW);
 $router->post('/clients/{id}/delete', fn($p) => ClientsController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 
 // ---- Stoc (Admin/Gestionar/Operator). Operator = read-only (nu poate crea plăci/piese)
