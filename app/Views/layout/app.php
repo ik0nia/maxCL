@@ -70,6 +70,9 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= str_starts_with($p, '/projects') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
           <i class="bi bi-kanban me-2"></i> Proiecte
         </a>
+        <a class="app-nav-link <?= str_starts_with($p, '/products') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/products')) ?>">
+          <i class="bi bi-box2-heart me-2"></i> Produse
+        </a>
 
         <div class="app-nav-section">Clienți</div>
         <a class="app-nav-link <?= str_starts_with($p, '/clients') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/clients')) ?>">

@@ -10,6 +10,7 @@ $canWrite = ProjectsController::canWrite();
 
 $project = $project ?? [];
 $tab = (string)($tab ?? 'general');
+$projectProducts = $projectProducts ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -184,6 +185,180 @@ ob_start();
             <button class="btn btn-outline-secondary w-100 mt-3" type="submit">
               <i class="bi bi-arrow-repeat me-1"></i> Schimbă status
             </button>
+          </form>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php elseif ($tab === 'products'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-7">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Produse (piese) în proiect</div>
+        <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
+
+        <?php if (!$projectProducts): ?>
+          <div class="text-muted mt-2">Nu există produse încă.</div>
+        <?php else: ?>
+          <div class="table-responsive mt-2">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Produs</th>
+                  <th style="width:120px" class="text-end">Cant.</th>
+                  <th style="width:150px">Status</th>
+                  <th style="width:140px" class="text-end">Livrat</th>
+                  <th class="text-end" style="width:210px">Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($projectProducts as $pp): ?>
+                  <?php
+                    $ppId = (int)($pp['id'] ?? 0);
+                    $qty = (float)($pp['qty'] ?? 0);
+                    $del = (float)($pp['delivered_qty'] ?? 0);
+                    $pname = (string)($pp['product_name'] ?? '');
+                    $pcode = (string)($pp['product_code'] ?? '');
+                  ?>
+                  <tr>
+                    <td>
+                      <div class="fw-semibold"><?= htmlspecialchars($pname) ?></div>
+                      <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
+                    </td>
+                    <td class="text-end"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
+                    <td class="fw-semibold"><?= htmlspecialchars((string)($pp['production_status'] ?? '')) ?></td>
+                    <td class="text-end"><?= number_format($del, 2, '.', '') ?></td>
+                    <td class="text-end">
+                      <?php if ($canWrite): ?>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
+                          <i class="bi bi-pencil me-1"></i> Editează
+                        </button>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/unlink')) ?>" class="d-inline"
+                              onsubmit="return confirm('Scoți produsul din proiect?');">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <button class="btn btn-outline-secondary btn-sm" type="submit">
+                            <i class="bi bi-link-45deg me-1"></i> Scoate
+                          </button>
+                        </form>
+                      <?php else: ?>
+                        <span class="text-muted">—</span>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                  <?php if ($canWrite): ?>
+                    <tr class="collapse" id="ppEdit<?= $ppId ?>">
+                      <td colspan="5">
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/update')) ?>" class="row g-2 align-items-end">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <div class="col-6 col-md-2">
+                            <label class="form-label fw-semibold mb-1">Cant.</label>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>">
+                          </div>
+                          <div class="col-6 col-md-2">
+                            <label class="form-label fw-semibold mb-1">Unit</label>
+                            <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($pp['unit'] ?? 'buc')) ?>">
+                          </div>
+                          <div class="col-12 col-md-3">
+                            <label class="form-label fw-semibold mb-1">Status</label>
+                            <select class="form-select form-select-sm" name="production_status">
+                              <?php foreach (['DE_PREGATIT'=>'De pregătit','CNC'=>'CNC','ATELIER'=>'Atelier','FINISARE'=>'Finisare','GATA'=>'Gata','LIVRAT_PARTIAL'=>'Livrat parțial','LIVRAT_COMPLET'=>'Livrat complet','REBUT'=>'Rebut/Refăcut'] as $val => $lbl): ?>
+                                <option value="<?= htmlspecialchars($val) ?>" <?= ((string)($pp['production_status'] ?? '') === $val) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
+                              <?php endforeach; ?>
+                            </select>
+                          </div>
+                          <div class="col-6 col-md-2">
+                            <label class="form-label fw-semibold mb-1">Livrat</label>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="delivered_qty" value="<?= htmlspecialchars((string)$del) ?>">
+                          </div>
+                          <div class="col-12 col-md-3">
+                            <label class="form-label fw-semibold mb-1">Notă</label>
+                            <input class="form-control form-control-sm" name="notes" value="<?= htmlspecialchars((string)($pp['notes'] ?? '')) ?>">
+                          </div>
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-save me-1"></i> Salvează
+                            </button>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+      <div class="card app-card p-3 mb-3">
+        <div class="h5 m-0">Adaugă produs existent</div>
+        <div class="text-muted">Selectează un produs din modulul Produse</div>
+        <?php if (!$canWrite): ?>
+          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
+        <?php else: ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/add-existing')) ?>" class="row g-2 mt-1">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="col-12">
+              <label class="form-label fw-semibold">ID produs</label>
+              <input class="form-control" name="product_id" placeholder="ex: 123">
+              <div class="text-muted small mt-1">Momentan: introdu ID-ul produsului (următorul pas: search).</div>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Cantitate</label>
+              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Unit</label>
+              <input class="form-control" name="unit" value="buc">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-outline-secondary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă
+              </button>
+            </div>
+          </form>
+        <?php endif; ?>
+      </div>
+
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Creează produs nou în proiect</div>
+        <div class="text-muted">Se creează produs + se atașează automat</div>
+        <?php if (!$canWrite): ?>
+          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
+        <?php else: ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2 mt-1">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Denumire</label>
+              <input class="form-control" name="name" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Cod (opțional)</label>
+              <input class="form-control" name="code">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Cantitate</label>
+              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Unit</label>
+              <input class="form-control" name="unit" value="buc">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Lățime (mm)</label>
+              <input class="form-control" type="number" name="width_mm" min="1">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Lungime (mm)</label>
+              <input class="form-control" type="number" name="height_mm" min="1">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i> Creează
+              </button>
+            </div>
           </form>
         <?php endif; ?>
       </div>

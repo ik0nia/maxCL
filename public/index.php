@@ -22,6 +22,7 @@ use App\Controllers\Hpl\OffcutsController as HplOffcutsController;
 use App\Controllers\Magazie\StockController as MagazieStockController;
 use App\Controllers\Magazie\ReceptionController as MagazieReceptionController;
 use App\Controllers\DashboardController;
+use App\Controllers\ProductsController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
@@ -208,6 +209,12 @@ $router->post('/projects/create', fn() => ProjectsController::create(), $project
 $router->get('/projects/{id}', fn($p) => ProjectsController::show($p), $projectsReadMW);
 $router->post('/projects/{id}/edit', fn($p) => ProjectsController::update($p), $projectsWriteMW);
 $router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatus($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/add-existing', fn($p) => ProjectsController::addExistingProduct($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/create', fn($p) => ProjectsController::createProductInProject($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsController::updateProjectProduct($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
+
+$router->get('/products', fn() => ProductsController::index(), $projectsReadMW);
 
 $clientsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];

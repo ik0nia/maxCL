@@ -12,7 +12,9 @@ use App\Core\Validator;
 use App\Core\View;
 use App\Models\Client;
 use App\Models\ClientGroup;
+use App\Models\Product;
 use App\Models\Project;
+use App\Models\ProjectProduct;
 
 final class ProjectsController
 {
@@ -171,10 +173,20 @@ final class ProjectsController
         $tab = isset($_GET['tab']) ? trim((string)($_GET['tab'] ?? '')) : '';
         if ($tab === '') $tab = 'general';
 
+        $projectProducts = [];
+        if ($tab === 'products') {
+            try {
+                $projectProducts = ProjectProduct::forProject($id);
+            } catch (\Throwable $e) {
+                $projectProducts = [];
+            }
+        }
+
         echo View::render('projects/show', [
             'title' => 'Proiect',
             'project' => $project,
             'tab' => $tab,
+            'projectProducts' => $projectProducts,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
@@ -309,6 +321,191 @@ final class ProjectsController
     {
         $u = Auth::user();
         return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+    }
+
+    public static function addExistingProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $productId = Validator::int(trim((string)($_POST['product_id'] ?? '')), 1);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
+        $unit = trim((string)($_POST['unit'] ?? 'buc'));
+        if ($productId === null) {
+            Session::flash('toast_error', 'Produs invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        if ($qty <= 0) $qty = 1.0;
+
+        $prod = Product::find((int)$productId);
+        if (!$prod) {
+            Session::flash('toast_error', 'Produs inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        try {
+            $ppId = ProjectProduct::addToProject([
+                'project_id' => $projectId,
+                'product_id' => (int)$productId,
+                'qty' => $qty,
+                'unit' => $unit !== '' ? $unit : 'buc',
+                'production_status' => 'DE_PREGATIT',
+                'delivered_qty' => 0,
+                'notes' => null,
+            ]);
+            Audit::log('PROJECT_PRODUCT_ATTACH', 'project_products', $ppId, null, null, [
+                'message' => 'A atașat produs la proiect: ' . (string)($prod['name'] ?? ''),
+                'project_id' => $projectId,
+                'product_id' => (int)$productId,
+                'qty' => $qty,
+                'unit' => $unit,
+            ]);
+            Session::flash('toast_success', 'Produs adăugat în proiect.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot adăuga produsul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    public static function createProductInProject(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $check = Validator::required($_POST, [
+            'name' => 'Denumire',
+            'qty' => 'Cantitate',
+        ]);
+        $errors = $check['errors'];
+        $name = trim((string)($_POST['name'] ?? ''));
+        $code = trim((string)($_POST['code'] ?? ''));
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
+        $unit = trim((string)($_POST['unit'] ?? 'buc'));
+        $width = Validator::int(trim((string)($_POST['width_mm'] ?? '')), 1, 100000);
+        $height = Validator::int(trim((string)($_POST['height_mm'] ?? '')), 1, 100000);
+
+        if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
+        if ($errors) {
+            Session::flash('toast_error', 'Completează corect produsul.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        try {
+            $pid = Product::create([
+                'code' => $code !== '' ? $code : null,
+                'name' => $name,
+                'width_mm' => $width,
+                'height_mm' => $height,
+                'notes' => null,
+                'cnc_settings_json' => null,
+            ]);
+            Audit::log('PRODUCT_CREATE', 'products', $pid, null, null, [
+                'message' => 'A creat produs: ' . $name,
+                'project_id' => $projectId,
+            ]);
+
+            $ppId = ProjectProduct::addToProject([
+                'project_id' => $projectId,
+                'product_id' => $pid,
+                'qty' => $qty,
+                'unit' => $unit !== '' ? $unit : 'buc',
+                'production_status' => 'DE_PREGATIT',
+                'delivered_qty' => 0,
+                'notes' => null,
+            ]);
+            Audit::log('PROJECT_PRODUCT_ATTACH', 'project_products', $ppId, null, null, [
+                'message' => 'A atașat produs nou la proiect: ' . $name,
+                'project_id' => $projectId,
+                'product_id' => $pid,
+                'qty' => $qty,
+                'unit' => $unit,
+            ]);
+
+            Session::flash('toast_success', 'Produs creat și adăugat în proiect.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot crea produsul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    public static function updateProjectProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+
+        $before = ProjectProduct::find($ppId);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
+        $del = Validator::dec(trim((string)($_POST['delivered_qty'] ?? '0'))) ?? 0.0;
+        $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
+        $st = trim((string)($_POST['production_status'] ?? (string)($before['production_status'] ?? 'DE_PREGATIT')));
+        $note = trim((string)($_POST['notes'] ?? ''));
+
+        $allowed = ['DE_PREGATIT','CNC','ATELIER','FINISARE','GATA','LIVRAT_PARTIAL','LIVRAT_COMPLET','REBUT'];
+        if (!in_array($st, $allowed, true)) $st = (string)($before['production_status'] ?? 'DE_PREGATIT');
+        if ($qty <= 0) $qty = 1.0;
+        if ($del < 0) $del = 0.0;
+        if ($del > $qty) $del = $qty;
+
+        $after = [
+            'qty' => $qty,
+            'unit' => $unit !== '' ? $unit : 'buc',
+            'production_status' => $st,
+            'delivered_qty' => $del,
+            'notes' => $note !== '' ? $note : null,
+        ];
+
+        try {
+            ProjectProduct::updateFields($ppId, $after);
+            Audit::log('PROJECT_PRODUCT_UPDATE', 'project_products', $ppId, $before, $after, [
+                'message' => 'A actualizat produs în proiect.',
+                'project_id' => $projectId,
+            ]);
+            Session::flash('toast_success', 'Produs actualizat.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot actualiza produsul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    public static function unlinkProjectProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $before = ProjectProduct::find($ppId);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        try {
+            ProjectProduct::delete($ppId);
+            Audit::log('PROJECT_PRODUCT_DETACH', 'project_products', $ppId, $before, null, [
+                'message' => 'A dezlegat produs din proiect.',
+                'project_id' => $projectId,
+                'product_id' => (int)($before['product_id'] ?? 0),
+            ]);
+            Session::flash('toast_success', 'Produs scos din proiect.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot scoate produsul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
     }
 }
 
