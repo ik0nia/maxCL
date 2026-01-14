@@ -100,5 +100,86 @@ final class AuditLog
         $rows = $pdo->query('SELECT DISTINCT action FROM audit_log ORDER BY action ASC')->fetchAll();
         return array_map(fn($r) => (string)$r['action'], $rows);
     }
+
+    /**
+     * Istoric pentru o placă: include evenimente pe placă + pe piese,
+     * filtrat în PHP (fără funcții JSON SQL pentru compat cu hosting).
+     *
+     * @return array<int, array{
+     *   id:int,
+     *   created_at:string,
+     *   action:string,
+     *   entity_type:?string,
+     *   entity_id:?string,
+     *   user_name:?string,
+     *   user_email:?string,
+     *   message:?string
+     * }>
+     */
+    public static function forBoard(int $boardId, int $limit = 120): array
+    {
+        $boardId = (int)$boardId;
+        $limit = max(1, min(500, $limit));
+
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+
+        // Luăm un “window” mai mare și filtrăm local după board_id din meta/before/after.
+        $st = $pdo->prepare("
+          SELECT
+            a.id, a.created_at, a.action, a.entity_type, a.entity_id,
+            a.before_json, a.after_json, a.meta_json,
+            u.name AS user_name, u.email AS user_email
+          FROM audit_log a
+          LEFT JOIN users u ON u.id = a.actor_user_id
+          WHERE a.entity_type IN ('hpl_boards','hpl_stock_pieces')
+          ORDER BY a.id DESC
+          LIMIT 1200
+        ");
+        $st->execute();
+        $rows = $st->fetchAll();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $etype = isset($r['entity_type']) ? (string)$r['entity_type'] : null;
+            $eid = $r['entity_id'] ?? null;
+            $eidInt = is_numeric($eid) ? (int)$eid : 0;
+
+            $match = false;
+            if ($etype === 'hpl_boards' && $eidInt === $boardId) {
+                $match = true;
+            } else {
+                $before = is_string($r['before_json'] ?? null) ? json_decode((string)$r['before_json'], true) : null;
+                $after = is_string($r['after_json'] ?? null) ? json_decode((string)$r['after_json'], true) : null;
+                $meta = is_string($r['meta_json'] ?? null) ? json_decode((string)$r['meta_json'], true) : null;
+                $bid = null;
+                if (is_array($meta) && isset($meta['board_id'])) $bid = (int)$meta['board_id'];
+                if ($bid === null && is_array($before) && isset($before['board_id'])) $bid = (int)$before['board_id'];
+                if ($bid === null && is_array($after) && isset($after['board_id'])) $bid = (int)$after['board_id'];
+                if ($bid !== null && $bid === $boardId) $match = true;
+            }
+
+            if (!$match) continue;
+
+            $metaDecoded = is_string($r['meta_json'] ?? null) ? json_decode((string)$r['meta_json'], true) : null;
+            $message = (is_array($metaDecoded) && isset($metaDecoded['message']) && is_string($metaDecoded['message']))
+                ? (string)$metaDecoded['message']
+                : null;
+
+            $out[] = [
+                'id' => (int)$r['id'],
+                'created_at' => (string)$r['created_at'],
+                'action' => (string)$r['action'],
+                'entity_type' => $etype,
+                'entity_id' => $eid !== null ? (string)$eid : null,
+                'user_name' => isset($r['user_name']) ? (string)$r['user_name'] : null,
+                'user_email' => isset($r['user_email']) ? (string)$r['user_email'] : null,
+                'message' => $message,
+            ];
+            if (count($out) >= $limit) break;
+        }
+
+        return $out;
+    }
 }
 

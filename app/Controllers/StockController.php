@@ -9,6 +9,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Models\AuditLog;
 use App\Models\Finish;
 use App\Models\HplBoard;
 use App\Models\HplStockPiece;
@@ -365,10 +366,17 @@ final class StockController
                 Response::redirect('/stock');
             }
             $pieces = HplStockPiece::forBoard($id);
+            $history = [];
+            try {
+                $history = AuditLog::forBoard($id, 120);
+            } catch (\Throwable $e) {
+                $history = [];
+            }
             echo View::render('stock/board_details', [
                 'title' => 'Stoc · Placă',
                 'board' => $board,
                 'pieces' => $pieces,
+                'history' => $history,
             ]);
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Stoc indisponibil. Rulează Setup.');

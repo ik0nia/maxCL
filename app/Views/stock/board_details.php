@@ -8,6 +8,7 @@ use App\Models\Texture;
 
 $board = $board ?? [];
 $pieces = $pieces ?? [];
+$history = $history ?? [];
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 $isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
@@ -179,6 +180,81 @@ ob_start();
     </div>
 
     <div class="card app-card p-3">
+      <div class="h5 m-0">Istoric</div>
+      <div class="text-muted">Modificări și mișcări de stoc pentru această placă</div>
+
+      <div class="mt-2">
+        <?php if (!$history): ?>
+          <div class="text-muted">Nu există evenimente încă.</div>
+        <?php else: ?>
+          <div class="list-group list-group-flush">
+            <?php foreach ($history as $h): ?>
+              <?php
+                $who = trim((string)($h['user_name'] ?? ''));
+                if ($who === '') {
+                  $em = trim((string)($h['user_email'] ?? ''));
+                  $who = $em !== '' ? $em : '—';
+                }
+                $msg = trim((string)($h['message'] ?? ''));
+                if ($msg === '') $msg = (string)($h['action'] ?? '');
+              ?>
+              <div class="list-group-item px-0">
+                <div class="d-flex justify-content-between gap-2">
+                  <div class="fw-semibold" style="color:#111"><?= htmlspecialchars($who) ?></div>
+                  <div class="text-muted small"><?= htmlspecialchars((string)($h['created_at'] ?? '')) ?></div>
+                </div>
+                <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($msg) ?></div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card app-card p-3">
+      <div class="h5 m-0">Piese asociate</div>
+      <div class="text-muted">Lista pieselor pentru această placă</div>
+      <table class="table table-hover align-middle mb-0 mt-2" id="piecesTable">
+        <thead>
+          <tr>
+            <th>Tip</th>
+            <th>Status</th>
+            <th>Dimensiuni</th>
+            <th class="text-end">Buc</th>
+            <th>Locație</th>
+            <th class="text-end">mp</th>
+            <?php if ($isAdmin): ?><th class="text-end" style="width:110px">Acțiuni</th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($pieces as $p): ?>
+            <tr>
+              <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
+              <td><?= htmlspecialchars((string)$p['status']) ?></td>
+              <td><?= (int)$p['width_mm'] ?> × <?= (int)$p['height_mm'] ?> mm</td>
+              <td class="text-end"><?= (int)$p['qty'] ?></td>
+              <td><?= htmlspecialchars((string)$p['location']) ?></td>
+              <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
+              <?php if ($isAdmin): ?>
+                <td class="text-end">
+                  <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/' . (int)$p['id'] . '/delete')) ?>"
+                        class="d-inline" onsubmit="return confirm('Sigur vrei să ștergi această piesă?');">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">
+                      <i class="bi bi-trash me-1"></i> Șterge
+                    </button>
+                  </form>
+                </td>
+              <?php endif; ?>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card app-card p-3 mt-3">
       <div class="h5 m-0">Adaugă piesă în stoc</div>
       <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>
       <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/add')) ?>">
@@ -227,49 +303,6 @@ ob_start();
           </button>
         </div>
       </form>
-    </div>
-  </div>
-
-  <div class="col-12 col-lg-7">
-    <div class="card app-card p-3">
-      <div class="h5 m-0">Piese asociate</div>
-      <div class="text-muted">Lista pieselor pentru această placă</div>
-      <table class="table table-hover align-middle mb-0 mt-2" id="piecesTable">
-        <thead>
-          <tr>
-            <th>Tip</th>
-            <th>Status</th>
-            <th>Dimensiuni</th>
-            <th class="text-end">Buc</th>
-            <th>Locație</th>
-            <th class="text-end">mp</th>
-            <?php if ($isAdmin): ?><th class="text-end" style="width:110px">Acțiuni</th><?php endif; ?>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($pieces as $p): ?>
-            <tr>
-              <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
-              <td><?= htmlspecialchars((string)$p['status']) ?></td>
-              <td><?= (int)$p['width_mm'] ?> × <?= (int)$p['height_mm'] ?> mm</td>
-              <td class="text-end"><?= (int)$p['qty'] ?></td>
-              <td><?= htmlspecialchars((string)$p['location']) ?></td>
-              <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
-              <?php if ($isAdmin): ?>
-                <td class="text-end">
-                  <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/' . (int)$p['id'] . '/delete')) ?>"
-                        class="d-inline" onsubmit="return confirm('Sigur vrei să ștergi această piesă?');">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                    <button class="btn btn-outline-secondary btn-sm" type="submit">
-                      <i class="bi bi-trash me-1"></i> Șterge
-                    </button>
-                  </form>
-                </td>
-              <?php endif; ?>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
     </div>
   </div>
 </div>
