@@ -95,6 +95,18 @@ final class DbUpdateController
         ];
 
         $needs[] = [
+            'key' => 'magazie_items_table',
+            'label' => 'Tabelă `magazie_items` (Magazie)',
+            'needed' => !self::tableExists($pdo, 'magazie_items'),
+        ];
+
+        $needs[] = [
+            'key' => 'magazie_movements_table',
+            'label' => 'Tabelă `magazie_movements` (istoric Magazie)',
+            'needed' => !self::tableExists($pdo, 'magazie_movements'),
+        ];
+
+        $needs[] = [
             'key' => 'hpl_boards_sale_price',
             'label' => 'Coloană `hpl_boards.sale_price`',
             'needed' => self::tableExists($pdo, 'hpl_boards') && !self::columnExists($pdo, 'hpl_boards', 'sale_price'),
@@ -272,6 +284,71 @@ final class DbUpdateController
             }
         } else {
             $skipped[] = 'projects (există deja)';
+        }
+
+        // 5b) magazie_items
+        if (!self::tableExists($pdo, 'magazie_items')) {
+            try {
+                $pdo->exec("
+                    CREATE TABLE magazie_items (
+                      id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                      winmentor_code VARCHAR(64) NOT NULL,
+                      name VARCHAR(190) NOT NULL,
+                      unit_price DECIMAL(12,2) NULL,
+                      stock_qty INT NOT NULL DEFAULT 0,
+                      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id),
+                      UNIQUE KEY uq_magazie_items_winmentor (winmentor_code),
+                      KEY idx_magazie_items_name (name),
+                      KEY idx_magazie_items_stock (stock_qty)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                ");
+                $applied[] = 'CREATE TABLE magazie_items';
+            } catch (\Throwable $e) {
+                $errors[] = 'magazie_items: ' . $e->getMessage();
+            }
+        } else {
+            $skipped[] = 'magazie_items (există deja)';
+        }
+
+        // 5c) magazie_movements
+        if (!self::tableExists($pdo, 'magazie_movements')) {
+            try {
+                // depinde de magazie_items; FK-urile către projects/users sunt best-effort
+                if (!self::tableExists($pdo, 'magazie_items')) {
+                    throw new \RuntimeException('lipsește magazie_items');
+                }
+                $pdo->exec("
+                    CREATE TABLE magazie_movements (
+                      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                      item_id INT UNSIGNED NOT NULL,
+                      direction ENUM('IN','OUT','ADJUST') NOT NULL,
+                      qty INT NOT NULL,
+                      unit_price DECIMAL(12,2) NULL,
+                      project_id INT UNSIGNED NULL,
+                      project_code VARCHAR(64) NULL,
+                      note VARCHAR(255) NULL,
+                      created_by INT UNSIGNED NULL,
+                      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id),
+                      KEY idx_mag_mov_item (item_id),
+                      KEY idx_mag_mov_dir (direction),
+                      KEY idx_mag_mov_created (created_at),
+                      KEY idx_mag_mov_project (project_id),
+                      KEY idx_mag_mov_project_code (project_code),
+                      CONSTRAINT fk_mag_mov_item FOREIGN KEY (item_id) REFERENCES magazie_items(id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                ");
+                // best-effort FK către projects/users
+                try { if (self::tableExists($pdo, 'projects')) $pdo->exec("ALTER TABLE magazie_movements ADD CONSTRAINT fk_mag_mov_project FOREIGN KEY (project_id) REFERENCES projects(id)"); } catch (\Throwable $e) {}
+                try { if (self::tableExists($pdo, 'users')) $pdo->exec("ALTER TABLE magazie_movements ADD CONSTRAINT fk_mag_mov_user FOREIGN KEY (created_by) REFERENCES users(id)"); } catch (\Throwable $e) {}
+                $applied[] = 'CREATE TABLE magazie_movements';
+            } catch (\Throwable $e) {
+                $errors[] = 'magazie_movements: ' . $e->getMessage();
+            }
+        } else {
+            $skipped[] = 'magazie_movements (există deja)';
         }
 
         // 6) sale_price column for older installs

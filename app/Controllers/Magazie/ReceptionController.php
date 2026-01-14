@@ -7,6 +7,8 @@ use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\DB;
+use App\Core\DbMigrations;
+use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
@@ -18,6 +20,7 @@ final class ReceptionController
 {
     public static function index(): void
     {
+        $triedMigrate = false;
         try {
             $recent = MagazieMovement::recent(120);
             echo View::render('magazie/receptie/index', [
@@ -25,9 +28,31 @@ final class ReceptionController
                 'recent' => $recent,
             ]);
         } catch (\Throwable $e) {
+            // Încearcă încă o dată după auto-migrare (hosting poate servi request-ul înainte să se aplice).
+            if (!$triedMigrate) {
+                $triedMigrate = true;
+                try {
+                    DbMigrations::runAuto();
+                    $recent = MagazieMovement::recent(120);
+                    echo View::render('magazie/receptie/index', [
+                        'title' => 'Recepție marfă',
+                        'recent' => $recent,
+                    ]);
+                    return;
+                } catch (\Throwable $e2) {
+                    $e = $e2;
+                }
+            }
+
+            $u = Auth::user();
+            $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro');
+            $msg = 'Recepția nu este disponibilă momentan. Rulează Update DB ca să creezi tabelele necesare.';
+            if ($debug) {
+                $msg .= ' Eroare: ' . $e->getMessage();
+            }
             echo View::render('system/placeholder', [
                 'title' => 'Recepție marfă',
-                'message' => 'Recepția nu este disponibilă momentan. Rulează Setup/Update DB ca să creezi tabelele necesare.',
+                'message' => $msg,
             ]);
         }
     }

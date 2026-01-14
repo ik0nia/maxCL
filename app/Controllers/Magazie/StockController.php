@@ -7,6 +7,8 @@ use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\DB;
+use App\Core\DbMigrations;
+use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
@@ -19,6 +21,7 @@ final class StockController
 {
     public static function index(): void
     {
+        $triedMigrate = false;
         try {
             $q = isset($_GET['q']) ? trim((string)($_GET['q'] ?? '')) : '';
             $items = MagazieItem::all($q !== '' ? $q : null, 5000);
@@ -28,9 +31,32 @@ final class StockController
                 'q' => $q,
             ]);
         } catch (\Throwable $e) {
+            if (!$triedMigrate) {
+                $triedMigrate = true;
+                try {
+                    DbMigrations::runAuto();
+                    $q = isset($_GET['q']) ? trim((string)($_GET['q'] ?? '')) : '';
+                    $items = MagazieItem::all($q !== '' ? $q : null, 5000);
+                    echo View::render('magazie/stoc/index', [
+                        'title' => 'Stoc Magazie',
+                        'items' => $items,
+                        'q' => $q,
+                    ]);
+                    return;
+                } catch (\Throwable $e2) {
+                    $e = $e2;
+                }
+            }
+
+            $u = Auth::user();
+            $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro');
+            $msg = 'Magazia nu este disponibilă momentan. Rulează Update DB ca să creezi tabelele necesare.';
+            if ($debug) {
+                $msg .= ' Eroare: ' . $e->getMessage();
+            }
             echo View::render('system/placeholder', [
                 'title' => 'Stoc Magazie',
-                'message' => 'Magazia nu este disponibilă momentan. Rulează Setup/Update DB ca să creezi tabelele necesare.',
+                'message' => $msg,
             ]);
         }
     }
