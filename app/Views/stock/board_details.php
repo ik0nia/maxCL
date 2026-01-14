@@ -245,25 +245,23 @@ ob_start();
         <tbody>
           <?php foreach ($pieces as $p): ?>
             <?php
-              $noteRaw = trim((string)($p['notes'] ?? ''));
-              $noteTooltip = '';
-              if ($noteRaw !== '') {
-                $noteTooltip = preg_replace('/\s+/u', ' ', $noteRaw) ?: $noteRaw;
-                $noteTooltip = mb_substr((string)$noteTooltip, 0, 400);
+              $noteRaw = (string)($p['notes'] ?? '');
+              $noteTrim = trim($noteRaw);
+              $noteShort = $noteTrim;
+              if ($noteShort !== '') {
+                if (mb_strlen($noteShort) > 500) {
+                  $noteShort = mb_substr($noteShort, 0, 500) . '…';
+                }
               }
             ?>
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
               <td>
                 <?= htmlspecialchars((string)$p['status']) ?>
-                <?php if ($noteTooltip !== ''): ?>
-                  <i class="bi bi-chat-left-text ms-1 text-muted js-piece-notes"
-                     style="cursor:pointer"
-                     data-bs-toggle="tooltip"
-                     data-bs-container="body"
-                     data-bs-title="<?= htmlspecialchars($noteTooltip) ?>"
-                     data-notes="<?= htmlspecialchars((string)($p['notes'] ?? ''), ENT_QUOTES) ?>"
-                     title="<?= htmlspecialchars($noteTooltip) ?>"></i>
+                <?php if ($noteShort !== ''): ?>
+                  <div class="text-muted small mt-1" style="white-space:pre-wrap">
+                    <?= nl2br(htmlspecialchars($noteShort)) ?>
+                  </div>
                 <?php endif; ?>
               </td>
               <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
@@ -306,24 +304,22 @@ ob_start();
           <tbody>
             <?php foreach ($internalPieces as $p): ?>
               <?php
-                $noteRaw = trim((string)($p['notes'] ?? ''));
-                $noteTooltip = '';
-                if ($noteRaw !== '') {
-                  $noteTooltip = preg_replace('/\s+/u', ' ', $noteRaw) ?: $noteRaw;
-                  $noteTooltip = mb_substr((string)$noteTooltip, 0, 400);
+                $noteRaw = (string)($p['notes'] ?? '');
+                $noteTrim = trim($noteRaw);
+                $noteShort = $noteTrim;
+                if ($noteShort !== '') {
+                  if (mb_strlen($noteShort) > 500) {
+                    $noteShort = mb_substr($noteShort, 0, 500) . '…';
+                  }
                 }
               ?>
               <tr>
                 <td>
                   <?= htmlspecialchars((string)$p['status']) ?>
-                  <?php if ($noteTooltip !== ''): ?>
-                    <i class="bi bi-chat-left-text ms-1 text-muted js-piece-notes"
-                       style="cursor:pointer"
-                       data-bs-toggle="tooltip"
-                       data-bs-container="body"
-                       data-bs-title="<?= htmlspecialchars($noteTooltip) ?>"
-                       data-notes="<?= htmlspecialchars((string)($p['notes'] ?? ''), ENT_QUOTES) ?>"
-                       title="<?= htmlspecialchars($noteTooltip) ?>"></i>
+                  <?php if ($noteShort !== ''): ?>
+                    <div class="text-muted small mt-1" style="white-space:pre-wrap">
+                      <?= nl2br(htmlspecialchars($noteShort)) ?>
+                    </div>
                   <?php endif; ?>
                 </td>
                 <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
