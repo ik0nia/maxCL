@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Hpl;
 
+use App\Core\Env;
 use App\Core\Response;
 use App\Core\View;
 use App\Models\Finish;
@@ -81,7 +82,11 @@ final class CatalogController
             ]);
             Response::json(['ok' => true, 'html' => $html, 'count' => count($data['finishes'])]);
         } catch (\Throwable $e) {
-            Response::json(['ok' => false, 'error' => 'Nu am putut încărca catalogul.'], 500);
+            $payload = ['ok' => false, 'error' => 'Nu am putut încărca catalogul.'];
+            if (Env::bool('APP_DEBUG', false)) {
+                $payload['debug'] = $e->getMessage();
+            }
+            Response::json($payload, 500);
         }
     }
 }

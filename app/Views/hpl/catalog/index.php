@@ -73,8 +73,17 @@ ob_start();
       });
 
       const ct = (res.headers.get('content-type') || '').toLowerCase();
-      if (!ct.includes('application/json')) throw new Error('non_json');
-      return await res.json();
+      if (!ct.includes('application/json')) {
+        const txt = await res.text();
+        const snip = String(txt || '').slice(0, 240).replace(/\s+/g, ' ').trim();
+        throw new Error('non_json:' + res.status + ':' + snip);
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        const dbg = (data && (data.debug || data.error)) ? String(data.debug || data.error) : '';
+        throw new Error('http_' + res.status + (dbg ? (': ' + dbg) : ''));
+      }
+      return data;
     }
 
     async function load(q){
@@ -82,13 +91,16 @@ ob_start();
       try {
         const data = await fetchJson(endpoint, { q: q || '' });
         if (!data || data.ok !== true) {
-          grid.innerHTML = '<div class="text-muted">Nu am putut încărca catalogul.</div>';
+          const extra = data && (data.debug || data.error) ? ('<div class="text-muted small mt-1">' + String(data.debug || data.error) + '</div>') : '';
+          grid.innerHTML = '<div class="text-muted">Nu am putut încărca catalogul.</div>' + extra;
           return;
         }
         grid.innerHTML = String(data.html || '');
       } catch (e) {
         if (e && String(e.name || '') === 'AbortError') return;
-        grid.innerHTML = '<div class="text-muted">Nu am putut încărca catalogul.</div>';
+        const msg = e && e.message ? String(e.message) : '';
+        const extra = msg ? ('<div class="text-muted small mt-1">' + msg.replace(/</g,'&lt;') + '</div>') : '';
+        grid.innerHTML = '<div class="text-muted">Nu am putut încărca catalogul.</div>' + extra;
       } finally {
         setLoading(false);
       }
