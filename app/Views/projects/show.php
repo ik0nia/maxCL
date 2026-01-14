@@ -706,6 +706,37 @@ ob_start();
                   delay: 250,
                   headers: { 'Accept': 'application/json' },
                   data: function(params){ return { q: params.term }; },
+                  transport: function (params, success, failure) {
+                    const $ = window.jQuery;
+                    if (!$ || !$.ajax) return $.ajax(params).then(success).catch(failure);
+                    const req = $.ajax(params);
+                    req.done(function (resp) {
+                      if (resp && resp.ok === false) {
+                        let msg = String(resp.error || 'Nu pot încărca plăcile HPL.');
+                        if (resp.debug) msg += ' — ' + String(resp.debug);
+                        if (window.toastr) window.toastr.error(msg);
+                        success({ ok: true, items: [] });
+                        return;
+                      }
+                      success(resp);
+                    });
+                    req.fail(function (xhr) {
+                      let msg = 'Nu pot încărca plăcile HPL. (API)';
+                      try {
+                        const ct = String((xhr && xhr.getResponseHeader) ? (xhr.getResponseHeader('content-type') || '') : '');
+                        if (ct.toLowerCase().includes('application/json') && xhr.responseJSON) {
+                          msg = String(xhr.responseJSON.error || msg);
+                          if (xhr.responseJSON.debug) msg += ' — ' + String(xhr.responseJSON.debug);
+                        } else if (xhr && typeof xhr.status === 'number' && xhr.status) {
+                          msg += ' HTTP ' + String(xhr.status);
+                        }
+                      } catch (e) {}
+                      if (window.toastr) window.toastr.error(msg);
+                      success({ ok: true, items: [] });
+                      if (typeof failure === 'function') failure();
+                    });
+                    return req;
+                  },
                   processResults: function(resp){
                     const items = (resp && resp.items) ? resp.items : [];
                     return { results: items };

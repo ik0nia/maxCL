@@ -81,11 +81,12 @@ final class HplBoard
             ? "JOIN textures ft ON ft.id = b.face_texture_id
                LEFT JOIN textures bt ON bt.id = b.back_texture_id"
             : "";
+        // IMPORTANT: fără virgulă la final (altfel SQL syntax error).
         $selTextures = $hasTextures
             ? "ft.name AS face_texture_name,
-               bt.name AS back_texture_name,"
+               bt.name AS back_texture_name"
             : "NULL AS face_texture_name,
-               NULL AS back_texture_name,";
+               NULL AS back_texture_name";
 
         // IMPORTANT: ignorăm piesele interne (nestocabile) din totaluri, dacă există coloana is_accounting.
         $sqlWithAccounting = "
