@@ -65,6 +65,7 @@ final class ReceptionController
             'winmentor_code' => 'Cod WinMentor',
             'name' => 'Denumire',
             'qty' => 'Bucăți',
+            'unit' => 'Unit',
             'unit_price' => 'Preț/bucată',
         ]);
         $errors = $check['errors'];
@@ -72,6 +73,7 @@ final class ReceptionController
         $code = trim((string)($_POST['winmentor_code'] ?? ''));
         $name = trim((string)($_POST['name'] ?? ''));
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '')));
+        $unit = trim((string)($_POST['unit'] ?? 'buc'));
         $unitPriceRaw = trim((string)($_POST['unit_price'] ?? ''));
         $unitPrice = Validator::dec($unitPriceRaw);
         $note = trim((string)($_POST['note'] ?? ''));
@@ -79,6 +81,8 @@ final class ReceptionController
         if ($code !== '' && mb_strlen($code) > 64) $errors['winmentor_code'] = 'Cod prea lung.';
         if ($name !== '' && mb_strlen($name) > 190) $errors['name'] = 'Denumire prea lungă.';
         if ($qty === null || $qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
+        $allowedUnits = ['buc','ml','set','kg','l'];
+        if (!in_array($unit, $allowedUnits, true)) $errors['unit'] = 'Unitate invalidă.';
         if ($unitPrice === null || $unitPrice < 0 || $unitPrice > 100000000) $errors['unit_price'] = 'Preț invalid.';
         if ($note !== '' && mb_strlen($note) > 255) $errors['note'] = 'Notă prea lungă.';
 
@@ -96,6 +100,7 @@ final class ReceptionController
                 $before = $existing;
                 MagazieItem::updateFields((int)$existing['id'], [
                     'name' => $name,
+                    'unit' => $unit,
                     'unit_price' => $unitPrice,
                 ]);
                 MagazieItem::adjustStock((int)$existing['id'], (float)$qty);
@@ -105,6 +110,7 @@ final class ReceptionController
                 $itemId = MagazieItem::create([
                     'winmentor_code' => $code,
                     'name' => $name,
+                    'unit' => $unit,
                     'unit_price' => $unitPrice,
                     'stock_qty' => (float)$qty,
                 ]);

@@ -724,6 +724,20 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-14_17_magazie_item_unit',
+                'label' => 'ALTER magazie_items ADD unit',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'magazie_items')) return;
+                    if (!self::columnExists($pdo, 'magazie_items', 'unit')) {
+                        try {
+                            $pdo->exec("ALTER TABLE magazie_items ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT 'buc' AFTER name");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                },
+            ],
         ];
     }
 

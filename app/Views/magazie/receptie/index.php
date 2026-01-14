@@ -41,6 +41,14 @@ ob_start();
         <label class="form-label fw-semibold">Denumire</label>
         <input class="form-control" name="name" required maxlength="190" placeholder="ex: Balamale, șuruburi…">
       </div>
+      <div class="col-6 col-md-1">
+        <label class="form-label fw-semibold">Unit</label>
+        <select class="form-select" name="unit" required>
+          <?php foreach (['buc','ml','set','kg','l'] as $u): ?>
+            <option value="<?= htmlspecialchars($u) ?>" <?= $u === 'buc' ? 'selected' : '' ?>><?= htmlspecialchars($u) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
       <div class="col-6 col-md-2">
         <label class="form-label fw-semibold">Bucăți</label>
         <input class="form-control" type="number" name="qty" required min="0.001" step="0.001" value="1">

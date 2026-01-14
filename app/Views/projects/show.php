@@ -438,7 +438,11 @@ ob_start();
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Unit</label>
-              <input class="form-control" name="unit" value="buc">
+              <select class="form-select" name="unit" id="magazieUnit">
+                <?php foreach (['buc','ml','set','kg','l'] as $u): ?>
+                  <option value="<?= htmlspecialchars($u) ?>" <?= $u === 'buc' ? 'selected' : '' ?>><?= htmlspecialchars($u) ?></option>
+                <?php endforeach; ?>
+              </select>
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Mod</label>
@@ -468,6 +472,39 @@ ob_start();
               </button>
             </div>
           </form>
+
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              const el = document.getElementById('magazieItemSelect');
+              if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              const $el = window.jQuery(el);
+              const unitEl = document.getElementById('magazieUnit');
+
+              $el.select2({
+                width: '100%',
+                placeholder: 'Caută accesoriu…',
+                allowClear: true,
+                minimumInputLength: 1,
+                ajax: {
+                  url: "<?= htmlspecialchars(Url::to('/api/magazie/items/search')) ?>",
+                  dataType: 'json',
+                  delay: 250,
+                  data: function(params){ return { q: params.term }; },
+                  processResults: function(resp){
+                    const items = (resp && resp.items) ? resp.items : [];
+                    return { results: items };
+                  },
+                  cache: true
+                }
+              });
+
+              $el.on('select2:select', function(e){
+                if (!unitEl) return;
+                const item = e && e.params ? e.params.data : null;
+                if (item && item.unit) unitEl.value = item.unit;
+              });
+            });
+          </script>
         <?php endif; ?>
 
         <div class="mt-3">
@@ -1164,32 +1201,6 @@ ob_start();
       </script>
     <?php endif; ?>
   </div>
-  <?php if ($canWrite): ?>
-  <script>
-    document.addEventListener('DOMContentLoaded', function(){
-      const el = document.getElementById('magazieItemSelect');
-      if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
-      const $el = window.jQuery(el);
-      $el.select2({
-        width: '100%',
-        placeholder: 'Caută accesoriu…',
-        allowClear: true,
-        minimumInputLength: 1,
-        ajax: {
-          url: "<?= htmlspecialchars(Url::to('/api/magazie/items/search')) ?>",
-          dataType: 'json',
-          delay: 250,
-          data: function(params){ return { q: params.term }; },
-          processResults: function(resp){
-            const items = (resp && resp.items) ? resp.items : [];
-            return { results: items };
-          },
-          cache: true
-        }
-      });
-    });
-  </script>
-  <?php endif; ?>
 <?php else: ?>
   <div class="card app-card p-4">
     <div class="h5 m-0"><?= htmlspecialchars($tabs[$tab]) ?></div>

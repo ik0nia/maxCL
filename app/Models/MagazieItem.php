@@ -132,19 +132,20 @@ final class MagazieItem
     }
 
     /**
-     * @param array{winmentor_code:string,name:string,unit_price:float|null,stock_qty:float} $data
+     * @param array{winmentor_code:string,name:string,unit:string,unit_price:float|null,stock_qty:float} $data
      */
     public static function create(array $data): int
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         $st = $pdo->prepare('
-            INSERT INTO magazie_items (winmentor_code, name, unit_price, stock_qty)
-            VALUES (:c, :n, :p, :q)
+            INSERT INTO magazie_items (winmentor_code, name, unit, unit_price, stock_qty)
+            VALUES (:c, :n, :u, :p, :q)
         ');
         $st->execute([
             ':c' => trim((string)$data['winmentor_code']),
             ':n' => trim((string)$data['name']),
+            ':u' => trim((string)$data['unit']),
             ':p' => $data['unit_price'],
             ':q' => (float)$data['stock_qty'],
         ]);
@@ -152,7 +153,7 @@ final class MagazieItem
     }
 
     /**
-     * @param array{name?:string,unit_price?:float|null} $fields
+     * @param array{name?:string,unit?:string,unit_price?:float|null} $fields
      */
     public static function updateFields(int $id, array $fields): void
     {
@@ -162,6 +163,10 @@ final class MagazieItem
         if (array_key_exists('name', $fields)) {
             $sets[] = 'name = :name';
             $params[':name'] = trim((string)$fields['name']);
+        }
+        if (array_key_exists('unit', $fields)) {
+            $sets[] = 'unit = :unit';
+            $params[':unit'] = trim((string)$fields['unit']);
         }
         if (array_key_exists('unit_price', $fields)) {
             $sets[] = 'unit_price = :unit_price';
