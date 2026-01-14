@@ -204,13 +204,14 @@ $router->post('/clients/{id}/delete', fn($p) => ClientsController::delete($p), [
 // ---- Stoc (Admin/Gestionar/Operator). Operator = read-only (nu poate crea plăci/piese)
 $stockReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $stockWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$stockMoveMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 
 $router->get('/stock', fn() => StockController::index(), $stockReadMW);
 $router->get('/stock/boards/create', fn() => StockController::createBoardForm(), $stockWriteMW);
 $router->post('/stock/boards/create', fn() => StockController::createBoard(), $stockWriteMW);
 $router->get('/stock/boards/{id}', fn($p) => StockController::boardDetails($p), $stockReadMW);
 $router->post('/stock/boards/{id}/pieces/add', fn($p) => StockController::addPiece($p), $stockWriteMW);
-$router->post('/stock/boards/{id}/pieces/move', fn($p) => StockController::movePiece($p), $stockWriteMW);
+$router->post('/stock/boards/{id}/pieces/move', fn($p) => StockController::movePiece($p), $stockMoveMW);
 $router->get('/stock/boards/{id}/edit', fn($p) => StockController::editBoardForm($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/edit', fn($p) => StockController::updateBoard($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/delete', fn($p) => StockController::deleteBoard($p), $stockWriteMW);

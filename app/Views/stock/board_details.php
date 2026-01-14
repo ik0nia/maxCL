@@ -11,6 +11,7 @@ $pieces = $pieces ?? [];
 $history = $history ?? [];
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+$canMove = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 $stdW = (int)($board['std_width_mm'] ?? 0);
 $stdH = (int)($board['std_height_mm'] ?? 0);
@@ -266,7 +267,7 @@ ob_start();
       </table>
     </div>
 
-    <?php if ($canWrite): ?>
+    <?php if ($canMove): ?>
       <div class="card app-card p-3 mt-3">
         <div class="h5 m-0">Mutare stoc</div>
         <div class="text-muted">Mută o cantitate pe altă locație și/sau schimbă statusul (devine indisponibil dacă nu este „Disponibil”).</div>
@@ -325,7 +326,9 @@ ob_start();
           </div>
         </form>
       </div>
+    <?php endif; ?>
 
+    <?php if ($canWrite): ?>
       <div class="card app-card p-3 mt-3">
         <div class="h5 m-0">Adaugă piesă în stoc</div>
         <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>
