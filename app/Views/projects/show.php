@@ -625,19 +625,19 @@ ob_start();
     <div class="col-12 col-lg-6">
       <div class="card app-card p-3">
         <div class="h5 m-0">Consum HPL</div>
-        <div class="text-muted">Rezervat/Consumat (mp) + alocare automată pe produse</div>
+        <div class="text-muted">Rezervat/Consumat (plăci întregi) + alocare automată (mp) pe produse</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
             <div class="col-12">
-              <label class="form-label fw-semibold">Placă HPL (ID)</label>
-              <input class="form-control" name="board_id" placeholder="ID hpl_boards…">
-              <div class="text-muted small mt-1">Momentan: introdu ID-ul plăcii (următorul pas: search).</div>
+              <label class="form-label fw-semibold">Placă HPL</label>
+              <select class="form-select" name="board_id" id="hplBoardSelect" style="width:100%"></select>
+              <div class="text-muted small mt-1">Caută după cod placă sau coduri culoare. (Cu thumbnail)</div>
             </div>
             <div class="col-6">
-              <label class="form-label fw-semibold">mp</label>
-              <input class="form-control" type="number" step="0.0001" min="0.0001" name="qty_m2" value="1">
+              <label class="form-label fw-semibold">Plăci (buc)</label>
+              <input class="form-control" type="number" step="1" min="1" name="qty_boards" value="1">
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Mod</label>
@@ -656,6 +656,49 @@ ob_start();
               </button>
             </div>
           </form>
+
+          <style>
+            .s2-thumb{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px}
+            .s2-row{display:flex;align-items:center}
+          </style>
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              const el = document.getElementById('hplBoardSelect');
+              if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              const $ = window.jQuery;
+              const $el = $(el);
+              function fmtBoard(opt){
+                if (!opt.id) return opt.text;
+                const thumb = opt.thumb || null;
+                if (!thumb) return opt.text;
+                const $row = $('<span class="s2-row"></span>');
+                $row.append($('<img class="s2-thumb" />').attr('src', thumb));
+                $row.append($('<span></span>').text(opt.text || ''));
+                return $row;
+              }
+              $el.select2({
+                width: '100%',
+                placeholder: 'Caută placă HPL…',
+                allowClear: true,
+                minimumInputLength: 1,
+                templateResult: fmtBoard,
+                templateSelection: fmtBoard,
+                escapeMarkup: m => m,
+                ajax: {
+                  url: "<?= htmlspecialchars(Url::to('/api/hpl/boards/search')) ?>",
+                  dataType: 'json',
+                  delay: 250,
+                  headers: { 'Accept': 'application/json' },
+                  data: function(params){ return { q: params.term }; },
+                  processResults: function(resp){
+                    const items = (resp && resp.items) ? resp.items : [];
+                    return { results: items };
+                  },
+                  cache: true
+                }
+              });
+            });
+          </script>
         <?php endif; ?>
 
         <div class="mt-3">
@@ -667,7 +710,7 @@ ob_start();
                 <thead>
                   <tr>
                     <th>Placă</th>
-                    <th style="width:110px" class="text-end">mp</th>
+                    <th style="width:140px" class="text-end">Plăci</th>
                     <th style="width:110px">Mod</th>
                     <th>Notă</th>
                     <th class="text-end" style="width:130px">Acțiuni</th>
@@ -678,7 +721,11 @@ ob_start();
                     <?php $cid = (int)($c['id'] ?? 0); ?>
                     <tr>
                       <td class="fw-semibold"><?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?></td>
-                      <td class="text-end fw-semibold"><?= number_format((float)($c['qty_m2'] ?? 0), 4, '.', '') ?></td>
+                      <?php $qb = (int)($c['qty_boards'] ?? 0); ?>
+                      <td class="text-end fw-semibold">
+                        <?= $qb > 0 ? ($qb . ' buc') : '—' ?>
+                        <div class="text-muted small"><?= number_format((float)($c['qty_m2'] ?? 0), 4, '.', '') ?> mp</div>
+                      </td>
                       <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
                       <td class="text-end">

@@ -667,6 +667,7 @@ final class DbMigrations
                               id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                               project_id INT UNSIGNED NOT NULL,
                               board_id INT UNSIGNED NOT NULL,
+                              qty_boards INT NOT NULL DEFAULT 0,
                               qty_m2 DECIMAL(12,4) NOT NULL,
                               mode ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'RESERVED',
                               note VARCHAR(255) NULL,
@@ -701,6 +702,20 @@ final class DbMigrations
                               CONSTRAINT fk_ph_alloc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE
                             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                         ");
+                    }
+                },
+            ],
+            [
+                'id' => '2026-01-14_18_project_hpl_qty_boards',
+                'label' => 'ALTER project_hpl_consumptions ADD qty_boards',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_hpl_consumptions')) return;
+                    if (!self::columnExists($pdo, 'project_hpl_consumptions', 'qty_boards')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_hpl_consumptions ADD COLUMN qty_boards INT NOT NULL DEFAULT 0 AFTER board_id");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
                     }
                 },
             ],

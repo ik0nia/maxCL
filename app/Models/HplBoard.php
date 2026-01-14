@@ -155,7 +155,7 @@ final class HplBoard
         }
     }
 
-    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int}> */
+    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int,thumb?:string|null,face_color_code?:string|null,back_color_code?:string|null}> */
     public static function searchForSelect(?string $q, int $limit = 25): array
     {
         /** @var PDO $pdo */
@@ -168,15 +168,25 @@ final class HplBoard
         $params = [];
         if ($q !== '') {
             $like = '%' . $q . '%';
-            $where = 'WHERE (code LIKE ? OR name LIKE ? OR brand LIKE ?)';
-            $params = [$like, $like, $like];
+            $where = 'WHERE (
+                b.code LIKE ? OR b.name LIKE ? OR b.brand LIKE ?
+                OR fc.code LIKE ? OR bc.code LIKE ?
+                OR fc.color_name LIKE ? OR bc.color_name LIKE ?
+            )';
+            $params = [$like, $like, $like, $like, $like, $like, $like];
         }
 
         $sql = "
-            SELECT id, code, name, brand, thickness_mm, std_width_mm, std_height_mm
-            FROM hpl_boards
+            SELECT
+              b.id, b.code, b.name, b.brand, b.thickness_mm, b.std_width_mm, b.std_height_mm,
+              fc.code AS face_color_code,
+              bc.code AS back_color_code,
+              fc.thumb_path AS thumb
+            FROM hpl_boards b
+            JOIN finishes fc ON fc.id = b.face_color_id
+            LEFT JOIN finishes bc ON bc.id = b.back_color_id
             $where
-            ORDER BY code ASC
+            ORDER BY b.code ASC
             LIMIT $limit
         ";
         $st = $pdo->prepare($sql);
@@ -192,7 +202,12 @@ final class HplBoard
             $th = (int)($r['thickness_mm'] ?? 0);
             $w = (int)($r['std_width_mm'] ?? 0);
             $h = (int)($r['std_height_mm'] ?? 0);
+            $fc = (string)($r['face_color_code'] ?? '');
+            $bc = (string)($r['back_color_code'] ?? '');
+            $colors = $fc !== '' ? $fc : '';
+            if ($bc !== '' && $bc !== $fc) $colors = $colors !== '' ? ($colors . '/' . $bc) : $bc;
             $text = trim($code . ' · ' . $name . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
+            if ($colors !== '') $text .= ' · ' . $colors;
             $out[] = [
                 'id' => $id,
                 'text' => $text,
@@ -202,6 +217,9 @@ final class HplBoard
                 'thickness_mm' => $th,
                 'std_width_mm' => $w,
                 'std_height_mm' => $h,
+                'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
+                'face_color_code' => $fc !== '' ? $fc : null,
+                'back_color_code' => $bc !== '' ? $bc : null,
             ];
         }
         return $out;

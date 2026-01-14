@@ -46,13 +46,14 @@ final class ProjectHplConsumption
         $pdo = DB::pdo();
         $st = $pdo->prepare('
             INSERT INTO project_hpl_consumptions
-              (project_id, board_id, qty_m2, mode, note, created_by)
+              (project_id, board_id, qty_boards, qty_m2, mode, note, created_by)
             VALUES
-              (:project_id, :board_id, :qty_m2, :mode, :note, :created_by)
+              (:project_id, :board_id, :qty_boards, :qty_m2, :mode, :note, :created_by)
         ');
         $st->execute([
             ':project_id' => (int)$data['project_id'],
             ':board_id' => (int)$data['board_id'],
+            ':qty_boards' => (int)($data['qty_boards'] ?? 0),
             ':qty_m2' => (float)$data['qty_m2'],
             ':mode' => (string)($data['mode'] ?? 'RESERVED'),
             ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,

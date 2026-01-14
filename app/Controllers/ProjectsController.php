@@ -13,6 +13,7 @@ use App\Core\View;
 use App\Models\Client;
 use App\Models\ClientGroup;
 use App\Models\HplBoard;
+use App\Models\HplStockPiece;
 use App\Models\MagazieItem;
 use App\Models\Product;
 use App\Models\Project;
@@ -54,6 +55,105 @@ final class ProjectsController
             ['value' => 'by_qty', 'label' => 'by_qty (după cantitate)'],
             ['value' => 'manual', 'label' => 'manual'],
         ];
+    }
+
+    /**
+     * Mută plăci întregi (piece_type=FULL) între status-uri în stoc (AVAILABLE/RESERVED/CONSUMED).
+     * Se face split/merge pe rânduri cu qty.
+     */
+    private static function moveFullBoards(int $boardId, int $qty, string $fromStatus, string $toStatus, ?string $noteAppend = null): void
+    {
+        $qty = (int)$qty;
+        if ($qty <= 0) return;
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+
+        // Compat: is_accounting poate lipsi; încercăm filtrat, altfel fără.
+        $rows = [];
+        try {
+            $st = $pdo->prepare("
+                SELECT *
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'FULL'
+                  AND status = ?
+                  AND (is_accounting = 1 OR is_accounting IS NULL)
+                ORDER BY created_at ASC, id ASC
+                FOR UPDATE
+            ");
+            $st->execute([(int)$boardId, $fromStatus]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $st = $pdo->prepare("
+                SELECT *
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'FULL'
+                  AND status = ?
+                ORDER BY created_at ASC, id ASC
+                FOR UPDATE
+            ");
+            $st->execute([(int)$boardId, $fromStatus]);
+            $rows = $st->fetchAll();
+        }
+
+        $need = $qty;
+        foreach ($rows as $r) {
+            if ($need <= 0) break;
+            $id = (int)($r['id'] ?? 0);
+            $rowQty = (int)($r['qty'] ?? 0);
+            if ($id <= 0 || $rowQty <= 0) continue;
+
+            $take = min($need, $rowQty);
+            if ($take <= 0) continue;
+
+            $width = (int)($r['width_mm'] ?? 0);
+            $height = (int)($r['height_mm'] ?? 0);
+            $location = (string)($r['location'] ?? '');
+            $isAcc = (int)($r['is_accounting'] ?? 1);
+            $notes = (string)($r['notes'] ?? '');
+
+            if ($take === $rowQty) {
+                HplStockPiece::updateFields($id, ['status' => $toStatus]);
+                if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+            } else {
+                // scade din rândul sursă
+                HplStockPiece::updateQty($id, $rowQty - $take);
+
+                // adaugă/îmbină în rândul destinație
+                $ident = null;
+                try {
+                    $ident = HplStockPiece::findIdentical($boardId, 'FULL', $toStatus, $width, $height, $location, $isAcc);
+                } catch (\Throwable $e) {
+                    $ident = null;
+                }
+                if ($ident) {
+                    HplStockPiece::incrementQty((int)$ident['id'], $take);
+                    if ($noteAppend) HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
+                } else {
+                    $newNotes = trim($notes);
+                    if ($noteAppend) $newNotes = trim($newNotes . ($newNotes !== '' ? "\n" : '') . $noteAppend);
+                    HplStockPiece::create([
+                        'board_id' => $boardId,
+                        'is_accounting' => $isAcc,
+                        'piece_type' => 'FULL',
+                        'status' => $toStatus,
+                        'width_mm' => $width,
+                        'height_mm' => $height,
+                        'qty' => $take,
+                        'location' => $location,
+                        'notes' => $newNotes !== '' ? $newNotes : null,
+                    ]);
+                }
+            }
+
+            $need -= $take;
+        }
+
+        if ($need > 0) {
+            throw new \RuntimeException('Stoc insuficient (plăci întregi).');
+        }
     }
 
     public static function index(): void
@@ -709,10 +809,10 @@ final class ProjectsController
         }
 
         $boardId = Validator::int(trim((string)($_POST['board_id'] ?? '')), 1);
-        $qtyM2 = Validator::dec(trim((string)($_POST['qty_m2'] ?? ''))) ?? null;
+        $qtyBoards = Validator::int(trim((string)($_POST['qty_boards'] ?? '')), 1);
         $mode = trim((string)($_POST['mode'] ?? 'RESERVED'));
         $note = trim((string)($_POST['note'] ?? ''));
-        if ($boardId === null || $qtyM2 === null || $qtyM2 <= 0) {
+        if ($boardId === null || $qtyBoards === null || $qtyBoards <= 0) {
             Session::flash('toast_error', 'Consum HPL invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
@@ -724,24 +824,17 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
 
-        // Stoc disponibil (mp) - rezervări din alte proiecte (best-effort)
+        // Stoc disponibil (plăci întregi)
         $stockRows = HplBoard::allWithTotals(null, null);
-        $stockM2 = 0.0;
+        $stockFull = 0;
         foreach ($stockRows as $r) {
             if ((int)($r['id'] ?? 0) === (int)$boardId) {
-                $stockM2 = (float)($r['stock_m2_available'] ?? 0);
+                $stockFull = (int)($r['stock_qty_full_available'] ?? 0);
                 break;
             }
         }
-        $reservedOther = 0.0;
-        try {
-            $reservedOther = ProjectHplConsumption::reservedTotalForBoard((int)$boardId, $projectId);
-        } catch (\Throwable $e) {
-            $reservedOther = 0.0;
-        }
-        $effectiveAvailable = max(0.0, $stockM2 - $reservedOther);
-        if ($qtyM2 > $effectiveAvailable + 1e-9) {
-            Session::flash('toast_error', 'Stoc HPL insuficient (mp).');
+        if ($qtyBoards > $stockFull) {
+            Session::flash('toast_error', 'Stoc HPL insuficient (plăci întregi).');
             Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
 
@@ -749,14 +842,24 @@ final class ProjectsController
         $pdo = \App\Core\DB::pdo();
         $pdo->beginTransaction();
         try {
+            $wStd = (int)($board['std_width_mm'] ?? 0);
+            $hStd = (int)($board['std_height_mm'] ?? 0);
+            $areaPer = ($wStd > 0 && $hStd > 0) ? (($wStd * $hStd) / 1000000.0) : 0.0;
+            $qtyM2 = $areaPer > 0 ? ($areaPer * (float)$qtyBoards) : 0.0;
+
             $cid = ProjectHplConsumption::create([
                 'project_id' => $projectId,
                 'board_id' => (int)$boardId,
+                'qty_boards' => (int)$qtyBoards,
                 'qty_m2' => (float)$qtyM2,
                 'mode' => $mode,
                 'note' => $note !== '' ? $note : null,
                 'created_by' => Auth::id(),
             ]);
+
+            // Actualizează stocul pe plăci întregi (AVAILABLE -> RESERVED/CONSUMED)
+            $target = $mode === 'CONSUMED' ? 'CONSUMED' : 'RESERVED';
+            self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, 'Proiect ' . (string)($project['code'] ?? '') . ' · consum HPL #' . $cid);
 
             // Auto-alocare pe produse (dacă nu e blocată distribuția și există produse)
             $allocLocked = (int)($project['allocations_locked'] ?? 0) === 1;
@@ -796,9 +899,10 @@ final class ProjectsController
             $pdo->commit();
 
             Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_hpl_consumptions', $cid, null, null, [
-                'message' => 'Consum HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? ''),
+                'message' => 'Consum HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? '') . ' · ' . (int)$qtyBoards . ' buc',
                 'project_id' => $projectId,
                 'board_id' => (int)$boardId,
+                'qty_boards' => (int)$qtyBoards,
                 'qty_m2' => (float)$qtyM2,
                 'mode' => $mode,
                 'note' => $note !== '' ? $note : null,
@@ -971,6 +1075,17 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
         try {
+            // Reverse stoc (best-effort): RESERVED/CONSUMED -> AVAILABLE
+            $mode = (string)($before['mode'] ?? 'RESERVED');
+            $from = $mode === 'CONSUMED' ? 'CONSUMED' : 'RESERVED';
+            $qtyBoards = (int)($before['qty_boards'] ?? 0);
+            if ($qtyBoards > 0) {
+                try {
+                    self::moveFullBoards((int)($before['board_id'] ?? 0), $qtyBoards, $from, 'AVAILABLE', 'Anulare consum HPL #' . $cid);
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
             ProjectHplConsumption::delete($cid);
             Audit::log('PROJECT_CONSUMPTION_DELETE', 'project_hpl_consumptions', $cid, $before, null, [
                 'message' => 'Ștergere consum HPL.',
