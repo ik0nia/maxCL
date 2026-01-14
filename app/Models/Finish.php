@@ -29,6 +29,82 @@ final class Finish
         return $ok;
     }
 
+    private static function isUnknownColumn(\Throwable $e, string $col): bool
+    {
+        $m = strtolower($e->getMessage());
+        return str_contains($m, 'unknown column') && str_contains($m, strtolower($col));
+    }
+
+    /**
+     * Căutare pentru Catalog (carduri) fără dependență de SHOW COLUMNS,
+     * cu fallback dacă lipsesc coloane (compat instalări vechi / hosting restricționat).
+     *
+     * @return array<int, array{id:int, code:string, color_name:string, thumb_path:string, image_path:?string}>
+     */
+    public static function catalogSearch(?string $q, int $limit = 500): array
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $limit = max(1, min(2000, $limit));
+        $q = $q !== null ? trim($q) : '';
+
+        if ($q === '') {
+            $sql = "SELECT id, code, color_name, thumb_path, image_path
+                    FROM finishes
+                    ORDER BY code ASC, color_name ASC
+                    LIMIT $limit";
+            return $pdo->query($sql)->fetchAll();
+        }
+
+        $qNoSpace = str_replace(["\xC2\xA0", ' '], '', $q);
+        $like = '%' . $q . '%';
+        $like2 = '%' . $qNoSpace . '%';
+        $prefix2 = $qNoSpace . '%';
+
+        // Preferăm query-ul complet (include color_code), dar facem fallback dacă nu există coloana.
+        $sql1 = "
+          SELECT id, code, color_name, thumb_path, image_path
+          FROM finishes
+          WHERE
+            code LIKE ?
+            OR REPLACE(code, ' ', '') LIKE ?
+            OR color_name LIKE ?
+            OR color_code LIKE ?
+            OR REPLACE(COALESCE(color_code,''), ' ', '') LIKE ?
+          ORDER BY
+            CASE WHEN REPLACE(code, ' ', '') LIKE ? THEN 0 ELSE 1 END,
+            code ASC,
+            color_name ASC
+          LIMIT $limit
+        ";
+        $sql2 = "
+          SELECT id, code, color_name, thumb_path, image_path
+          FROM finishes
+          WHERE
+            code LIKE ?
+            OR REPLACE(code, ' ', '') LIKE ?
+            OR color_name LIKE ?
+          ORDER BY
+            CASE WHEN REPLACE(code, ' ', '') LIKE ? THEN 0 ELSE 1 END,
+            code ASC,
+            color_name ASC
+          LIMIT $limit
+        ";
+
+        try {
+            $st = $pdo->prepare($sql1);
+            $st->execute([$like, $like2, $like, $like, $like2, $prefix2]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'color_code')) {
+                throw $e;
+            }
+            $st = $pdo->prepare($sql2);
+            $st->execute([$like, $like2, $like, $prefix2]);
+            return $st->fetchAll();
+        }
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function all(): array
     {

@@ -16,7 +16,9 @@ final class CatalogController
      */
     private static function build(?string $q): array
     {
-        $finishes = Finish::search($q);
+        // Pentru catalog folosim o căutare robustă (compat hosting/DB),
+        // ca să găsească inclusiv după o singură cifră în cod.
+        $finishes = Finish::catalogSearch($q, 2000);
 
         // Stoc agregat pe Tip culoare (față) și grosimi (ignoră texturile)
         $rows = StockStats::availableByColorAndThickness(null);
