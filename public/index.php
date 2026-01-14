@@ -210,6 +210,7 @@ $router->get('/stock/boards/create', fn() => StockController::createBoardForm(),
 $router->post('/stock/boards/create', fn() => StockController::createBoard(), $stockWriteMW);
 $router->get('/stock/boards/{id}', fn($p) => StockController::boardDetails($p), $stockReadMW);
 $router->post('/stock/boards/{id}/pieces/add', fn($p) => StockController::addPiece($p), $stockWriteMW);
+$router->post('/stock/boards/{id}/pieces/move', fn($p) => StockController::movePiece($p), $stockWriteMW);
 $router->get('/stock/boards/{id}/edit', fn($p) => StockController::editBoardForm($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/edit', fn($p) => StockController::updateBoard($p), $stockWriteMW);
 $router->post('/stock/boards/{id}/delete', fn($p) => StockController::deleteBoard($p), $stockWriteMW);

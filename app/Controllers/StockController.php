@@ -9,6 +9,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Core\DB;
 use App\Models\AuditLog;
 use App\Models\Finish;
 use App\Models\HplBoard;
@@ -20,7 +21,18 @@ final class StockController
     /** @return array<int,string> */
     private static function locations(): array
     {
-        return ['Depozit', 'Producție', 'Magazin'];
+        return ['Depozit', 'Producție', 'Magazin', 'Depozit (Stricat)'];
+    }
+
+    /** @return array<string,string> */
+    private static function statusLabels(): array
+    {
+        return [
+            'AVAILABLE' => 'Disponibil',
+            'RESERVED' => 'Rezervat / Indisponibil',
+            'CONSUMED' => 'Consumat',
+            'SCRAP' => 'Rebut / Stricat',
+        ];
     }
 
     private static function fmtBoardLabel(array $board, ?int $faceColorId, ?int $faceTextureId, ?int $backColorId, ?int $backTextureId): string
@@ -465,6 +477,125 @@ final class StockController
             'std_height_mm' => $stdH,
         ]);
         Session::flash('toast_success', 'Piesă adăugată în stoc.');
+        Response::redirect('/stock/boards/' . $boardId);
+    }
+
+    // Mutare piesă (split pe qty) + schimbare locație/status (ADMIN/GESTIONAR)
+    public static function movePiece(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $boardId = (int)($params['id'] ?? 0);
+        $board = HplBoard::find($boardId);
+        if (!$board) {
+            Session::flash('toast_error', 'Placă inexistentă.');
+            Response::redirect('/stock');
+        }
+
+        $check = Validator::required($_POST, [
+            'from_piece_id' => 'Sursă',
+            'qty' => 'Bucăți',
+            'to_location' => 'Locație destinație',
+            'to_status' => 'Status destinație',
+            'note' => 'Notiță',
+        ]);
+        $errors = $check['errors'];
+
+        $fromId = Validator::int((string)($_POST['from_piece_id'] ?? ''), 1) ?? null;
+        $qty = Validator::int((string)($_POST['qty'] ?? ''), 1, 100000) ?? null;
+        $toLocation = trim((string)($_POST['to_location'] ?? ''));
+        $toStatus = trim((string)($_POST['to_status'] ?? ''));
+        $note = trim((string)($_POST['note'] ?? ''));
+
+        if ($fromId === null) $errors['from_piece_id'] = 'Selectează piesa sursă.';
+        if ($qty === null) $errors['qty'] = 'Cantitate invalidă.';
+        if ($toLocation === '' || !in_array($toLocation, self::locations(), true)) $errors['to_location'] = 'Locație invalidă.';
+        $allowedStatuses = array_keys(self::statusLabels());
+        if ($toStatus === '' || !in_array($toStatus, $allowedStatuses, true)) $errors['to_status'] = 'Status invalid.';
+        if ($note === '') $errors['note'] = 'Notița este obligatorie.';
+
+        if ($errors) {
+            Session::flash('toast_error', 'Completează corect câmpurile pentru mutare.');
+            Response::redirect('/stock/boards/' . $boardId);
+        }
+
+        $from = HplStockPiece::find((int)$fromId);
+        if (!$from || (int)$from['board_id'] !== $boardId) {
+            Session::flash('toast_error', 'Piesa sursă este invalidă.');
+            Response::redirect('/stock/boards/' . $boardId);
+        }
+
+        $fromQty = (int)($from['qty'] ?? 0);
+        if ($qty > $fromQty) {
+            Session::flash('toast_error', 'Nu poți muta mai multe bucăți decât există în piesa sursă.');
+            Response::redirect('/stock/boards/' . $boardId);
+        }
+
+        $labels = self::statusLabels();
+        $fromStatus = (string)($from['status'] ?? '');
+        $fromLoc = (string)($from['location'] ?? '');
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $destId = null;
+            $updatedFrom = $from;
+
+            if ($qty < $fromQty) {
+                // Split: scade din sursă + creează destinație
+                HplStockPiece::updateQty((int)$from['id'], $fromQty - $qty);
+                $updatedFrom['qty'] = $fromQty - $qty;
+
+                $destData = [
+                    'board_id' => $boardId,
+                    'piece_type' => (string)$from['piece_type'],
+                    'status' => $toStatus,
+                    'width_mm' => (int)$from['width_mm'],
+                    'height_mm' => (int)$from['height_mm'],
+                    'qty' => $qty,
+                    'location' => $toLocation,
+                    'notes' => $note,
+                ];
+                $destId = HplStockPiece::create($destData);
+            } else {
+                // Mută întreaga piesă (update)
+                $newNotes = $note;
+                $oldNotes = trim((string)($from['notes'] ?? ''));
+                if ($oldNotes !== '') $newNotes = $oldNotes . "\n" . $note;
+                HplStockPiece::updateFields((int)$from['id'], [
+                    'status' => $toStatus,
+                    'location' => $toLocation,
+                    'notes' => $newNotes,
+                ]);
+                $destId = (int)$from['id'];
+            }
+
+            $pdo->commit();
+
+            $dim = (int)$from['height_mm'] . '×' . (int)$from['width_mm'] . ' mm';
+            $msg = 'A mutat ' . (int)$qty . ' buc ' . (string)$from['piece_type'] . " {$dim} din {$fromLoc} (" . ($labels[$fromStatus] ?? $fromStatus) . ') în ' . $toLocation . ' (' . ($labels[$toStatus] ?? $toStatus) . '). Notă: ' . $note;
+            Audit::log('STOCK_PIECE_MOVE', 'hpl_stock_pieces', $destId, $from, null, [
+                'message' => $msg,
+                'board_id' => $boardId,
+                'from_piece_id' => (int)$from['id'],
+                'to_piece_id' => (int)$destId,
+                'qty' => (int)$qty,
+                'piece_type' => (string)$from['piece_type'],
+                'height_mm' => (int)$from['height_mm'],
+                'width_mm' => (int)$from['width_mm'],
+                'from_location' => $fromLoc,
+                'to_location' => $toLocation,
+                'from_status' => $fromStatus,
+                'to_status' => $toStatus,
+                'note' => $note,
+            ]);
+
+            Session::flash('toast_success', 'Mutare efectuată.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot efectua mutarea: ' . $e->getMessage());
+        }
+
         Response::redirect('/stock/boards/' . $boardId);
     }
 

@@ -268,6 +268,65 @@ ob_start();
 
     <?php if ($canWrite): ?>
       <div class="card app-card p-3 mt-3">
+        <div class="h5 m-0">Mutare stoc</div>
+        <div class="text-muted">Mută o cantitate pe altă locație și/sau schimbă statusul (devine indisponibil dacă nu este „Disponibil”).</div>
+        <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/move')) ?>">
+          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+
+          <div class="col-12">
+            <label class="form-label small">Din piesă</label>
+            <select class="form-select" name="from_piece_id" required>
+              <option value="">Alege piesa sursă...</option>
+              <?php foreach ($pieces as $p): ?>
+                <?php
+                  $pid = (int)$p['id'];
+                  $lbl = (string)$p['piece_type'] . ' · ' . (int)$p['height_mm'] . '×' . (int)$p['width_mm'] . ' mm · ' . (int)$p['qty'] . ' buc · ' . (string)$p['location'] . ' · ' . (string)$p['status'];
+                ?>
+                <option value="<?= $pid ?>"><?= htmlspecialchars($lbl) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="col-6 col-md-4">
+            <label class="form-label small">Bucăți de mutat</label>
+            <input type="number" min="1" class="form-control" name="qty" value="1" required>
+          </div>
+
+          <div class="col-6 col-md-4">
+            <label class="form-label small">Status destinație</label>
+            <select class="form-select" name="to_status" required>
+              <option value="RESERVED" selected>Rezervat / Indisponibil</option>
+              <option value="AVAILABLE">Disponibil</option>
+              <option value="SCRAP">Rebut / Stricat</option>
+              <option value="CONSUMED">Consumat</option>
+            </select>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Locație destinație</label>
+            <select class="form-select" name="to_location" required>
+              <option value="">Alege locație...</option>
+              <option value="Depozit">Depozit</option>
+              <option value="Producție">Producție</option>
+              <option value="Magazin">Magazin</option>
+              <option value="Depozit (Stricat)">Depozit (Stricat)</option>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label small">Notiță (obligatoriu)</label>
+            <textarea class="form-control" name="note" rows="2" placeholder="ex: Mutat pentru prelucrare / Rezervat pentru comandă / Placă defectă" required></textarea>
+          </div>
+
+          <div class="col-12">
+            <button class="btn btn-outline-secondary w-100" type="submit">
+              <i class="bi bi-arrow-left-right me-1"></i> Mută
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card app-card p-3 mt-3">
         <div class="h5 m-0">Adaugă piesă în stoc</div>
         <div class="text-muted">Poți adăuga plăci întregi (FULL) sau resturi (OFFCUT) cu dimensiuni specifice.</div>
         <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$board['id'] . '/pieces/add')) ?>">
@@ -299,6 +358,7 @@ ob_start();
               <option value="Depozit">Depozit</option>
               <option value="Producție">Producție</option>
               <option value="Magazin">Magazin</option>
+              <option value="Depozit (Stricat)">Depozit (Stricat)</option>
             </select>
           </div>
           <div class="col-12">

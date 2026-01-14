@@ -67,5 +67,41 @@ final class HplStockPiece
         $st = $pdo->prepare('DELETE FROM hpl_stock_pieces WHERE id = ?');
         $st->execute([$id]);
     }
+
+    public static function updateQty(int $id, int $qty): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('UPDATE hpl_stock_pieces SET qty = ? WHERE id = ?');
+        $st->execute([$qty, $id]);
+    }
+
+    /**
+     * @param array{status?:string|null, location?:string|null, notes?:string|null} $data
+     */
+    public static function updateFields(int $id, array $data): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $set = [];
+        $params = [];
+        if (array_key_exists('status', $data)) {
+            $set[] = 'status = :status';
+            $params[':status'] = $data['status'];
+        }
+        if (array_key_exists('location', $data)) {
+            $set[] = 'location = :location';
+            $params[':location'] = $data['location'] ?? '';
+        }
+        if (array_key_exists('notes', $data)) {
+            $set[] = 'notes = :notes';
+            $params[':notes'] = $data['notes'] ?: null;
+        }
+        if (!$set) return;
+        $params[':id'] = $id;
+        $sql = 'UPDATE hpl_stock_pieces SET ' . implode(', ', $set) . ' WHERE id = :id';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+    }
 }
 
