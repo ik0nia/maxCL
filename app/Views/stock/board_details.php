@@ -264,8 +264,8 @@ ob_start();
                 <div class="d-flex flex-column align-items-start">
                   <div><?= htmlspecialchars($pStatus) ?></div>
                   <?php if ($showNote): ?>
-                    <div class="small mt-1 px-2 py-1 rounded"
-                         style="white-space:pre-wrap;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
+                    <div class="small mt-1 d-inline-block rounded"
+                         style="white-space:pre-wrap;line-height:1.2;padding:.15rem .5rem;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
                       <?= nl2br(htmlspecialchars($noteShort)) ?>
                     </div>
                   <?php endif; ?>
@@ -327,8 +327,8 @@ ob_start();
                   <div class="d-flex flex-column align-items-start">
                     <div><?= htmlspecialchars($pStatus) ?></div>
                     <?php if ($noteShort !== ''): ?>
-                      <div class="small mt-1 px-2 py-1 rounded"
-                           style="white-space:pre-wrap;background:#F3F7F8;border:1px solid #D9E3E6;color:#5F6B72">
+                      <div class="small mt-1 d-inline-block rounded"
+                           style="white-space:pre-wrap;line-height:1.2;padding:.15rem .5rem;background:#F3F7F8;border:1px solid #D9E3E6;color:#5F6B72">
                         <?= nl2br(htmlspecialchars($noteShort)) ?>
                       </div>
                     <?php endif; ?>
