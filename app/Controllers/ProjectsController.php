@@ -32,6 +32,37 @@ use App\Models\EntityLabel;
 
 final class ProjectsController
 {
+    private static function countFullBoardsAvailable(int $boardId): int
+    {
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        try {
+            $st = $pdo->prepare("
+                SELECT COALESCE(SUM(qty),0) AS c
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'FULL'
+                  AND status = 'AVAILABLE'
+                  AND (is_accounting = 1 OR is_accounting IS NULL)
+            ");
+            $st->execute([(int)$boardId]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        } catch (\Throwable $e) {
+            // Compat: vechi schema fără is_accounting
+            $st = $pdo->prepare("
+                SELECT COALESCE(SUM(qty),0) AS c
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'FULL'
+                  AND status = 'AVAILABLE'
+            ");
+            $st->execute([(int)$boardId]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        }
+    }
+
     /** @return array<int, array{value:string,label:string}> */
     private static function statuses(): array
     {
@@ -818,20 +849,24 @@ final class ProjectsController
         }
         if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'RESERVED';
 
-        $board = HplBoard::find((int)$boardId);
+        try {
+            $board = HplBoard::find((int)$boardId);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot încărca placa HPL.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
         if (!$board) {
             Session::flash('toast_error', 'Placă HPL inexistentă.');
             Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
 
         // Stoc disponibil (plăci întregi)
-        $stockRows = HplBoard::allWithTotals(null, null);
         $stockFull = 0;
-        foreach ($stockRows as $r) {
-            if ((int)($r['id'] ?? 0) === (int)$boardId) {
-                $stockFull = (int)($r['stock_qty_full_available'] ?? 0);
-                break;
-            }
+        try {
+            $stockFull = self::countFullBoardsAvailable((int)$boardId);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot calcula stocul HPL.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
         if ($qtyBoards > $stockFull) {
             Session::flash('toast_error', 'Stoc HPL insuficient (plăci întregi).');

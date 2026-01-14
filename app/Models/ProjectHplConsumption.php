@@ -8,6 +8,12 @@ use PDO;
 
 final class ProjectHplConsumption
 {
+    private static function isUnknownColumn(\Throwable $e, string $col): bool
+    {
+        $m = strtolower($e->getMessage());
+        return str_contains($m, 'unknown column') && str_contains($m, strtolower($col));
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function forProject(int $projectId): array
     {
@@ -44,21 +50,42 @@ final class ProjectHplConsumption
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            INSERT INTO project_hpl_consumptions
-              (project_id, board_id, qty_boards, qty_m2, mode, note, created_by)
-            VALUES
-              (:project_id, :board_id, :qty_boards, :qty_m2, :mode, :note, :created_by)
-        ');
-        $st->execute([
-            ':project_id' => (int)$data['project_id'],
-            ':board_id' => (int)$data['board_id'],
-            ':qty_boards' => (int)($data['qty_boards'] ?? 0),
-            ':qty_m2' => (float)$data['qty_m2'],
-            ':mode' => (string)($data['mode'] ?? 'RESERVED'),
-            ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
-            ':created_by' => $data['created_by'] ?? null,
-        ]);
+        try {
+            $st = $pdo->prepare('
+                INSERT INTO project_hpl_consumptions
+                  (project_id, board_id, qty_boards, qty_m2, mode, note, created_by)
+                VALUES
+                  (:project_id, :board_id, :qty_boards, :qty_m2, :mode, :note, :created_by)
+            ');
+            $st->execute([
+                ':project_id' => (int)$data['project_id'],
+                ':board_id' => (int)$data['board_id'],
+                ':qty_boards' => (int)($data['qty_boards'] ?? 0),
+                ':qty_m2' => (float)$data['qty_m2'],
+                ':mode' => (string)($data['mode'] ?? 'RESERVED'),
+                ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
+                ':created_by' => $data['created_by'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            // Compat: dacă DB nu are încă coloana qty_boards, inserăm fără ea.
+            if (!self::isUnknownColumn($e, 'qty_boards')) {
+                throw $e;
+            }
+            $st = $pdo->prepare('
+                INSERT INTO project_hpl_consumptions
+                  (project_id, board_id, qty_m2, mode, note, created_by)
+                VALUES
+                  (:project_id, :board_id, :qty_m2, :mode, :note, :created_by)
+            ');
+            $st->execute([
+                ':project_id' => (int)$data['project_id'],
+                ':board_id' => (int)$data['board_id'],
+                ':qty_m2' => (float)$data['qty_m2'],
+                ':mode' => (string)($data['mode'] ?? 'RESERVED'),
+                ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
+                ':created_by' => $data['created_by'] ?? null,
+            ]);
+        }
         return (int)$pdo->lastInsertId();
     }
 
