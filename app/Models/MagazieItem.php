@@ -132,7 +132,7 @@ final class MagazieItem
     }
 
     /**
-     * @param array{winmentor_code:string,name:string,unit_price:float|null,stock_qty:int} $data
+     * @param array{winmentor_code:string,name:string,unit_price:float|null,stock_qty:float} $data
      */
     public static function create(array $data): int
     {
@@ -146,7 +146,7 @@ final class MagazieItem
             ':c' => trim((string)$data['winmentor_code']),
             ':n' => trim((string)$data['name']),
             ':p' => $data['unit_price'],
-            ':q' => (int)$data['stock_qty'],
+            ':q' => (float)$data['stock_qty'],
         ]);
         return (int)$pdo->lastInsertId();
     }
@@ -177,7 +177,7 @@ final class MagazieItem
     }
 
     /** Ajustează stocul (delta poate fi negativ). Returnează false dacă ar duce sub 0. */
-    public static function adjustStock(int $id, int $delta): bool
+    public static function adjustStock(int $id, float $delta): bool
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();

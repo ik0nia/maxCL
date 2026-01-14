@@ -11,6 +11,11 @@ $canWrite = ProjectsController::canWrite();
 $project = $project ?? [];
 $tab = (string)($tab ?? 'general');
 $projectProducts = $projectProducts ?? [];
+$magazieConsum = $magazieConsum ?? [];
+$hplConsum = $hplConsum ?? [];
+$hplAlloc = $hplAlloc ?? [];
+$hplBoards = $hplBoards ?? [];
+$magazieItems = $magazieItems ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -360,6 +365,188 @@ ob_start();
               </button>
             </div>
           </form>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php elseif ($tab === 'consum'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Consum Magazie (accesorii)</div>
+        <div class="text-muted">Rezervat/Consumat — legabil la produs</div>
+
+        <?php if ($canWrite): ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/create')) ?>" class="row g-2 mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Accesoriu (ID)</label>
+              <input class="form-control" name="item_id" placeholder="ID magazie_items…">
+              <div class="text-muted small mt-1">Momentan: introdu ID-ul accesoriului (următorul pas: search).</div>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Cantitate</label>
+              <input class="form-control" type="number" step="0.001" min="0.001" name="qty" value="1">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Unit</label>
+              <input class="form-control" name="unit" value="buc">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Mod</label>
+              <select class="form-select" name="mode">
+                <option value="CONSUMED">consumat</option>
+                <option value="RESERVED">rezervat</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Produs (opțional)</label>
+              <select class="form-select" name="project_product_id">
+                <option value="">—</option>
+                <?php foreach ($projectProducts as $pp): ?>
+                  <option value="<?= (int)($pp['id'] ?? 0) ?>">
+                    <?= htmlspecialchars((string)($pp['product_name'] ?? '')) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Notă</label>
+              <input class="form-control" name="note" maxlength="255" placeholder="opțional…">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-outline-secondary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă consum
+              </button>
+            </div>
+          </form>
+        <?php endif; ?>
+
+        <div class="mt-3">
+          <?php if (!$magazieConsum): ?>
+            <div class="text-muted">Nu există consumuri Magazie încă.</div>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Accesoriu</th>
+                    <th style="width:110px" class="text-end">Cant</th>
+                    <th style="width:110px">Mod</th>
+                    <th>Notă</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($magazieConsum as $c): ?>
+                    <tr>
+                      <td class="fw-semibold">
+                        <?= htmlspecialchars((string)($c['winmentor_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['item_name'] ?? '')) ?>
+                      </td>
+                      <td class="text-end fw-semibold"><?= number_format((float)($c['qty'] ?? 0), 3, '.', '') ?> <?= htmlspecialchars((string)($c['unit'] ?? '')) ?></td>
+                      <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
+                      <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Consum HPL</div>
+        <div class="text-muted">Rezervat/Consumat (mp) + alocare automată pe produse</div>
+
+        <?php if ($canWrite): ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Placă HPL (ID)</label>
+              <input class="form-control" name="board_id" placeholder="ID hpl_boards…">
+              <div class="text-muted small mt-1">Momentan: introdu ID-ul plăcii (următorul pas: search).</div>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">mp</label>
+              <input class="form-control" type="number" step="0.0001" min="0.0001" name="qty_m2" value="1">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Mod</label>
+              <select class="form-select" name="mode">
+                <option value="RESERVED">rezervat</option>
+                <option value="CONSUMED">consumat</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Notă</label>
+              <input class="form-control" name="note" maxlength="255" placeholder="opțional…">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-outline-secondary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă consum HPL
+              </button>
+            </div>
+          </form>
+        <?php endif; ?>
+
+        <div class="mt-3">
+          <?php if (!$hplConsum): ?>
+            <div class="text-muted">Nu există consumuri HPL încă.</div>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Placă</th>
+                    <th style="width:110px" class="text-end">mp</th>
+                    <th style="width:110px">Mod</th>
+                    <th>Notă</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($hplConsum as $c): ?>
+                    <tr>
+                      <td class="fw-semibold"><?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?></td>
+                      <td class="text-end fw-semibold"><?= number_format((float)($c['qty_m2'] ?? 0), 4, '.', '') ?></td>
+                      <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
+                      <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <?php if ($hplAlloc): ?>
+          <div class="mt-3">
+            <div class="fw-semibold">Alocare HPL pe produse (auto)</div>
+            <div class="text-muted small">Suma alocărilor per consum ≈ mp</div>
+            <div class="table-responsive mt-2">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Placă</th>
+                    <th>Produs</th>
+                    <th class="text-end" style="width:110px">mp</th>
+                    <th style="width:100px">Mod</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($hplAlloc as $a): ?>
+                    <tr>
+                      <td class="text-muted"><?= htmlspecialchars((string)($a['board_code'] ?? '')) ?></td>
+                      <td><?= htmlspecialchars((string)($a['product_name'] ?? '')) ?></td>
+                      <td class="text-end fw-semibold"><?= number_format((float)($a['qty_m2'] ?? 0), 4, '.', '') ?></td>
+                      <td class="text-muted"><?= htmlspecialchars((string)($a['mode'] ?? '')) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
         <?php endif; ?>
       </div>
     </div>

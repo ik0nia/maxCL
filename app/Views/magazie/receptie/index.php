@@ -43,7 +43,7 @@ ob_start();
       </div>
       <div class="col-6 col-md-2">
         <label class="form-label fw-semibold">Bucăți</label>
-        <input class="form-control" type="number" name="qty" required min="1" step="1" value="1">
+        <input class="form-control" type="number" name="qty" required min="0.001" step="0.001" value="1">
       </div>
       <div class="col-6 col-md-2">
         <label class="form-label fw-semibold">Preț/buc</label>
@@ -88,7 +88,7 @@ ob_start();
       <?php foreach ($recent as $m): ?>
         <?php
           $dir = (string)($m['direction'] ?? '');
-          $qty = (int)($m['qty'] ?? 0);
+          $qty = (float)($m['qty'] ?? 0);
           $price = null;
           if (isset($m['unit_price']) && $m['unit_price'] !== null && $m['unit_price'] !== '' && is_numeric($m['unit_price'])) {
             $price = (float)$m['unit_price'];
@@ -100,7 +100,7 @@ ob_start();
           <td class="fw-semibold"><?= htmlspecialchars($dir) ?></td>
           <td class="fw-semibold"><?= htmlspecialchars((string)($m['winmentor_code'] ?? '')) ?></td>
           <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
-          <td class="text-end fw-semibold"><?= $qty ?></td>
+          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>

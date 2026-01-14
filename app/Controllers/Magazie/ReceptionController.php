@@ -71,14 +71,14 @@ final class ReceptionController
 
         $code = trim((string)($_POST['winmentor_code'] ?? ''));
         $name = trim((string)($_POST['name'] ?? ''));
-        $qty = Validator::int((string)($_POST['qty'] ?? ''), 1, 100000000);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '')));
         $unitPriceRaw = trim((string)($_POST['unit_price'] ?? ''));
         $unitPrice = Validator::dec($unitPriceRaw);
         $note = trim((string)($_POST['note'] ?? ''));
 
         if ($code !== '' && mb_strlen($code) > 64) $errors['winmentor_code'] = 'Cod prea lung.';
         if ($name !== '' && mb_strlen($name) > 190) $errors['name'] = 'Denumire prea lungă.';
-        if ($qty === null) $errors['qty'] = 'Cantitate invalidă.';
+        if ($qty === null || $qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($unitPrice === null || $unitPrice < 0 || $unitPrice > 100000000) $errors['unit_price'] = 'Preț invalid.';
         if ($note !== '' && mb_strlen($note) > 255) $errors['note'] = 'Notă prea lungă.';
 
@@ -98,7 +98,7 @@ final class ReceptionController
                     'name' => $name,
                     'unit_price' => $unitPrice,
                 ]);
-                MagazieItem::adjustStock((int)$existing['id'], (int)$qty);
+                MagazieItem::adjustStock((int)$existing['id'], (float)$qty);
                 $itemId = (int)$existing['id'];
                 $after = MagazieItem::findForUpdate($itemId) ?: $before;
             } else {
@@ -106,7 +106,7 @@ final class ReceptionController
                     'winmentor_code' => $code,
                     'name' => $name,
                     'unit_price' => $unitPrice,
-                    'stock_qty' => (int)$qty,
+                    'stock_qty' => (float)$qty,
                 ]);
                 $before = null;
                 $after = MagazieItem::findForUpdate($itemId);
@@ -115,7 +115,7 @@ final class ReceptionController
             $movementId = MagazieMovement::create([
                 'item_id' => $itemId,
                 'direction' => 'IN',
-                'qty' => (int)$qty,
+                'qty' => (float)$qty,
                 'unit_price' => $unitPrice,
                 'project_id' => null,
                 'project_code' => null,
@@ -127,7 +127,7 @@ final class ReceptionController
 
             Audit::log('MAGAZIE_IN', 'magazie_items', $itemId, is_array($before) ? $before : null, is_array($after) ? $after : null, [
                 'movement_id' => $movementId,
-                'qty' => (int)$qty,
+                'qty' => (float)$qty,
                 'unit_price' => $unitPrice,
                 'note' => $note !== '' ? $note : null,
             ]);

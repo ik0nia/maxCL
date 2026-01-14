@@ -28,7 +28,7 @@ final class MagazieMovement
     }
 
     /**
-     * @param array{item_id:int,direction:string,qty:int,unit_price:float|null,project_id:int|null,project_code:string|null,note:string|null,created_by:int|null} $data
+     * @param array{item_id:int,direction:string,qty:float,unit_price:float|null,project_id:int|null,project_code:string|null,note:string|null,created_by:int|null} $data
      */
     public static function create(array $data): int
     {
@@ -43,7 +43,7 @@ final class MagazieMovement
         $st->execute([
             ':item_id' => (int)$data['item_id'],
             ':direction' => (string)$data['direction'],
-            ':qty' => (int)$data['qty'],
+            ':qty' => (float)$data['qty'],
             ':unit_price' => $data['unit_price'],
             ':project_id' => $data['project_id'],
             ':project_code' => $data['project_code'] !== null ? trim((string)$data['project_code']) : null,

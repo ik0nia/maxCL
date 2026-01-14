@@ -704,6 +704,26 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-14_16_magazie_decimal_qty',
+                'label' => 'ALTER magazie qty columns to DECIMAL',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'magazie_items') && self::columnExists($pdo, 'magazie_items', 'stock_qty')) {
+                        try {
+                            $pdo->exec("ALTER TABLE magazie_items MODIFY stock_qty DECIMAL(12,3) NOT NULL DEFAULT 0");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                    if (self::tableExists($pdo, 'magazie_movements') && self::columnExists($pdo, 'magazie_movements', 'qty')) {
+                        try {
+                            $pdo->exec("ALTER TABLE magazie_movements MODIFY qty DECIMAL(12,3) NOT NULL");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                },
+            ],
         ];
     }
 

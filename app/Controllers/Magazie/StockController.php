@@ -72,12 +72,12 @@ final class StockController
         ]);
         $errors = $check['errors'];
 
-        $qty = Validator::int((string)($_POST['qty'] ?? ''), 1, 1000000);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '')));
         $projectCode = trim((string)($_POST['project_code'] ?? ''));
         $projectName = trim((string)($_POST['project_name'] ?? ''));
         $note = trim((string)($_POST['note'] ?? ''));
 
-        if ($qty === null) $errors['qty'] = 'Cantitate invalidă.';
+        if ($qty === null || $qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($projectCode !== '' && mb_strlen($projectCode) > 64) $errors['project_code'] = 'Cod proiect prea lung.';
         if ($projectName !== '' && mb_strlen($projectName) > 190) $errors['project_name'] = 'Denumire proiect prea lungă.';
         if ($note !== '' && mb_strlen($note) > 255) $errors['note'] = 'Notă prea lungă.';
@@ -101,7 +101,7 @@ final class StockController
             if (!$before) {
                 throw new \RuntimeException('Produs inexistent.');
             }
-            $beforeQty = (int)($before['stock_qty'] ?? 0);
+            $beforeQty = (float)($before['stock_qty'] ?? 0);
             if ($qty > $beforeQty) {
                 throw new \RuntimeException('Stoc insuficient.');
             }
@@ -118,14 +118,14 @@ final class StockController
                 }
             }
 
-            if (!MagazieItem::adjustStock($id, -$qty)) {
+            if (!MagazieItem::adjustStock($id, -(float)$qty)) {
                 throw new \RuntimeException('Nu pot scădea stocul (concurență sau stoc insuficient).');
             }
 
             $movementId = MagazieMovement::create([
                 'item_id' => $id,
                 'direction' => 'OUT',
-                'qty' => $qty,
+                'qty' => (float)$qty,
                 'unit_price' => (isset($before['unit_price']) && $before['unit_price'] !== '' && is_numeric($before['unit_price'])) ? (float)$before['unit_price'] : null,
                 'project_id' => $projectId,
                 'project_code' => $projectCode !== '' ? $projectCode : null,
@@ -141,7 +141,7 @@ final class StockController
                 'project_id' => $projectId,
                 'project_code' => $projectCode,
                 'project_name' => $proj ? (string)($proj['name'] ?? '') : null,
-                'qty' => $qty,
+                'qty' => (float)$qty,
                 'note' => $note !== '' ? $note : null,
             ]);
 

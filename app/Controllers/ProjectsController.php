@@ -12,8 +12,13 @@ use App\Core\Validator;
 use App\Core\View;
 use App\Models\Client;
 use App\Models\ClientGroup;
+use App\Models\HplBoard;
+use App\Models\MagazieItem;
 use App\Models\Product;
 use App\Models\Project;
+use App\Models\ProjectHplAllocation;
+use App\Models\ProjectHplConsumption;
+use App\Models\ProjectMagazieConsumption;
 use App\Models\ProjectProduct;
 
 final class ProjectsController
@@ -174,12 +179,24 @@ final class ProjectsController
         if ($tab === '') $tab = 'general';
 
         $projectProducts = [];
+        $magazieConsum = [];
+        $hplConsum = [];
+        $hplAlloc = [];
+        $hplBoards = [];
+        $magazieItems = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
             } catch (\Throwable $e) {
                 $projectProducts = [];
             }
+        } elseif ($tab === 'consum') {
+            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+            try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
+            try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
+            try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
+            try { $hplBoards = HplBoard::allWithTotals(null, null); } catch (\Throwable $e) { $hplBoards = []; }
+            try { $magazieItems = MagazieItem::all(null, 5000); } catch (\Throwable $e) { $magazieItems = []; }
         }
 
         echo View::render('projects/show', [
@@ -187,6 +204,11 @@ final class ProjectsController
             'project' => $project,
             'tab' => $tab,
             'projectProducts' => $projectProducts,
+            'magazieConsum' => $magazieConsum,
+            'hplConsum' => $hplConsum,
+            'hplAlloc' => $hplAlloc,
+            'hplBoards' => $hplBoards,
+            'magazieItems' => $magazieItems,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
@@ -506,6 +528,207 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot scoate produsul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    public static function addMagazieConsumption(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
+        $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        $unit = trim((string)($_POST['unit'] ?? 'buc'));
+        $mode = trim((string)($_POST['mode'] ?? 'CONSUMED'));
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($itemId === null || $qty === null || $qty <= 0) {
+            Session::flash('toast_error', 'Consum invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+        if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'CONSUMED';
+
+        $item = MagazieItem::find((int)$itemId);
+        if (!$item) {
+            Session::flash('toast_error', 'Accesoriu inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+
+        // dacă e consumat, verificăm stoc
+        if ($mode === 'CONSUMED') {
+            $stock = (float)($item['stock_qty'] ?? 0);
+            if ($qty > $stock + 1e-9) {
+                Session::flash('toast_error', 'Stoc insuficient în Magazie.');
+                Response::redirect('/projects/' . $projectId . '?tab=consum');
+            }
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $cid = ProjectMagazieConsumption::create([
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'item_id' => (int)$itemId,
+                'qty' => (float)$qty,
+                'unit' => $unit !== '' ? $unit : 'buc',
+                'mode' => $mode,
+                'note' => $note !== '' ? $note : null,
+                'created_by' => Auth::id(),
+            ]);
+
+            if ($mode === 'CONSUMED') {
+                if (!MagazieItem::adjustStock((int)$itemId, -(float)$qty)) {
+                    throw new \RuntimeException('Nu pot scădea stocul.');
+                }
+                // mișcare Magazie
+                \App\Models\MagazieMovement::create([
+                    'item_id' => (int)$itemId,
+                    'direction' => 'OUT',
+                    'qty' => (float)$qty,
+                    'unit_price' => (isset($item['unit_price']) && $item['unit_price'] !== '' && is_numeric($item['unit_price'])) ? (float)$item['unit_price'] : null,
+                    'project_id' => $projectId,
+                    'project_code' => (string)($project['code'] ?? null),
+                    'note' => $note !== '' ? $note : 'Consum proiect',
+                    'created_by' => Auth::id(),
+                ]);
+            }
+
+            $pdo->commit();
+
+            Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_magazie_consumptions', $cid, null, null, [
+                'message' => 'Consum Magazie ' . $mode . ': ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'project_id' => $projectId,
+                'item_id' => (int)$itemId,
+                'qty' => (float)$qty,
+                'unit' => $unit,
+                'mode' => $mode,
+                'note' => $note !== '' ? $note : null,
+            ]);
+            Session::flash('toast_success', 'Consum Magazie salvat.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot salva consumul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=consum');
+    }
+
+    public static function addHplConsumption(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $boardId = Validator::int(trim((string)($_POST['board_id'] ?? '')), 1);
+        $qtyM2 = Validator::dec(trim((string)($_POST['qty_m2'] ?? ''))) ?? null;
+        $mode = trim((string)($_POST['mode'] ?? 'RESERVED'));
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($boardId === null || $qtyM2 === null || $qtyM2 <= 0) {
+            Session::flash('toast_error', 'Consum HPL invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+        if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'RESERVED';
+
+        $board = HplBoard::find((int)$boardId);
+        if (!$board) {
+            Session::flash('toast_error', 'Placă HPL inexistentă.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+
+        // Stoc disponibil (mp) - rezervări din alte proiecte (best-effort)
+        $stockRows = HplBoard::allWithTotals(null, null);
+        $stockM2 = 0.0;
+        foreach ($stockRows as $r) {
+            if ((int)($r['id'] ?? 0) === (int)$boardId) {
+                $stockM2 = (float)($r['stock_m2_available'] ?? 0);
+                break;
+            }
+        }
+        $reservedOther = 0.0;
+        try {
+            $reservedOther = ProjectHplConsumption::reservedTotalForBoard((int)$boardId, $projectId);
+        } catch (\Throwable $e) {
+            $reservedOther = 0.0;
+        }
+        $effectiveAvailable = max(0.0, $stockM2 - $reservedOther);
+        if ($qtyM2 > $effectiveAvailable + 1e-9) {
+            Session::flash('toast_error', 'Stoc HPL insuficient (mp).');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $cid = ProjectHplConsumption::create([
+                'project_id' => $projectId,
+                'board_id' => (int)$boardId,
+                'qty_m2' => (float)$qtyM2,
+                'mode' => $mode,
+                'note' => $note !== '' ? $note : null,
+                'created_by' => Auth::id(),
+            ]);
+
+            // Auto-alocare pe produse (dacă nu e blocată distribuția și există produse)
+            $allocLocked = (int)($project['allocations_locked'] ?? 0) === 1;
+            if (!$allocLocked) {
+                $pps = ProjectProduct::forProject($projectId);
+                $weights = [];
+                $sum = 0.0;
+                $byArea = ((string)($project['allocation_mode'] ?? 'by_area')) === 'by_area';
+                foreach ($pps as $pp) {
+                    $ppid = (int)($pp['id'] ?? 0);
+                    if ($ppid <= 0) continue;
+                    $w = (int)($pp['product_width_mm'] ?? 0);
+                    $h = (int)($pp['product_height_mm'] ?? 0);
+                    $qq = (float)($pp['qty'] ?? 0);
+                    $weight = 0.0;
+                    if ($byArea && $w > 0 && $h > 0 && $qq > 0) {
+                        $weight = (($w * $h) / 1000000.0) * $qq;
+                    } elseif ($qq > 0) {
+                        $weight = $qq;
+                    }
+                    if ($weight <= 0) continue;
+                    $weights[$ppid] = $weight;
+                    $sum += $weight;
+                }
+                if ($sum > 0.0) {
+                    $alloc = [];
+                    foreach ($weights as $ppid => $wgt) {
+                        $alloc[] = [
+                            'project_product_id' => (int)$ppid,
+                            'qty_m2' => (float)$qtyM2 * ($wgt / $sum),
+                        ];
+                    }
+                    ProjectHplAllocation::replaceForConsumption($cid, $alloc);
+                }
+            }
+
+            $pdo->commit();
+
+            Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_hpl_consumptions', $cid, null, null, [
+                'message' => 'Consum HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? ''),
+                'project_id' => $projectId,
+                'board_id' => (int)$boardId,
+                'qty_m2' => (float)$qtyM2,
+                'mode' => $mode,
+                'note' => $note !== '' ? $note : null,
+            ]);
+            Session::flash('toast_success', 'Consum HPL salvat.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot salva consumul HPL: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=consum');
     }
 }
 
