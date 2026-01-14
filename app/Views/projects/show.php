@@ -22,6 +22,7 @@ $projectFiles = $projectFiles ?? [];
 $workLogs = $workLogs ?? [];
 $history = $history ?? [];
 $projectLabels = $projectLabels ?? [];
+$cncFiles = $cncFiles ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -714,6 +715,66 @@ ob_start();
                         </tbody>
                       </table>
                     <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php elseif ($tab === 'cnc'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">CNC / Tehnic</div>
+        <div class="text-muted">Note tehnice + fișiere (DXF/G-code/PDF)</div>
+
+        <div class="mt-2">
+          <div class="fw-semibold">Note tehnice</div>
+          <div class="text-muted small">Se editează din tab-ul General.</div>
+          <div class="mt-2 p-2 rounded" style="background:#F7FAFB;border:1px solid #E5EEF1">
+            <?= nl2br(htmlspecialchars((string)($project['technical_notes'] ?? ''))) ?>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '?tab=files')) ?>">
+            <i class="bi bi-paperclip me-1"></i> Mergi la Fișiere (upload)
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Fișiere tehnice</div>
+        <div class="text-muted">Proiect + produse (ordonate după dată)</div>
+
+        <?php if (!$cncFiles): ?>
+          <div class="text-muted mt-2">Nu există fișiere încă.</div>
+        <?php else: ?>
+          <div class="list-group list-group-flush mt-2">
+            <?php foreach ($cncFiles as $f): ?>
+              <?php
+                $url = Url::to('/uploads/files/' . (string)($f['stored_name'] ?? ''));
+                $cat = (string)($f['category'] ?? '');
+                $pname = (string)($f['_product_name'] ?? '');
+              ?>
+              <div class="list-group-item px-0">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-semibold">
+                      <a href="<?= htmlspecialchars($url) ?>" target="_blank" rel="noopener" class="text-decoration-none">
+                        <?= htmlspecialchars((string)($f['original_name'] ?? '')) ?>
+                      </a>
+                    </div>
+                    <div class="text-muted small">
+                      <?= $cat !== '' ? htmlspecialchars($cat) : '' ?>
+                      <?= $pname !== '' ? (' · Produs: ' . htmlspecialchars($pname)) : '' ?>
+                      <?= !empty($f['created_at']) ? (' · ' . htmlspecialchars((string)$f['created_at'])) : '' ?>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -197,6 +197,7 @@ final class ProjectsController
         $projectFiles = [];
         $workLogs = [];
         $projectLabels = [];
+        $cncFiles = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -234,6 +235,23 @@ final class ProjectsController
             try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
         } elseif ($tab === 'general') {
             try { $projectLabels = EntityLabel::labelsForEntity('projects', $id); } catch (\Throwable $e) { $projectLabels = []; }
+        } elseif ($tab === 'cnc') {
+            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+            $cncFiles = [];
+            try {
+                $cncFiles = array_merge($cncFiles, EntityFile::forEntity('projects', $id));
+            } catch (\Throwable $e) {}
+            foreach ($projectProducts as $pp) {
+                $ppId = (int)($pp['id'] ?? 0);
+                if ($ppId <= 0) continue;
+                try {
+                    $files = EntityFile::forEntity('project_products', $ppId);
+                    foreach ($files as $f) {
+                        $f['_product_name'] = (string)($pp['product_name'] ?? '');
+                        $cncFiles[] = $f;
+                    }
+                } catch (\Throwable $e) {}
+            }
         }
 
         $history = [];
@@ -261,6 +279,7 @@ final class ProjectsController
             'workLogs' => $workLogs,
             'history' => $history,
             'projectLabels' => $projectLabels,
+            'cncFiles' => $cncFiles,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
