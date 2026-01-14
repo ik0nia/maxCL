@@ -1,6 +1,7 @@
 <?php
 use App\Core\Csrf;
 use App\Core\Auth;
+use App\Core\DB;
 use App\Core\Url;
 use App\Core\View;
 use App\Models\Finish;
@@ -28,6 +29,37 @@ foreach ($pieces as $p) {
 $availableValueLei = ($canWrite && $salePerM2 !== null && is_finite($salePerM2) && $salePerM2 >= 0)
   ? ($availableM2 * $salePerM2)
   : null;
+
+// Mapare consum HPL (#id) -> project_id (pentru link-uri din notițele pieselor rezervate)
+$hplConsumptionToProject = [];
+try {
+  $ids = [];
+  foreach ($pieces as $p) {
+    $note = (string)($p['notes'] ?? '');
+    if ($note === '') continue;
+    if (preg_match_all('/consum\s+HPL\s*#\s*(\d+)/i', $note, $m)) {
+      foreach (($m[1] ?? []) as $cidRaw) {
+        $cid = is_numeric($cidRaw) ? (int)$cidRaw : 0;
+        if ($cid > 0) $ids[$cid] = true;
+      }
+    }
+  }
+  $ids = array_keys($ids);
+  if ($ids) {
+    /** @var \PDO $pdo */
+    $pdo = DB::pdo();
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $st = $pdo->prepare("SELECT id, project_id FROM project_hpl_consumptions WHERE id IN ($ph)");
+    $st->execute($ids);
+    foreach ($st->fetchAll() as $r) {
+      $cid = (int)($r['id'] ?? 0);
+      $pid = (int)($r['project_id'] ?? 0);
+      if ($cid > 0 && $pid > 0) $hplConsumptionToProject[$cid] = $pid;
+    }
+  }
+} catch (\Throwable $e) {
+  // ignore (nu blocăm pagina)
+}
 
 // Culori + finisaje (texturi) pentru față/verso
 $faceFinish = null;
@@ -274,6 +306,15 @@ ob_start();
               $pLoc = (string)($p['location'] ?? '');
               // Cerință: ascundem notița DOAR când piesa este în Depozit și Disponibilă.
               $showNote = ($noteShort !== '') && !($pStatus === 'AVAILABLE' && $pLoc === 'Depozit');
+
+              $noteLink = null;
+              if ($showNote && preg_match('/consum\s+HPL\s*#\s*(\d+)/i', $noteShort, $mm)) {
+                $cid = is_numeric($mm[1] ?? null) ? (int)$mm[1] : 0;
+                $pid = ($cid > 0 && isset($hplConsumptionToProject[$cid])) ? (int)$hplConsumptionToProject[$cid] : 0;
+                if ($pid > 0) {
+                  $noteLink = Url::to('/projects/' . $pid . '?tab=consum');
+                }
+              }
             ?>
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
@@ -281,10 +322,18 @@ ob_start();
                 <div class="d-flex flex-column align-items-start">
                   <div><?= htmlspecialchars($pStatus) ?></div>
                   <?php if ($showNote): ?>
-                    <div class="small d-inline-block rounded"
+                    <?php if ($noteLink): ?>
+                      <a class="small d-inline-block rounded text-decoration-none"
+                         href="<?= htmlspecialchars($noteLink) ?>"
                          style="margin-top:2px;align-self:flex-start;max-width:520px;text-align:left;white-space:pre-line;line-height:1.15;padding:.1rem .45rem;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
-                      <?= htmlspecialchars($noteShort) ?>
-                    </div>
+                        <?= htmlspecialchars($noteShort) ?>
+                      </a>
+                    <?php else: ?>
+                      <div class="small d-inline-block rounded"
+                           style="margin-top:2px;align-self:flex-start;max-width:520px;text-align:left;white-space:pre-line;line-height:1.15;padding:.1rem .45rem;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
+                        <?= htmlspecialchars($noteShort) ?>
+                      </div>
+                    <?php endif; ?>
                   <?php endif; ?>
                 </div>
               </td>
