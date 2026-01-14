@@ -67,8 +67,16 @@ ob_start();
           }
         ?>
         <tr>
-          <td class="fw-semibold"><?= htmlspecialchars((string)($it['winmentor_code'] ?? '')) ?></td>
-          <td><?= htmlspecialchars((string)($it['name'] ?? '')) ?></td>
+          <td class="fw-semibold">
+            <a href="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $id)) ?>" class="text-decoration-none">
+              <?= htmlspecialchars((string)($it['winmentor_code'] ?? '')) ?>
+            </a>
+          </td>
+          <td>
+            <a href="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $id)) ?>" class="text-decoration-none">
+              <?= htmlspecialchars((string)($it['name'] ?? '')) ?>
+            </a>
+          </td>
           <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>

@@ -158,5 +158,31 @@ final class StockController
 
         Response::redirect('/magazie/stoc');
     }
+
+    public static function show(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        if ($id <= 0) {
+            Session::flash('toast_error', 'Produs invalid.');
+            Response::redirect('/magazie/stoc');
+        }
+
+        try {
+            $item = MagazieItem::find($id);
+            if (!$item) {
+                Session::flash('toast_error', 'Produs inexistent.');
+                Response::redirect('/magazie/stoc');
+            }
+            $movements = MagazieMovement::forItem($id, 300);
+            echo View::render('magazie/stoc/show', [
+                'title' => 'Produs Magazie',
+                'item' => $item,
+                'movements' => $movements,
+            ]);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot încărca produsul.');
+            Response::redirect('/magazie/stoc');
+        }
+    }
 }
 

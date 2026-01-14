@@ -293,6 +293,7 @@ $magReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::R
 $magWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 
 $router->get('/magazie/stoc', fn() => MagazieStockController::index(), $magReadMW);
+$router->get('/magazie/stoc/{id}', fn($p) => MagazieStockController::show($p), $magReadMW);
 $router->post('/magazie/stoc/{id}/consume', fn($p) => MagazieStockController::consume($p), $magReadMW);
 $router->get('/magazie/receptie', fn() => MagazieReceptionController::index(), $magReadMW);
 $router->post('/magazie/receptie/create', fn() => MagazieReceptionController::create(), $magWriteMW);
