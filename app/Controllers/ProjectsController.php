@@ -25,6 +25,7 @@ use App\Models\ProjectProduct;
 use App\Models\EntityFile;
 use App\Core\Upload;
 use App\Models\ProjectWorkLog;
+use App\Models\AuditLog;
 
 final class ProjectsController
 {
@@ -225,6 +226,18 @@ final class ProjectsController
         } elseif ($tab === 'hours') {
             try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
             try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
+        } elseif ($tab === 'history') {
+            // no heavy joins; filter in PHP
+            try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
+        }
+
+        $history = [];
+        if ($tab === 'history') {
+            try {
+                $history = AuditLog::forProject($id, 300);
+            } catch (\Throwable $e) {
+                $history = [];
+            }
         }
 
         echo View::render('projects/show', [
@@ -241,6 +254,7 @@ final class ProjectsController
             'deliveryItems' => $deliveryItems,
             'projectFiles' => $projectFiles,
             'workLogs' => $workLogs,
+            'history' => $history,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),

@@ -20,6 +20,7 @@ $deliveries = $deliveries ?? [];
 $deliveryItems = $deliveryItems ?? [];
 $projectFiles = $projectFiles ?? [];
 $workLogs = $workLogs ?? [];
+$history = $history ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -919,6 +920,69 @@ ob_start();
         <?php endif; ?>
       </div>
     </div>
+  </div>
+<?php elseif ($tab === 'history'): ?>
+  <div class="card app-card p-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <div class="h5 m-0">Istoric / Log-uri</div>
+        <div class="text-muted">Acțiuni pe proiect/produs/consum/livrare/fișiere/ore</div>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
+        <i class="bi bi-journal-text me-1"></i> Jurnal global
+      </a>
+    </div>
+
+    <?php if (!$history): ?>
+      <div class="text-muted mt-3">Nu există log-uri încă.</div>
+    <?php else: ?>
+      <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle mb-0" id="projectHistoryTable">
+          <thead>
+            <tr>
+              <th style="width:170px">Dată</th>
+              <th style="width:160px">Acțiune</th>
+              <th style="width:170px">User</th>
+              <th>Mesaj</th>
+              <th>Notă</th>
+              <th style="width:140px">Entitate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($history as $h): ?>
+              <tr>
+                <td class="text-muted"><?= htmlspecialchars((string)($h['created_at'] ?? '')) ?></td>
+                <td class="fw-semibold"><?= htmlspecialchars((string)($h['action'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string)($h['user_name'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string)($h['message'] ?? '')) ?></td>
+                <td class="text-muted"><?= htmlspecialchars((string)($h['note'] ?? '')) ?></td>
+                <td class="text-muted">
+                  <?= htmlspecialchars((string)($h['entity_type'] ?? '')) ?>#<?= htmlspecialchars((string)($h['entity_id'] ?? '')) ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        document.addEventListener('DOMContentLoaded', function(){
+          const el = document.getElementById('projectHistoryTable');
+          if (el && window.DataTable) {
+            window.__projectHistoryDT = new DataTable(el, {
+              pageLength: 50,
+              lengthMenu: [[25, 50, 100, 200], [25, 50, 100, 200]],
+              order: [[0, 'desc']],
+              language: {
+                search: 'Caută:',
+                searchPlaceholder: 'Caută în istoric…',
+                lengthMenu: 'Afișează _MENU_',
+              }
+            });
+          }
+        });
+      </script>
+    <?php endif; ?>
   </div>
 <?php else: ?>
   <div class="card app-card p-4">
