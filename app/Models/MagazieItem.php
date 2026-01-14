@@ -43,13 +43,15 @@ final class MagazieItem
             }
 
             $like = '%' . $q . '%';
+            // IMPORTANT: pe unele hosting-uri / setări PDO, folosirea aceluiași placeholder (:q) de 2 ori
+            // poate arunca SQLSTATE[HY093] "Invalid parameter number". Folosim parametri poziționali.
             $st = $pdo->prepare(
                 'SELECT * FROM magazie_items
-                 WHERE winmentor_code LIKE :q OR name LIKE :q
+                 WHERE winmentor_code LIKE ? OR name LIKE ?
                  ORDER BY name ASC, winmentor_code ASC
                  LIMIT ' . (int)$limit
             );
-            $st->execute([':q' => $like]);
+            $st->execute([$like, $like]);
             return $st->fetchAll();
         } catch (\Throwable $e) {
             if (self::maybeAutoMigrateAndRetry($e)) {
