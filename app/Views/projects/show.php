@@ -767,7 +767,16 @@ ob_start();
                   <?php foreach ($hplConsum as $c): ?>
                     <?php $cid = (int)($c['id'] ?? 0); ?>
                     <tr>
-                      <td class="fw-semibold"><?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?></td>
+                      <?php $bid = (int)($c['board_id'] ?? 0); ?>
+                      <td class="fw-semibold">
+                        <?php if ($bid > 0): ?>
+                          <a href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid)) ?>" class="text-decoration-none">
+                            <?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?>
+                          </a>
+                        <?php else: ?>
+                          <?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?>
+                        <?php endif; ?>
+                      </td>
                       <?php $qb = (int)($c['qty_boards'] ?? 0); ?>
                       <td class="text-end fw-semibold">
                         <?= $qb > 0 ? ($qb . ' buc') : '—' ?>
@@ -813,7 +822,16 @@ ob_start();
                 <tbody>
                   <?php foreach ($hplAlloc as $a): ?>
                     <tr>
-                      <td class="text-muted"><?= htmlspecialchars((string)($a['board_code'] ?? '')) ?></td>
+                      <?php $abid = (int)($a['board_id'] ?? 0); ?>
+                      <td class="text-muted">
+                        <?php if ($abid > 0): ?>
+                          <a href="<?= htmlspecialchars(Url::to('/stock/boards/' . $abid)) ?>" class="text-decoration-none">
+                            <?= htmlspecialchars((string)($a['board_code'] ?? '')) ?>
+                          </a>
+                        <?php else: ?>
+                          <?= htmlspecialchars((string)($a['board_code'] ?? '')) ?>
+                        <?php endif; ?>
+                      </td>
                       <td><?= htmlspecialchars((string)($a['product_name'] ?? '')) ?></td>
                       <td class="text-end fw-semibold"><?= number_format((float)($a['qty_m2'] ?? 0), 4, '.', '') ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($a['mode'] ?? '')) ?></td>
