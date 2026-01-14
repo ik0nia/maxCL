@@ -195,8 +195,20 @@ ob_start();
                   $em = trim((string)($h['user_email'] ?? ''));
                   $who = $em !== '' ? $em : '—';
                 }
+                $action = (string)($h['action'] ?? '');
                 $msg = trim((string)($h['message'] ?? ''));
-                if ($msg === '') $msg = (string)($h['action'] ?? '');
+                if ($msg === '') $msg = $action;
+
+                // Pe pagina plăcii nu repetăm identificarea plăcii (cod/denumire/brand/grosime),
+                // fiindcă sunt deja în "Detalii placă".
+                // Tăiem orice sufix de forma "· Placă: ...".
+                if (str_contains($msg, '· Placă:')) {
+                  $msg = trim(explode('· Placă:', $msg, 2)[0]);
+                }
+                // Mesaje mai scurte pentru acțiuni pe placa însăși
+                if ($action === 'BOARD_CREATE') $msg = 'A creat placa.';
+                if ($action === 'BOARD_UPDATE') $msg = 'A actualizat placa.';
+                if ($action === 'BOARD_DELETE') $msg = 'A șters placa.';
               ?>
               <div class="list-group-item px-0">
                 <div class="d-flex justify-content-between gap-2">
