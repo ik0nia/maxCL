@@ -811,6 +811,179 @@ final class ProjectsController
         Response::redirect('/projects/' . $projectId . '?tab=consum');
     }
 
+    public static function updateMagazieConsumption(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $cid = (int)($params['cid'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $before = ProjectMagazieConsumption::find($cid);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Consum inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+
+        $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
+        $mode = trim((string)($_POST['mode'] ?? (string)($before['mode'] ?? 'CONSUMED')));
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($qty === null || $qty <= 0) {
+            Session::flash('toast_error', 'Cantitate invalidă.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+        if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = (string)($before['mode'] ?? 'CONSUMED');
+
+        $itemId = (int)($before['item_id'] ?? 0);
+        $item = MagazieItem::find($itemId);
+        if (!$item) {
+            Session::flash('toast_error', 'Accesoriu inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+
+        $beforeMode = (string)($before['mode'] ?? '');
+        $beforeQty = (float)($before['qty'] ?? 0);
+        $afterQty = (float)$qty;
+        $afterMode = $mode;
+
+        $stockDelta = 0.0;
+        if ($beforeMode === 'CONSUMED') $stockDelta += $beforeQty;
+        if ($afterMode === 'CONSUMED') $stockDelta -= $afterQty;
+
+        $stock = (float)($item['stock_qty'] ?? 0);
+        if ($stockDelta < 0 && (($stock + $stockDelta) < -1e-9)) {
+            Session::flash('toast_error', 'Stoc insuficient pentru actualizare.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            ProjectMagazieConsumption::update($cid, [
+                'project_product_id' => $ppId,
+                'qty' => $afterQty,
+                'unit' => $unit !== '' ? $unit : 'buc',
+                'mode' => $afterMode,
+                'note' => $note !== '' ? $note : null,
+            ]);
+            if (abs($stockDelta) > 0.0000001) {
+                MagazieItem::adjustStock($itemId, $stockDelta);
+                \App\Models\MagazieMovement::create([
+                    'item_id' => $itemId,
+                    'direction' => 'ADJUST',
+                    'qty' => $stockDelta,
+                    'unit_price' => (isset($item['unit_price']) && $item['unit_price'] !== '' && is_numeric($item['unit_price'])) ? (float)$item['unit_price'] : null,
+                    'project_id' => $projectId,
+                    'project_code' => (string)($project['code'] ?? null),
+                    'note' => 'Corecție consum proiect #' . $cid,
+                    'created_by' => Auth::id(),
+                ]);
+            }
+            $pdo->commit();
+            Audit::log('PROJECT_CONSUMPTION_UPDATE', 'project_magazie_consumptions', $cid, $before, null, [
+                'message' => 'Actualizare consum Magazie.',
+                'project_id' => $projectId,
+                'item_id' => $itemId,
+                'stock_delta' => $stockDelta,
+            ]);
+            Session::flash('toast_success', 'Consum actualizat.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot actualiza consumul.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=consum');
+    }
+
+    public static function deleteMagazieConsumption(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $cid = (int)($params['cid'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $before = ProjectMagazieConsumption::find($cid);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Consum inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+        $itemId = (int)($before['item_id'] ?? 0);
+        $item = MagazieItem::find($itemId);
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $stockDelta = 0.0;
+            if ((string)($before['mode'] ?? '') === 'CONSUMED') {
+                $stockDelta = (float)($before['qty'] ?? 0);
+                if ($stockDelta > 0) {
+                    MagazieItem::adjustStock($itemId, $stockDelta);
+                    if ($item) {
+                        \App\Models\MagazieMovement::create([
+                            'item_id' => $itemId,
+                            'direction' => 'ADJUST',
+                            'qty' => $stockDelta,
+                            'unit_price' => (isset($item['unit_price']) && $item['unit_price'] !== '' && is_numeric($item['unit_price'])) ? (float)$item['unit_price'] : null,
+                            'project_id' => $projectId,
+                            'project_code' => (string)($project['code'] ?? null),
+                            'note' => 'Ștergere consum proiect #' . $cid,
+                            'created_by' => Auth::id(),
+                        ]);
+                    }
+                }
+            }
+            ProjectMagazieConsumption::delete($cid);
+            $pdo->commit();
+            Audit::log('PROJECT_CONSUMPTION_DELETE', 'project_magazie_consumptions', $cid, $before, null, [
+                'message' => 'Ștergere consum Magazie.',
+                'project_id' => $projectId,
+                'item_id' => $itemId,
+                'stock_delta' => $stockDelta,
+            ]);
+            Session::flash('toast_success', 'Consum șters.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot șterge consumul.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=consum');
+    }
+
+    public static function deleteHplConsumption(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $cid = (int)($params['cid'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $before = ProjectHplConsumption::find($cid);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Consum inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=consum');
+        }
+        try {
+            ProjectHplConsumption::delete($cid);
+            Audit::log('PROJECT_CONSUMPTION_DELETE', 'project_hpl_consumptions', $cid, $before, null, [
+                'message' => 'Ștergere consum HPL.',
+                'project_id' => $projectId,
+                'board_id' => (int)($before['board_id'] ?? 0),
+            ]);
+            Session::flash('toast_success', 'Consum HPL șters.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge consumul HPL.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=consum');
+    }
+
     public static function createDelivery(array $params): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);

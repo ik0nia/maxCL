@@ -482,10 +482,12 @@ ob_start();
                     <th style="width:110px" class="text-end">Cant</th>
                     <th style="width:110px">Mod</th>
                     <th>Notă</th>
+                    <th class="text-end" style="width:160px">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php foreach ($magazieConsum as $c): ?>
+                    <?php $cid = (int)($c['id'] ?? 0); ?>
                     <tr>
                       <td class="fw-semibold">
                         <?= htmlspecialchars((string)($c['winmentor_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['item_name'] ?? '')) ?>
@@ -493,7 +495,67 @@ ob_start();
                       <td class="text-end fw-semibold"><?= number_format((float)($c['qty'] ?? 0), 3, '.', '') ?> <?= htmlspecialchars((string)($c['unit'] ?? '')) ?></td>
                       <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
+                      <td class="text-end">
+                        <?php if ($canWrite): ?>
+                          <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#mcEdit<?= $cid ?>">
+                            <i class="bi bi-pencil me-1"></i> Editează
+                          </button>
+                          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/' . $cid . '/delete')) ?>" class="d-inline"
+                                onsubmit="return confirm('Ștergi consumul?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <button class="btn btn-outline-secondary btn-sm" type="submit">
+                              <i class="bi bi-trash me-1"></i> Șterge
+                            </button>
+                          </form>
+                        <?php else: ?>
+                          <span class="text-muted">—</span>
+                        <?php endif; ?>
+                      </td>
                     </tr>
+                    <?php if ($canWrite): ?>
+                      <tr class="collapse" id="mcEdit<?= $cid ?>">
+                        <td colspan="5">
+                          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/' . $cid . '/update')) ?>" class="row g-2 align-items-end">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <div class="col-6 col-md-2">
+                              <label class="form-label fw-semibold mb-1">Cant</label>
+                              <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty" value="<?= htmlspecialchars((string)($c['qty'] ?? '')) ?>">
+                            </div>
+                            <div class="col-6 col-md-2">
+                              <label class="form-label fw-semibold mb-1">Unit</label>
+                              <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($c['unit'] ?? 'buc')) ?>">
+                            </div>
+                            <div class="col-12 col-md-2">
+                              <label class="form-label fw-semibold mb-1">Mod</label>
+                              <select class="form-select form-select-sm" name="mode">
+                                <option value="CONSUMED" <?= ((string)($c['mode'] ?? '') === 'CONSUMED') ? 'selected' : '' ?>>consumat</option>
+                                <option value="RESERVED" <?= ((string)($c['mode'] ?? '') === 'RESERVED') ? 'selected' : '' ?>>rezervat</option>
+                              </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                              <label class="form-label fw-semibold mb-1">Produs</label>
+                              <select class="form-select form-select-sm" name="project_product_id">
+                                <option value="">—</option>
+                                <?php foreach ($projectProducts as $pp): ?>
+                                  <option value="<?= (int)($pp['id'] ?? 0) ?>" <?= ((string)($c['project_product_id'] ?? '') === (string)($pp['id'] ?? '')) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)($pp['product_name'] ?? '')) ?>
+                                  </option>
+                                <?php endforeach; ?>
+                              </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                              <label class="form-label fw-semibold mb-1">Notă</label>
+                              <input class="form-control form-control-sm" name="note" value="<?= htmlspecialchars((string)($c['note'] ?? '')) ?>">
+                            </div>
+                            <div class="col-12 d-flex justify-content-end">
+                              <button class="btn btn-primary btn-sm" type="submit">
+                                <i class="bi bi-save me-1"></i> Salvează
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      </tr>
+                    <?php endif; ?>
                   <?php endforeach; ?>
                 </tbody>
               </table>
@@ -551,15 +613,30 @@ ob_start();
                     <th style="width:110px" class="text-end">mp</th>
                     <th style="width:110px">Mod</th>
                     <th>Notă</th>
+                    <th class="text-end" style="width:130px">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php foreach ($hplConsum as $c): ?>
+                    <?php $cid = (int)($c['id'] ?? 0); ?>
                     <tr>
                       <td class="fw-semibold"><?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?></td>
                       <td class="text-end fw-semibold"><?= number_format((float)($c['qty_m2'] ?? 0), 4, '.', '') ?></td>
                       <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
+                      <td class="text-end">
+                        <?php if ($canWrite): ?>
+                          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/' . $cid . '/delete')) ?>" class="m-0 d-inline"
+                                onsubmit="return confirm('Ștergi consumul HPL?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <button class="btn btn-outline-secondary btn-sm" type="submit">
+                              <i class="bi bi-trash me-1"></i> Șterge
+                            </button>
+                          </form>
+                        <?php else: ?>
+                          <span class="text-muted">—</span>
+                        <?php endif; ?>
+                      </td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
