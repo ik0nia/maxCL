@@ -146,8 +146,32 @@ final class ProjectsController
             $notes = (string)($r['notes'] ?? '');
 
             if ($take === $rowQty) {
-                HplStockPiece::updateFields($id, ['status' => $toStatus]);
-                if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                // Mută întreg rândul: încercăm să cumulăm într-un rând identic în destinație,
+                // ca să evităm duplicatele (ex: la anulare rezervare/consum).
+                $ident = null;
+                try {
+                    $ident = HplStockPiece::findIdentical($boardId, 'FULL', $toStatus, $width, $height, $location, $isAcc, $id);
+                } catch (\Throwable $e) {
+                    $ident = null;
+                }
+                if ($ident) {
+                    $destId = (int)($ident['id'] ?? 0);
+                    if ($destId > 0) {
+                        HplStockPiece::incrementQty($destId, $take);
+                        if ($noteAppend) {
+                            HplStockPiece::appendNote($destId, $noteAppend);
+                        }
+                        // sursa a fost cumulată
+                        HplStockPiece::delete($id);
+                    } else {
+                        // fallback: dacă nu avem id valid, mutăm în loc
+                        HplStockPiece::updateFields($id, ['status' => $toStatus]);
+                        if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                    }
+                } else {
+                    HplStockPiece::updateFields($id, ['status' => $toStatus]);
+                    if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                }
             } else {
                 // scade din rândul sursă
                 HplStockPiece::updateQty($id, $rowQty - $take);
