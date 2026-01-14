@@ -112,7 +112,20 @@ ob_start();
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>
-          <td><?= htmlspecialchars((string)($m['project_code'] ?? '')) ?></td>
+          <?php
+            $pcode = (string)($m['project_code_display'] ?? ($m['project_code'] ?? ''));
+            $pname = (string)($m['project_name'] ?? '');
+          ?>
+          <td>
+            <?php if ($pcode !== '' && $pname !== ''): ?>
+              <div class="fw-semibold"><?= htmlspecialchars($pcode) ?></div>
+              <div class="text-muted small" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                <?= htmlspecialchars($pname) ?>
+              </div>
+            <?php else: ?>
+              <?= htmlspecialchars($pcode) ?>
+            <?php endif; ?>
+          </td>
           <td class="text-muted"><?= htmlspecialchars((string)($m['note'] ?? '')) ?></td>
         </tr>
       <?php endforeach; ?>

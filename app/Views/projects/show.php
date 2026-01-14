@@ -436,11 +436,7 @@ ob_start();
               <label class="form-label fw-semibold">Cantitate</label>
               <input class="form-control" type="number" step="0.001" min="0.001" name="qty" value="1">
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Unit</label>
-              <input class="form-control" id="magazieUnitPreview" value="buc" readonly>
-              <div class="text-muted small mt-1">Se ia automat din produsul de Magazie.</div>
-            </div>
+            <div class="col-6"></div>
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Mod</label>
               <select class="form-select" name="mode">
@@ -475,7 +471,6 @@ ob_start();
               const el = document.getElementById('magazieItemSelect');
               if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
               const $el = window.jQuery(el);
-              const unitEl = document.getElementById('magazieUnitPreview');
 
               $el.select2({
                 width: '100%',
@@ -527,12 +522,6 @@ ob_start();
                   },
                   cache: true
                 }
-              });
-
-              $el.on('select2:select', function(e){
-                if (!unitEl) return;
-                const item = e && e.params ? e.params.data : null;
-                if (item && item.unit) unitEl.value = item.unit;
               });
             });
           </script>

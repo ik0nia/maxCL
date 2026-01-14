@@ -60,9 +60,15 @@ final class MagazieMovement
             /** @var PDO $pdo */
             $pdo = DB::pdo();
             $st = $pdo->prepare('
-                SELECT m.*, i.winmentor_code, i.name AS item_name
+                SELECT
+                  m.*,
+                  i.winmentor_code,
+                  i.name AS item_name,
+                  COALESCE(NULLIF(m.project_code, \'\'), p.code) AS project_code_display,
+                  p.name AS project_name
                 FROM magazie_movements m
                 INNER JOIN magazie_items i ON i.id = m.item_id
+                LEFT JOIN projects p ON p.id = m.project_id
                 ORDER BY m.created_at DESC, m.id DESC
                 LIMIT ' . (int)$limit
             );
