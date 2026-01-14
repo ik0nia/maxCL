@@ -29,6 +29,7 @@ use App\Controllers\ClientsController;
 use App\Controllers\ProjectsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
+use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
 use App\Controllers\System\DbUpdateController;
 
 require __DIR__ . '/../vendor_stub.php';
@@ -303,6 +304,7 @@ $router->get('/api/health', function () {
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);
+$router->get('/api/magazie/items/search', fn() => ApiMagazieItemsController::search(), $magReadMW);
 
 $router->get('/system/db-update', fn() => DbUpdateController::index(), [Auth::requireLogin()]);
 $router->post('/system/db-update/run', fn() => DbUpdateController::runNow(), [Auth::requireLogin()]);

@@ -428,9 +428,9 @@ ob_start();
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/create')) ?>" class="row g-2 mt-2">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
             <div class="col-12">
-              <label class="form-label fw-semibold">Accesoriu (ID)</label>
-              <input class="form-control" name="item_id" placeholder="ID magazie_items…">
-              <div class="text-muted small mt-1">Momentan: introdu ID-ul accesoriului (următorul pas: search).</div>
+              <label class="form-label fw-semibold">Accesoriu</label>
+              <select class="form-select" name="item_id" id="magazieItemSelect" style="width:100%"></select>
+              <div class="text-muted small mt-1">Caută după Cod WinMentor sau denumire.</div>
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Cantitate</label>
@@ -1164,6 +1164,32 @@ ob_start();
       </script>
     <?php endif; ?>
   </div>
+  <?php if ($canWrite): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      const el = document.getElementById('magazieItemSelect');
+      if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+      const $el = window.jQuery(el);
+      $el.select2({
+        width: '100%',
+        placeholder: 'Caută accesoriu…',
+        allowClear: true,
+        minimumInputLength: 1,
+        ajax: {
+          url: "<?= htmlspecialchars(Url::to('/api/magazie/items/search')) ?>",
+          dataType: 'json',
+          delay: 250,
+          data: function(params){ return { q: params.term }; },
+          processResults: function(resp){
+            const items = (resp && resp.items) ? resp.items : [];
+            return { results: items };
+          },
+          cache: true
+        }
+      });
+    });
+  </script>
+  <?php endif; ?>
 <?php else: ?>
   <div class="card app-card p-4">
     <div class="h5 m-0"><?= htmlspecialchars($tabs[$tab]) ?></div>
