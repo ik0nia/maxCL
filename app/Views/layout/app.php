@@ -90,6 +90,9 @@ $toastError = Session::flash('toast_error');
           $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
         ?>
         <?php if ($canInternal): ?>
+          <a class="app-nav-link <?= str_starts_with($p, '/hpl/bucati-rest') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
+            <i class="bi bi-bounding-box-circles me-2"></i> Bucăți rest
+          </a>
           <a class="app-nav-link <?= str_starts_with($p, '/hpl/piese-interne') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
             <i class="bi bi-scissors me-2"></i> Adăugare plăci mici (nestocabile)
           </a>

@@ -1,0 +1,215 @@
+<?php
+use App\Core\Url;
+use App\Core\View;
+
+$bucket = (string)($bucket ?? '');
+$counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0];
+$items = $items ?? [];
+
+function _normImg2(string $p): string {
+  $p = trim($p);
+  if ($p === '') return '';
+  if (str_starts_with($p, '/uploads/')) return Url::to($p);
+  return $p;
+}
+
+function _bucketLabel(string $b): string {
+  return match ($b) {
+    'gt_half' => 'Mai mari de 1/2 din placa standard',
+    'half_to_quarter' => 'Între 1/2 și 1/4 din placa standard',
+    'lt_quarter' => 'Mai mici de 1/4 din placa standard',
+    default => 'Toate',
+  };
+}
+
+function _statusLabel(string $s): string {
+  return match ($s) {
+    'AVAILABLE' => 'Disponibil',
+    'RESERVED' => 'Rezervat',
+    'SCRAP' => 'Rebut',
+    'CONSUMED' => 'Consumat',
+    default => $s,
+  };
+}
+
+ob_start();
+?>
+<div class="app-page-title">
+  <div>
+    <h1 class="m-0">Bucăți rest</h1>
+    <div class="text-muted">Toate piesele (stocabile + interne) care nu sunt la dimensiunea standard.</div>
+  </div>
+</div>
+
+<div class="card app-card p-3 mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <div class="fw-semibold">Filtre:</div>
+    <a class="btn btn-sm <?= $bucket === '' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
+      Toate <span class="badge text-bg-light ms-1"><?= (int)($counts['all'] ?? 0) ?></span>
+    </a>
+    <a class="btn btn-sm <?= $bucket === 'gt_half' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=gt_half')) ?>">
+      &gt; 1/2 <span class="badge text-bg-light ms-1"><?= (int)($counts['gt_half'] ?? 0) ?></span>
+    </a>
+    <a class="btn btn-sm <?= $bucket === 'half_to_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=half_to_quarter')) ?>">
+      1/2 – 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['half_to_quarter'] ?? 0) ?></span>
+    </a>
+    <a class="btn btn-sm <?= $bucket === 'lt_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=lt_quarter')) ?>">
+      &lt; 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['lt_quarter'] ?? 0) ?></span>
+    </a>
+    <div class="ms-auto text-muted small">
+      <?= htmlspecialchars(_bucketLabel($bucket)) ?> · Afișez <strong><?= count($items) ?></strong>
+    </div>
+  </div>
+</div>
+
+<style>
+  .offcut-canvas{
+    height: 160px;
+    background: #F3F7F8;
+    border: 1px solid #D9E3E6;
+    border-radius: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 10px;
+    overflow:hidden;
+  }
+  .offcut-rect{
+    background: #E9F4E4;
+    border: 2px solid #6FA94A;
+    border-radius: 12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color:#111;
+    font-weight:700;
+    line-height:1.1;
+    padding: 6px;
+  }
+  .offcut-meta{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+  }
+  .offcut-thumbs img{
+    width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;
+  }
+  .offcut-thumbs .lbl{font-size:.78rem;color:#5F6B72;font-weight:700;line-height:1}
+  .offcut-kv{font-size:.9rem;color:#111;font-weight:700;line-height:1.15}
+  .offcut-sub{font-size:.82rem;color:#5F6B72;font-weight:600;line-height:1.2}
+  .offcut-badges{display:flex;gap:6px;flex-wrap:wrap}
+</style>
+
+<?php if (!$items): ?>
+  <div class="card app-card p-4 text-muted">Nu există bucăți rest pentru filtrul curent.</div>
+<?php else: ?>
+  <div class="row g-3">
+    <?php foreach ($items as $it): ?>
+      <?php
+        $w = (int)($it['width_mm'] ?? 0);
+        $h = (int)($it['height_mm'] ?? 0);
+        $qty = (int)($it['qty'] ?? 0);
+        $isAcc = (int)($it['is_accounting'] ?? 1);
+        $isInternal = ($isAcc === 0);
+        $status = (string)($it['status'] ?? '');
+        $location = (string)($it['location'] ?? '');
+        $pieceType = (string)($it['piece_type'] ?? '');
+        $m2 = (float)($it['area_total_m2'] ?? 0);
+
+        $fThumb = _normImg2((string)($it['face_thumb_path'] ?? ''));
+        $bThumb = _normImg2((string)($it['back_thumb_path'] ?? ''));
+        if ($bThumb === '') $bThumb = $fThumb;
+        $fCode = (string)($it['face_color_code'] ?? '');
+        $bCode = (string)($it['back_color_code'] ?? '');
+        if ($bCode === '') $bCode = $fCode;
+        $fTex = (string)($it['face_texture_name'] ?? '');
+        $bTex = (string)($it['back_texture_name'] ?? '');
+        if ($bTex === '') $bTex = $fTex;
+
+        $ratio = $it['_area_ratio'] ?? null;
+        $ratioPct = (is_numeric($ratio) ? ((float)$ratio * 100.0) : null);
+        $bucketKey = (string)($it['_bucket'] ?? '');
+      ?>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="card app-card p-3 h-100">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="offcut-badges">
+              <span class="badge <?= $isInternal ? 'text-bg-secondary' : 'text-bg-success' ?>">
+                <?= $isInternal ? 'Intern' : 'Stocabil' ?>
+              </span>
+              <span class="badge text-bg-light"><?= htmlspecialchars(_statusLabel($status)) ?></span>
+              <span class="badge text-bg-light"><?= htmlspecialchars($location) ?></span>
+            </div>
+            <div class="text-muted small text-end">
+              <?= $ratioPct !== null ? number_format($ratioPct, 0, '.', '') . '%' : '—' ?>
+            </div>
+          </div>
+
+          <div class="offcut-canvas mt-2">
+            <div class="offcut-rect js-offcut-rect" data-w="<?= $w ?>" data-h="<?= $h ?>">
+              <div>
+                <div style="font-size:1.05rem"><?= $h ?> × <?= $w ?> mm</div>
+                <div class="text-muted" style="font-weight:700;font-size:.85rem"><?= number_format($m2, 2, '.', '') ?> mp</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="offcut-meta mt-2">
+            <div class="offcut-thumbs">
+              <div class="d-flex gap-1">
+                <div class="text-center">
+                  <img src="<?= htmlspecialchars($fThumb) ?>" alt="">
+                  <div class="lbl mt-1"><?= htmlspecialchars($fCode !== '' ? $fCode : '—') ?></div>
+                  <div class="offcut-sub"><?= htmlspecialchars($fTex !== '' ? $fTex : '—') ?></div>
+                </div>
+                <div class="text-center">
+                  <img src="<?= htmlspecialchars($bThumb) ?>" alt="">
+                  <div class="lbl mt-1"><?= htmlspecialchars($bCode !== '' ? $bCode : '—') ?></div>
+                  <div class="offcut-sub"><?= htmlspecialchars($bTex !== '' ? $bTex : '—') ?></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex-grow-1">
+              <div class="offcut-kv"><?= htmlspecialchars((string)($it['board_code'] ?? '')) ?></div>
+              <div class="offcut-sub"><?= htmlspecialchars((string)($it['board_name'] ?? '')) ?></div>
+              <div class="offcut-sub mt-1">
+                <strong><?= $qty ?></strong> buc · <?= htmlspecialchars($pieceType) ?> · <?= number_format($m2, 2, '.', '') ?> mp
+              </div>
+              <div class="offcut-sub">
+                Filtru: <?= htmlspecialchars(_bucketLabel($bucketKey)) ?>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+
+  <script>
+    // Scale rectangles to fit canvas, preserving aspect ratio.
+    document.addEventListener('DOMContentLoaded', function(){
+      document.querySelectorAll('.js-offcut-rect').forEach(function(el){
+        const w = parseInt(el.getAttribute('data-w') || '0', 10);
+        const h = parseInt(el.getAttribute('data-h') || '0', 10);
+        const max = Math.max(w, h, 1);
+        let wp = (w / max) * 100;
+        let hp = (h / max) * 100;
+        // avoid too tiny shapes
+        wp = Math.max(wp, 22);
+        hp = Math.max(hp, 22);
+        el.style.width = wp + '%';
+        el.style.height = hp + '%';
+      });
+    });
+  </script>
+<?php endif; ?>
+
+<?php
+$content = ob_get_clean();
+echo View::render('layout/app', compact('title', 'content'));
+

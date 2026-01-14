@@ -18,6 +18,7 @@ use App\Controllers\StockController;
 use App\Controllers\Hpl\InlineTexturesController;
 use App\Controllers\Hpl\CatalogController as HplCatalogController;
 use App\Controllers\Hpl\InternalPiecesController as HplInternalPiecesController;
+use App\Controllers\Hpl\OffcutsController as HplOffcutsController;
 use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
@@ -151,6 +152,9 @@ $router->get('/api/hpl/catalog', fn() => HplCatalogController::apiGrid(), $hplRe
 // Plăci HPL: Adăugare plăci mici (nestocabile)
 $router->get('/hpl/piese-interne', fn() => HplInternalPiecesController::index(), $hplReadMW);
 $router->post('/hpl/piese-interne/create', fn() => HplInternalPiecesController::create(), $hplReadMW);
+
+// Plăci HPL: Bucăți rest (piese non-standard, stocabile + interne)
+$router->get('/hpl/bucati-rest', fn() => HplOffcutsController::index(), $hplReadMW);
 
 // Plăci HPL: Tip culoare (folosește tabela finishes, dar fără texturi)
 $router->get('/hpl/tip-culoare', fn() => FinishesController::index(), $catalogMW);
