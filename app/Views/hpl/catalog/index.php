@@ -55,7 +55,7 @@ ob_start();
     if (!input || !grid || !loading || !endpoint) return;
 
     let timer = null;
-    let lastQ = null;
+    let lastKey = null;
     let ctrl = null;
 
     function setLoading(on){
@@ -123,8 +123,10 @@ ob_start();
       const q = String(input.value || '');
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(function(){
-        if (q === lastQ) return;
-        lastQ = q;
+        const inStock = !!(tStock && tStock.checked);
+        const key = q + '|' + (inStock ? '1' : '0');
+        if (key === lastKey) return;
+        lastKey = key;
         load(q);
       }, 250);
     });
@@ -140,12 +142,14 @@ ob_start();
     if (tStock) {
       tStock.addEventListener('change', function(){
         try { localStorage.setItem('hpl_catalog_in_stock', tStock.checked ? '1' : '0'); } catch (e) {}
-        // reload using current input
-        input.dispatchEvent(new Event('input'));
+        // Force reload even if input value didn't change
+        lastKey = null;
+        load(String(input.value || ''));
       });
       // if ON from localStorage, trigger first load to apply filter
       if (tStock.checked) {
-        input.dispatchEvent(new Event('input'));
+        lastKey = null;
+        load(String(input.value || ''));
       }
     }
   });
