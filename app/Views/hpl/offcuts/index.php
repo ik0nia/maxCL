@@ -110,6 +110,7 @@ ob_start();
   .offcut-kv{font-size:.9rem;color:#111;font-weight:700;line-height:1.15}
   .offcut-sub{font-size:.82rem;color:#5F6B72;font-weight:600;line-height:1.2}
   .offcut-badges{display:flex;gap:6px;flex-wrap:wrap}
+  .js-card-link{cursor:pointer}
 </style>
 
 <?php if (!$items): ?>
@@ -143,7 +144,9 @@ ob_start();
         $bucketKey = (string)($it['_bucket'] ?? '');
       ?>
       <div class="col-12 col-md-6 col-lg-3">
-        <div class="card app-card p-3 h-100">
+        <div class="card app-card p-3 h-100 js-card-link"
+             data-href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)($it['board_id'] ?? 0))) ?>"
+             role="button" tabindex="0">
           <div class="d-flex justify-content-between align-items-start gap-2">
             <div class="offcut-badges">
               <span class="badge <?= $isInternal ? 'text-bg-secondary' : 'text-bg-success' ?>">
@@ -215,6 +218,23 @@ ob_start();
         hp = Math.max(hp, 22);
         el.style.width = wp + '%';
         el.style.height = hp + '%';
+      });
+
+      // Click pe card -> intră în pagina de stoc a materialului (plăcii).
+      document.querySelectorAll('.js-card-link[data-href]').forEach(function(card){
+        function go(e){
+          const t = (e && e.target) ? e.target : null;
+          if (t && t.closest && t.closest('a,button,input,select,textarea,label,form')) return;
+          const href = card.getAttribute('data-href');
+          if (href) window.location.href = href;
+        }
+        card.addEventListener('click', go);
+        card.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            go(e);
+          }
+        });
       });
     });
   </script>
