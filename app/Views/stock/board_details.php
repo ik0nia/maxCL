@@ -155,7 +155,7 @@ ob_start();
         </div>
         <div class="d-flex justify-content-between border-bottom py-2">
           <div class="text-muted">Standard</div>
-          <div class="fw-semibold"><?= $stdW ?> × <?= $stdH ?> mm</div>
+          <div class="fw-semibold"><?= $stdH ?> × <?= $stdW ?> mm</div>
         </div>
         <div class="d-flex justify-content-between border-bottom py-2">
           <div class="text-muted">Suprafață standard</div>
@@ -245,7 +245,7 @@ ob_start();
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
               <td><?= htmlspecialchars((string)$p['status']) ?></td>
-              <td><?= (int)$p['width_mm'] ?> × <?= (int)$p['height_mm'] ?> mm</td>
+              <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
               <td class="text-end"><?= (int)$p['qty'] ?></td>
               <td><?= htmlspecialchars((string)$p['location']) ?></td>
               <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
@@ -281,12 +281,12 @@ ob_start();
             </select>
           </div>
           <div class="col-6 col-md-4">
-            <label class="form-label small">Lățime (mm)</label>
-            <input type="number" min="1" class="form-control" name="width_mm" value="<?= (int)($board['std_width_mm'] ?? 0) ?>" required>
-          </div>
-          <div class="col-6 col-md-4">
             <label class="form-label small">Lungime (mm)</label>
             <input type="number" min="1" class="form-control" name="height_mm" value="<?= (int)($board['std_height_mm'] ?? 0) ?>" required>
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small">Lățime (mm)</label>
+            <input type="number" min="1" class="form-control" name="width_mm" value="<?= (int)($board['std_width_mm'] ?? 0) ?>" required>
           </div>
           <div class="col-6 col-md-4">
             <label class="form-label small">Buc</label>

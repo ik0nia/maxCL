@@ -72,11 +72,11 @@ final class AuditController
                     if ($b) {
                         $message = 'A șters piesă '
                             . (string)($beforeDecoded['piece_type'] ?? '')
-                            . ' ' . (int)($beforeDecoded['width_mm'] ?? 0) . '×' . (int)($beforeDecoded['height_mm'] ?? 0) . ' mm, '
+                            . ' ' . (int)($beforeDecoded['height_mm'] ?? 0) . '×' . (int)($beforeDecoded['width_mm'] ?? 0) . ' mm, '
                             . (int)($beforeDecoded['qty'] ?? 0) . ' buc'
                             . ((isset($beforeDecoded['location']) && $beforeDecoded['location'] !== '') ? (', locație ' . (string)$beforeDecoded['location']) : '')
                             . ' · Placă: ' . (string)$b['code'] . ' · ' . (string)$b['name'] . ' · ' . (string)$b['brand']
-                            . ' · ' . (int)$b['thickness_mm'] . 'mm · ' . (int)$b['std_width_mm'] . '×' . (int)$b['std_height_mm'];
+                            . ' · ' . (int)$b['thickness_mm'] . 'mm · ' . (int)$b['std_height_mm'] . '×' . (int)$b['std_width_mm'];
                     }
                 } catch (\Throwable $e) {
                     // ignore

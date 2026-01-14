@@ -66,17 +66,17 @@ $backOpt = $backColorId0 && isset($finishMap[$backColorId0]) ? $finishMap[$backC
     </div>
 
     <div class="col-12 col-md-3">
-      <label class="form-label">Lățime standard (mm) *</label>
-      <input type="number" min="1" class="form-control <?= isset($errors['std_width_mm']) ? 'is-invalid' : '' ?>" name="std_width_mm"
-             value="<?= htmlspecialchars((string)($v['std_width_mm'] ?? '')) ?>" required>
-      <?php if (isset($errors['std_width_mm'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['std_width_mm']) ?></div><?php endif; ?>
-    </div>
-
-    <div class="col-12 col-md-3">
       <label class="form-label">Lungime standard (mm) *</label>
       <input type="number" min="1" class="form-control <?= isset($errors['std_height_mm']) ? 'is-invalid' : '' ?>" name="std_height_mm"
              value="<?= htmlspecialchars((string)($v['std_height_mm'] ?? '')) ?>" required>
       <?php if (isset($errors['std_height_mm'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['std_height_mm']) ?></div><?php endif; ?>
+    </div>
+
+    <div class="col-12 col-md-3">
+      <label class="form-label">Lățime standard (mm) *</label>
+      <input type="number" min="1" class="form-control <?= isset($errors['std_width_mm']) ? 'is-invalid' : '' ?>" name="std_width_mm"
+             value="<?= htmlspecialchars((string)($v['std_width_mm'] ?? '')) ?>" required>
+      <?php if (isset($errors['std_width_mm'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['std_width_mm']) ?></div><?php endif; ?>
     </div>
 
     <div class="col-12 col-md-2">

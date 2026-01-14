@@ -182,7 +182,7 @@ ob_start();
           <td class="fw-semibold js-wmcode-col"><?= htmlspecialchars((string)$r['code']) ?></td>
           <td><?= htmlspecialchars((string)$r['name']) ?></td>
           <td><?= (int)$r['thickness_mm'] ?> mm</td>
-          <td><?= (int)$r['std_width_mm'] ?> × <?= (int)$r['std_height_mm'] ?> mm</td>
+          <td><?= (int)$r['std_height_mm'] ?> × <?= (int)$r['std_width_mm'] ?> mm</td>
           <td class="text-end fw-semibold"><?= (int)($r['stock_qty_full_available'] ?? 0) ?></td>
           <td class="text-end fw-semibold"><?= (int)($r['stock_qty_offcut_available'] ?? 0) ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>

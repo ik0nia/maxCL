@@ -49,7 +49,8 @@ final class StockController
         $stdW = (int)($board['std_width_mm'] ?? 0);
         $stdH = (int)($board['std_height_mm'] ?? 0);
 
-        $label = trim("{$code} · {$name} · {$brand} · {$th}mm · {$stdW}×{$stdH}");
+        // Afișare dimensiuni: Lungime × Lățime
+        $label = trim("{$code} · {$name} · {$brand} · {$th}mm · {$stdH}×{$stdW}");
         if ($back !== '') {
             $label .= " · Față: {$face} · Verso: {$back}";
         } else {
@@ -448,7 +449,7 @@ final class StockController
         $pieceId = HplStockPiece::create($data);
         $m2 = (($width * $height) / 1000000.0) * (int)$data['qty'];
         $boardLabel = self::fmtBoardLabel($board, (int)$board['face_color_id'], (int)$board['face_texture_id'], $board['back_color_id'] ? (int)$board['back_color_id'] : null, $board['back_texture_id'] ? (int)$board['back_texture_id'] : null);
-        $msg = 'A adăugat piesă ' . $type . " {$width}×{$height} mm, " . (int)$data['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$data['location'] . " · Placă: {$boardLabel}";
+        $msg = 'A adăugat piesă ' . $type . " {$height}×{$width} mm, " . (int)$data['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$data['location'] . " · Placă: {$boardLabel}";
         Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, null, $data, [
             'message' => $msg,
             'board_id' => $boardId,
@@ -493,7 +494,7 @@ final class StockController
                 )
                 : ('ID ' . $boardId);
 
-            $msg = 'A șters piesă ' . (string)$before['piece_type'] . ' ' . (int)$before['width_mm'] . '×' . (int)$before['height_mm'] . ' mm, ' . (int)$before['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$before['location'] . " · Placă: {$boardLabel}";
+            $msg = 'A șters piesă ' . (string)$before['piece_type'] . ' ' . (int)$before['height_mm'] . '×' . (int)$before['width_mm'] . ' mm, ' . (int)$before['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$before['location'] . " · Placă: {$boardLabel}";
 
             Audit::log('STOCK_PIECE_DELETE', 'hpl_stock_pieces', $pieceId, $before, null, [
                 'message' => $msg,
