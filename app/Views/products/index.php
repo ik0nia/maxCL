@@ -53,7 +53,7 @@ ob_start();
         <tr>
           <td>
             <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0))) ?>">
-              <?= htmlspecialchars((string)($r['project_code'] ?? '')) ?>
+              <?= htmlspecialchars((string)($r['project_name'] ?? '')) ?>
             </a>
             <div class="text-muted small"><?= htmlspecialchars((string)($r['project_status'] ?? '')) ?></div>
           </td>
