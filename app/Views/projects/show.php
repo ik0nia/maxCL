@@ -659,6 +659,7 @@ ob_start();
 
           <style>
             .s2-thumb{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px}
+            .s2-thumb2{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px;margin-left:-8px}
             .s2-row{display:flex;align-items:center}
           </style>
           <script>
@@ -670,9 +671,11 @@ ob_start();
               function fmtBoard(opt){
                 if (!opt.id) return opt.text;
                 const thumb = opt.thumb || null;
-                if (!thumb) return opt.text;
+                const thumbBack = opt.thumb_back || null;
+                if (!thumb && !thumbBack) return opt.text;
                 const $row = $('<span class="s2-row"></span>');
-                $row.append($('<img class="s2-thumb" />').attr('src', thumb));
+                if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
+                if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
                 $row.append($('<span></span>').text(opt.text || ''));
                 return $row;
               }

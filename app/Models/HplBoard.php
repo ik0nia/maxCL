@@ -155,7 +155,7 @@ final class HplBoard
         }
     }
 
-    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int,thumb?:string|null,face_color_code?:string|null,back_color_code?:string|null}> */
+    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int,thumb?:string|null,thumb_back?:string|null,face_color_code?:string|null,back_color_code?:string|null}> */
     public static function searchForSelect(?string $q, int $limit = 25): array
     {
         /** @var PDO $pdo */
@@ -181,7 +181,8 @@ final class HplBoard
               b.id, b.code, b.name, b.brand, b.thickness_mm, b.std_width_mm, b.std_height_mm,
               fc.code AS face_color_code,
               bc.code AS back_color_code,
-              fc.thumb_path AS thumb
+              fc.thumb_path AS thumb,
+              bc.thumb_path AS thumb_back
             FROM hpl_boards b
             JOIN finishes fc ON fc.id = b.face_color_id
             LEFT JOIN finishes bc ON bc.id = b.back_color_id
@@ -206,8 +207,8 @@ final class HplBoard
             $bc = (string)($r['back_color_code'] ?? '');
             $colors = $fc !== '' ? $fc : '';
             if ($bc !== '' && $bc !== $fc) $colors = $colors !== '' ? ($colors . '/' . $bc) : $bc;
-            $text = trim($code . ' · ' . $name . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
-            if ($colors !== '') $text .= ' · ' . $colors;
+            $base = trim($code . ' · ' . $name . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
+            $text = $colors !== '' ? ($colors . ' · ' . $base) : $base;
             $out[] = [
                 'id' => $id,
                 'text' => $text,
@@ -218,6 +219,7 @@ final class HplBoard
                 'std_width_mm' => $w,
                 'std_height_mm' => $h,
                 'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
+                'thumb_back' => (isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '') ? (string)$r['thumb_back'] : null,
                 'face_color_code' => $fc !== '' ? $fc : null,
                 'back_color_code' => $bc !== '' ? $bc : null,
             ];
