@@ -17,9 +17,14 @@ final class ProjectMagazieConsumption
             SELECT
               c.*,
               mi.winmentor_code,
-              mi.name AS item_name
+              mi.name AS item_name,
+              pp.product_id AS linked_product_id,
+              p.code AS linked_product_code,
+              p.name AS linked_product_name
             FROM project_magazie_consumptions c
             INNER JOIN magazie_items mi ON mi.id = c.item_id
+            LEFT JOIN project_products pp ON pp.id = c.project_product_id
+            LEFT JOIN products p ON p.id = pp.product_id
             WHERE c.project_id = ?
             ORDER BY c.created_at DESC, c.id DESC
         ');

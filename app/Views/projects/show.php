@@ -547,7 +547,17 @@ ob_start();
                     <?php $cid = (int)($c['id'] ?? 0); ?>
                     <tr>
                       <td class="fw-semibold">
-                        <?= htmlspecialchars((string)($c['winmentor_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['item_name'] ?? '')) ?>
+                        <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/magazie/stoc/' . (int)($c['item_id'] ?? 0))) ?>">
+                          <?= htmlspecialchars((string)($c['winmentor_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['item_name'] ?? '')) ?>
+                        </a>
+                        <?php $ppid = (int)($c['project_product_id'] ?? 0); ?>
+                        <?php if ($ppid > 0): ?>
+                          <div class="text-muted small">
+                            Consum la produs: <span class="fw-semibold"><?= htmlspecialchars((string)($c['linked_product_name'] ?? '')) ?></span>
+                          </div>
+                        <?php else: ?>
+                          <div class="text-muted small">Consum la proiect</div>
+                        <?php endif; ?>
                       </td>
                       <td class="text-end fw-semibold"><?= number_format((float)($c['qty'] ?? 0), 3, '.', '') ?> <?= htmlspecialchars((string)($c['unit'] ?? '')) ?></td>
                       <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
