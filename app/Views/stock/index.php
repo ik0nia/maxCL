@@ -129,7 +129,7 @@ ob_start();
     </thead>
     <tbody>
       <?php foreach ($rows as $r): ?>
-        <tr>
+        <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$r['id'])) ?>" role="button" tabindex="0">
           <td>
             <div class="d-flex gap-2">
               <?php
@@ -247,6 +247,7 @@ ob_start();
     border-color:#6FA94A;
     box-shadow: 0 0 0 .2rem rgba(111,169,74,.15);
   }
+  #boardsTable tbody tr.js-row-link{cursor:pointer}
   @media (max-width: 991.98px){
     .dt-search{width:100%}
     .dt-search input{min-width:0;width:100%}
@@ -266,6 +267,24 @@ ob_start();
         }
       });
     }
+
+    // Click oriunde pe rând -> intră pe pagina plăcii (dar thumbnailurile rămân deschise în lightbox).
+    document.querySelectorAll('#boardsTable tbody tr.js-row-link[data-href]').forEach(function (tr) {
+      function go(e) {
+        const t = (e && e.target) ? e.target : null;
+        // Ignoră click pe elemente interactive (inclusiv link-ul de thumbnail / acțiuni)
+        if (t && t.closest && t.closest('a,button,input,select,textarea,label,form')) return;
+        const href = tr.getAttribute('data-href');
+        if (href) window.location.href = href;
+      }
+      tr.addEventListener('click', go);
+      tr.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          go(e);
+        }
+      });
+    });
   });
 </script>
 
