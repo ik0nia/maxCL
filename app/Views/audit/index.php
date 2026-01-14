@@ -77,10 +77,14 @@ ob_start();
           <td>
             <?php
               $msg = null;
+              $meta = null;
               if (!empty($r['meta_json'])) {
                 $decoded = json_decode((string)$r['meta_json'], true);
                 if (is_array($decoded) && isset($decoded['message']) && is_string($decoded['message'])) {
                   $msg = $decoded['message'];
+                }
+                if (is_array($decoded)) {
+                  $meta = $decoded;
                 }
               }
               // Fallback pentru log-uri vechi (ex: STOCK_PIECE_DELETE fără Placă:)
@@ -91,8 +95,32 @@ ob_start();
               if (!$msg) {
                 $msg = '—';
               }
+              $projId = (is_array($meta) && isset($meta['project_id']) && is_numeric($meta['project_id'])) ? (int)$meta['project_id'] : 0;
+              $projCode = (is_array($meta) && isset($meta['project_code'])) ? (string)$meta['project_code'] : '';
+              $projName = (is_array($meta) && isset($meta['project_name'])) ? (string)$meta['project_name'] : '';
+              $boardId = (is_array($meta) && isset($meta['board_id']) && is_numeric($meta['board_id'])) ? (int)$meta['board_id'] : 0;
             ?>
             <div class="fw-semibold"><?= htmlspecialchars($msg) ?></div>
+            <?php if ($projId > 0 || $boardId > 0): ?>
+              <div class="mt-1 d-flex flex-wrap gap-2">
+                <?php if ($projId > 0): ?>
+                  <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                    Proiect <?= htmlspecialchars($projCode !== '' ? $projCode : ('#' . $projId)) ?>
+                  </a>
+                  <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=consum')) ?>">
+                    Consum materiale
+                  </a>
+                  <?php if (trim($projName) !== ''): ?>
+                    <span class="text-muted small"><?= htmlspecialchars($projName) ?></span>
+                  <?php endif; ?>
+                <?php endif; ?>
+                <?php if ($boardId > 0): ?>
+                  <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $boardId)) ?>">
+                    Stoc placă
+                  </a>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
           </td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['entity_type'] ?? '—')) ?><?= $r['entity_id'] ? ' #' . htmlspecialchars((string)$r['entity_id']) : '' ?></td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['ip'] ?? '—')) ?></td>

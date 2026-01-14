@@ -894,7 +894,13 @@ final class ProjectsController
 
             // Actualizează stocul pe plăci întregi (AVAILABLE -> RESERVED/CONSUMED)
             $target = $mode === 'CONSUMED' ? 'CONSUMED' : 'RESERVED';
-            self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, 'Proiect ' . (string)($project['code'] ?? '') . ' · consum HPL #' . $cid);
+            $projCode = (string)($project['code'] ?? '');
+            $projName = (string)($project['name'] ?? '');
+            $noteAppend = 'Rezervat pentru Proiect: ' . $projCode . ($projName !== '' ? (' · ' . $projName) : '') . ' (consum HPL #' . $cid . ')';
+            if ($mode === 'CONSUMED') {
+                $noteAppend = 'Consumat pentru Proiect: ' . $projCode . ($projName !== '' ? (' · ' . $projName) : '') . ' (consum HPL #' . $cid . ')';
+            }
+            self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend);
 
             // Auto-alocare pe produse (dacă nu e blocată distribuția și există produse)
             $allocLocked = (int)($project['allocations_locked'] ?? 0) === 1;
@@ -934,13 +940,31 @@ final class ProjectsController
             $pdo->commit();
 
             Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_hpl_consumptions', $cid, null, null, [
-                'message' => 'Consum HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? '') . ' · ' . (int)$qtyBoards . ' buc',
+                'message' => 'Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? '') . ' — HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? '') . ' · ' . (int)$qtyBoards . ' buc',
                 'project_id' => $projectId,
                 'board_id' => (int)$boardId,
                 'qty_boards' => (int)$qtyBoards,
                 'qty_m2' => (float)$qtyM2,
                 'mode' => $mode,
                 'note' => $note !== '' ? $note : null,
+            ]);
+
+            // Log explicit pe placă (pentru Istoric placă + Jurnal activitate), cu link-uri către proiect și stoc.
+            Audit::log('HPL_STOCK_' . ($target === 'RESERVED' ? 'RESERVE' : 'CONSUME'), 'hpl_boards', (int)$boardId, null, null, [
+                'message' => ($target === 'RESERVED' ? 'Rezervat' : 'Consumat') . ' ' . (int)$qtyBoards . ' buc (FULL) pentru Proiect: ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
+                'board_id' => (int)$boardId,
+                'board_code' => (string)($board['code'] ?? ''),
+                'board_name' => (string)($board['name'] ?? ''),
+                'project_id' => $projectId,
+                'project_code' => (string)($project['code'] ?? ''),
+                'project_name' => (string)($project['name'] ?? ''),
+                'consumption_id' => $cid,
+                'mode' => $mode,
+                'qty_boards' => (int)$qtyBoards,
+                'to_status' => $target,
+                'url_board' => \App\Core\Url::to('/stock/boards/' . (int)$boardId),
+                'url_project' => \App\Core\Url::to('/projects/' . $projectId),
+                'url_project_consum' => \App\Core\Url::to('/projects/' . $projectId . '?tab=consum'),
             ]);
             Session::flash('toast_success', 'Consum HPL salvat.');
         } catch (\Throwable $e) {
@@ -1122,6 +1146,24 @@ final class ProjectsController
                 }
             }
             ProjectHplConsumption::delete($cid);
+            // Log pe placă (Istoric placă + Jurnal)
+            $bid = (int)($before['board_id'] ?? 0);
+            if ($bid > 0 && $qtyBoards > 0) {
+                Audit::log('HPL_STOCK_UNRESERVE', 'hpl_boards', $bid, null, null, [
+                    'message' => 'Anulare rezervare/consum HPL: +' . $qtyBoards . ' buc (FULL) înapoi la Disponibil pentru Proiect: ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
+                    'board_id' => $bid,
+                    'project_id' => $projectId,
+                    'project_code' => (string)($project['code'] ?? ''),
+                    'project_name' => (string)($project['name'] ?? ''),
+                    'consumption_id' => $cid,
+                    'qty_boards' => (int)$qtyBoards,
+                    'from_status' => $from,
+                    'to_status' => 'AVAILABLE',
+                    'url_board' => \App\Core\Url::to('/stock/boards/' . $bid),
+                    'url_project' => \App\Core\Url::to('/projects/' . $projectId),
+                    'url_project_consum' => \App\Core\Url::to('/projects/' . $projectId . '?tab=consum'),
+                ]);
+            }
             Audit::log('PROJECT_CONSUMPTION_DELETE', 'project_hpl_consumptions', $cid, $before, null, [
                 'message' => 'Ștergere consum HPL.',
                 'project_id' => $projectId,

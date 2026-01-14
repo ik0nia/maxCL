@@ -113,7 +113,8 @@ final class AuditLog
      *   entity_id:?string,
      *   user_name:?string,
      *   user_email:?string,
-     *   message:?string
+     *   message:?string,
+     *   meta?:array<string,mixed>|null
      * }>
      */
     public static function forBoard(int $boardId, int $limit = 120): array
@@ -175,6 +176,7 @@ final class AuditLog
                 'user_name' => isset($r['user_name']) ? (string)$r['user_name'] : null,
                 'user_email' => isset($r['user_email']) ? (string)$r['user_email'] : null,
                 'message' => $message,
+                'meta' => is_array($metaDecoded) ? $metaDecoded : null,
             ];
             if (count($out) >= $limit) break;
         }

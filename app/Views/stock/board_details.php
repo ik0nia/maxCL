@@ -200,6 +200,10 @@ ob_start();
                 $action = (string)($h['action'] ?? '');
                 $msg = trim((string)($h['message'] ?? ''));
                 if ($msg === '') $msg = $action;
+                $meta = is_array($h['meta'] ?? null) ? $h['meta'] : null;
+                $projId = (is_array($meta) && isset($meta['project_id']) && is_numeric($meta['project_id'])) ? (int)$meta['project_id'] : 0;
+                $projCode = (is_array($meta) && isset($meta['project_code'])) ? (string)$meta['project_code'] : '';
+                $projName = (is_array($meta) && isset($meta['project_name'])) ? (string)$meta['project_name'] : '';
 
                 // Pe pagina plăcii nu repetăm identificarea plăcii (cod/denumire/brand/grosime),
                 // fiindcă sunt deja în "Detalii placă".
@@ -218,6 +222,19 @@ ob_start();
                   <div class="text-muted small"><?= htmlspecialchars((string)($h['created_at'] ?? '')) ?></div>
                 </div>
                 <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($msg) ?></div>
+                <?php if ($projId > 0): ?>
+                  <div class="mt-1 d-flex flex-wrap gap-2">
+                    <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                      Proiect <?= htmlspecialchars($projCode !== '' ? $projCode : ('#' . $projId)) ?>
+                    </a>
+                    <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=consum')) ?>">
+                      Consum materiale
+                    </a>
+                    <?php if (trim($projName) !== ''): ?>
+                      <span class="text-muted small"><?= htmlspecialchars($projName) ?></span>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
               </div>
             <?php endforeach; ?>
           </div>
@@ -255,8 +272,8 @@ ob_start();
               }
               $pStatus = (string)($p['status'] ?? '');
               $pLoc = (string)($p['location'] ?? '');
-              // Cerință: la "Piese asociate" afișăm notița DOAR dacă NU e AVAILABLE și NU e în Depozit.
-              $showNote = ($noteShort !== '') && ($pStatus !== 'AVAILABLE') && ($pLoc !== 'Depozit');
+              // Cerință: ascundem notița DOAR când piesa este în Depozit și Disponibilă.
+              $showNote = ($noteShort !== '') && !($pStatus === 'AVAILABLE' && $pLoc === 'Depozit');
             ?>
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
