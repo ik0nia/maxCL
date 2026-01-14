@@ -458,7 +458,56 @@ final class StockController
             'notes' => trim((string)($_POST['notes'] ?? '')),
         ];
 
-        $pieceId = HplStockPiece::create($data);
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            // Dacă există deja piesă identică (același tip/status/dim/locație), cumulăm qty.
+            $existing = HplStockPiece::findIdentical(
+                $boardId,
+                (string)$data['piece_type'],
+                (string)$data['status'],
+                (int)$data['width_mm'],
+                (int)$data['height_mm'],
+                (string)$data['location']
+            );
+            if ($existing) {
+                $before = $existing;
+                HplStockPiece::incrementQty((int)$existing['id'], (int)$data['qty']);
+                if (trim((string)$data['notes']) !== '') {
+                    HplStockPiece::appendNote((int)$existing['id'], (string)$data['notes']);
+                }
+                $pieceId = (int)$existing['id'];
+                $pdo->commit();
+
+                $after = HplStockPiece::find($pieceId) ?: $before;
+                $m2 = (($width * $height) / 1000000.0) * (int)$data['qty'];
+                $boardLabel = self::fmtBoardLabel($board, (int)$board['face_color_id'], (int)$board['face_texture_id'], $board['back_color_id'] ? (int)$board['back_color_id'] : null, $board['back_texture_id'] ? (int)$board['back_texture_id'] : null);
+                $msg = 'A adăugat ' . (int)$data['qty'] . ' buc la piesa existentă ' . $type . " {$height}×{$width} mm, locație " . (string)$data['location'] . ' (cumulare).';
+                Audit::log('STOCK_PIECE_CREATE', 'hpl_stock_pieces', $pieceId, $before, $after, [
+                    'message' => $msg . " · Placă: {$boardLabel}",
+                    'board_id' => $boardId,
+                    'board_code' => (string)($board['code'] ?? ''),
+                    'requested_type' => $requestedType,
+                    'final_type' => $type,
+                    'width_mm' => $width,
+                    'height_mm' => $height,
+                    'qty' => (int)$data['qty'],
+                    'area_m2' => $m2,
+                    'location' => (string)$data['location'],
+                    'merged_into_piece_id' => $pieceId,
+                ]);
+                Session::flash('toast_success', 'Piesă actualizată (cumulare).');
+                Response::redirect('/stock/boards/' . $boardId);
+            }
+
+            $pieceId = HplStockPiece::create($data);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot adăuga piesa.');
+            Response::redirect('/stock/boards/' . $boardId);
+        }
         $m2 = (($width * $height) / 1000000.0) * (int)$data['qty'];
         $boardLabel = self::fmtBoardLabel($board, (int)$board['face_color_id'], (int)$board['face_texture_id'], $board['back_color_id'] ? (int)$board['back_color_id'] : null, $board['back_texture_id'] ? (int)$board['back_texture_id'] : null);
         $msg = 'A adăugat piesă ' . $type . " {$height}×{$width} mm, " . (int)$data['qty'] . ' buc, ' . number_format($m2, 2, '.', '') . ' mp, locație ' . (string)$data['location'] . " · Placă: {$boardLabel}";
@@ -541,39 +590,67 @@ final class StockController
             $destId = null;
             $updatedFrom = $from;
 
+            $destExisting = HplStockPiece::findIdentical(
+                $boardId,
+                (string)$from['piece_type'],
+                $toStatus,
+                (int)$from['width_mm'],
+                (int)$from['height_mm'],
+                $toLocation,
+                (int)$from['id']
+            );
+
             if ($qty < $fromQty) {
-                // Split: scade din sursă + creează destinație
+                // Split: scade din sursă + creează/actualizează destinație
                 HplStockPiece::updateQty((int)$from['id'], $fromQty - $qty);
                 $updatedFrom['qty'] = $fromQty - $qty;
 
-                $destData = [
-                    'board_id' => $boardId,
-                    'piece_type' => (string)$from['piece_type'],
-                    'status' => $toStatus,
-                    'width_mm' => (int)$from['width_mm'],
-                    'height_mm' => (int)$from['height_mm'],
-                    'qty' => $qty,
-                    'location' => $toLocation,
-                    'notes' => $note,
-                ];
-                $destId = HplStockPiece::create($destData);
+                if ($destExisting) {
+                    $destId = (int)$destExisting['id'];
+                    HplStockPiece::incrementQty($destId, $qty);
+                    HplStockPiece::appendNote($destId, $note);
+                } else {
+                    $destData = [
+                        'board_id' => $boardId,
+                        'piece_type' => (string)$from['piece_type'],
+                        'status' => $toStatus,
+                        'width_mm' => (int)$from['width_mm'],
+                        'height_mm' => (int)$from['height_mm'],
+                        'qty' => $qty,
+                        'location' => $toLocation,
+                        'notes' => $note,
+                    ];
+                    $destId = HplStockPiece::create($destData);
+                }
             } else {
-                // Mută întreaga piesă (update)
-                $newNotes = $note;
-                $oldNotes = trim((string)($from['notes'] ?? ''));
-                if ($oldNotes !== '') $newNotes = $oldNotes . "\n" . $note;
-                HplStockPiece::updateFields((int)$from['id'], [
-                    'status' => $toStatus,
-                    'location' => $toLocation,
-                    'notes' => $newNotes,
-                ]);
-                $destId = (int)$from['id'];
+                // Mută întreaga piesă: dacă există deja destinație identică, cumulăm și ștergem sursa.
+                if ($destExisting) {
+                    $destId = (int)$destExisting['id'];
+                    HplStockPiece::incrementQty($destId, $qty);
+                    HplStockPiece::appendNote($destId, $note);
+                    HplStockPiece::delete((int)$from['id']);
+                } else {
+                    // Update pe aceeași piesă
+                    $newNotes = $note;
+                    $oldNotes = trim((string)($from['notes'] ?? ''));
+                    if ($oldNotes !== '') $newNotes = $oldNotes . "\n" . $note;
+                    HplStockPiece::updateFields((int)$from['id'], [
+                        'status' => $toStatus,
+                        'location' => $toLocation,
+                        'notes' => $newNotes,
+                    ]);
+                    $destId = (int)$from['id'];
+                }
             }
 
             $pdo->commit();
 
             $dim = (int)$from['height_mm'] . '×' . (int)$from['width_mm'] . ' mm';
-            $msg = 'A mutat ' . (int)$qty . ' buc ' . (string)$from['piece_type'] . " {$dim} din {$fromLoc} (" . ($labels[$fromStatus] ?? $fromStatus) . ') în ' . $toLocation . ' (' . ($labels[$toStatus] ?? $toStatus) . '). Notă: ' . $note;
+            $msg = 'A mutat ' . (int)$qty . ' buc ' . (string)$from['piece_type'] . " {$dim} din {$fromLoc} (" . ($labels[$fromStatus] ?? $fromStatus) . ') în ' . $toLocation . ' (' . ($labels[$toStatus] ?? $toStatus) . ').';
+            if ($destExisting) {
+                $msg .= ' (cumulare)';
+            }
+            $msg .= ' Notă: ' . $note;
             Audit::log('STOCK_PIECE_MOVE', 'hpl_stock_pieces', $destId, $from, null, [
                 'message' => $msg,
                 'board_id' => $boardId,
@@ -588,6 +665,7 @@ final class StockController
                 'from_status' => $fromStatus,
                 'to_status' => $toStatus,
                 'note' => $note,
+                'merged' => $destExisting ? true : false,
             ]);
 
             Session::flash('toast_success', 'Mutare efectuată.');

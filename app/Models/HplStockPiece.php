@@ -60,6 +60,40 @@ final class HplStockPiece
         return (int)$pdo->lastInsertId();
     }
 
+    /**
+     * Găsește o piesă identică (pentru cumularea qty):
+     * aceeași placă, tip, status, dimensiuni și locație.
+     */
+    public static function findIdentical(
+        int $boardId,
+        string $pieceType,
+        string $status,
+        int $widthMm,
+        int $heightMm,
+        string $location,
+        ?int $excludeId = null
+    ): ?array {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $sql = 'SELECT * FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = ?
+                  AND status = ?
+                  AND width_mm = ?
+                  AND height_mm = ?
+                  AND location = ?';
+        $params = [$boardId, $pieceType, $status, $widthMm, $heightMm, $location];
+        if ($excludeId !== null && $excludeId > 0) {
+            $sql .= ' AND id <> ?';
+            $params[] = $excludeId;
+        }
+        $sql .= ' LIMIT 1';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $r = $st->fetch();
+        return $r ?: null;
+    }
+
     public static function delete(int $id): void
     {
         /** @var PDO $pdo */
@@ -74,6 +108,25 @@ final class HplStockPiece
         $pdo = DB::pdo();
         $st = $pdo->prepare('UPDATE hpl_stock_pieces SET qty = ? WHERE id = ?');
         $st->execute([$qty, $id]);
+    }
+
+    public static function incrementQty(int $id, int $delta): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('UPDATE hpl_stock_pieces SET qty = qty + ? WHERE id = ?');
+        $st->execute([$delta, $id]);
+    }
+
+    public static function appendNote(int $id, string $note): void
+    {
+        $note = trim($note);
+        if ($note === '') return;
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        // CONVERT to keep compatibility across MySQL/MariaDB.
+        $st = $pdo->prepare("UPDATE hpl_stock_pieces SET notes = TRIM(CONCAT(COALESCE(notes,''), CASE WHEN COALESCE(notes,'') = '' THEN '' ELSE '\n' END, ?)) WHERE id = ?");
+        $st->execute([$note, $id]);
     }
 
     /**
