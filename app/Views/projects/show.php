@@ -18,6 +18,7 @@ $hplBoards = $hplBoards ?? [];
 $magazieItems = $magazieItems ?? [];
 $deliveries = $deliveries ?? [];
 $deliveryItems = $deliveryItems ?? [];
+$projectFiles = $projectFiles ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -671,6 +672,111 @@ ob_start();
                     <?php endif; ?>
                   </div>
                 </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php elseif ($tab === 'files'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Upload fișier</div>
+        <div class="text-muted">DXF / G-code / PDF / imagini etc. (proiect sau produs)</div>
+
+        <?php if (!$canWrite): ?>
+          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
+        <?php else: ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/files/upload')) ?>" enctype="multipart/form-data" class="mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+
+            <div class="mb-2">
+              <label class="form-label fw-semibold">Destinație</label>
+              <select class="form-select" name="entity_type" id="fileEntityType">
+                <option value="projects">Proiect</option>
+                <option value="project_products">Produs (din proiect)</option>
+              </select>
+            </div>
+
+            <div class="mb-2" id="fileEntityIdWrap" style="display:none">
+              <label class="form-label fw-semibold">Produs</label>
+              <select class="form-select" name="entity_id">
+                <?php foreach ($projectProducts as $pp): ?>
+                  <option value="<?= (int)($pp['id'] ?? 0) ?>"><?= htmlspecialchars((string)($pp['product_name'] ?? '')) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label fw-semibold">Categorie (opțional)</label>
+              <input class="form-control" name="category" placeholder="ex: DXF, GCODE, PDF, IMG">
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label fw-semibold">Fișier</label>
+              <input class="form-control" type="file" name="file" required>
+            </div>
+
+            <div class="d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit">
+                <i class="bi bi-upload me-1"></i> Upload
+              </button>
+            </div>
+          </form>
+
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              const sel = document.getElementById('fileEntityType');
+              const wrap = document.getElementById('fileEntityIdWrap');
+              function apply(){
+                if (!sel || !wrap) return;
+                wrap.style.display = (sel.value === 'project_products') ? '' : 'none';
+              }
+              if (sel) sel.addEventListener('change', apply);
+              apply();
+            });
+          </script>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Fișiere</div>
+        <div class="text-muted">Click pentru deschidere; ștergere logată</div>
+
+        <?php if (!$projectFiles): ?>
+          <div class="text-muted mt-2">Nu există fișiere încă (pe proiect).</div>
+        <?php else: ?>
+          <div class="list-group list-group-flush mt-2">
+            <?php foreach ($projectFiles as $f): ?>
+              <?php
+                $fid = (int)($f['id'] ?? 0);
+                $url = Url::to('/uploads/files/' . (string)($f['stored_name'] ?? ''));
+              ?>
+              <div class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2">
+                <div>
+                  <div class="fw-semibold">
+                    <a href="<?= htmlspecialchars($url) ?>" target="_blank" rel="noopener" class="text-decoration-none">
+                      <?= htmlspecialchars((string)($f['original_name'] ?? '')) ?>
+                    </a>
+                  </div>
+                  <div class="text-muted small">
+                    <?= htmlspecialchars((string)($f['category'] ?? '')) ?>
+                    <?= !empty($f['created_at']) ? (' · ' . htmlspecialchars((string)$f['created_at'])) : '' ?>
+                  </div>
+                </div>
+                <?php if ($canWrite): ?>
+                  <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/files/' . $fid . '/delete')) ?>" class="m-0"
+                        onsubmit="return confirm('Ștergi fișierul?');">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                    <button class="btn btn-outline-secondary btn-sm" type="submit">
+                      <i class="bi bi-trash me-1"></i> Șterge
+                    </button>
+                  </form>
+                <?php endif; ?>
               </div>
             <?php endforeach; ?>
           </div>

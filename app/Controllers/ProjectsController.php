@@ -22,6 +22,8 @@ use App\Models\ProjectHplAllocation;
 use App\Models\ProjectHplConsumption;
 use App\Models\ProjectMagazieConsumption;
 use App\Models\ProjectProduct;
+use App\Models\EntityFile;
+use App\Core\Upload;
 
 final class ProjectsController
 {
@@ -188,6 +190,7 @@ final class ProjectsController
         $magazieItems = [];
         $deliveries = [];
         $deliveryItems = [];
+        $projectFiles = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -214,6 +217,9 @@ final class ProjectsController
                     $deliveryItems[$did] = [];
                 }
             }
+        } elseif ($tab === 'files') {
+            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+            try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
         }
 
         echo View::render('projects/show', [
@@ -228,6 +234,7 @@ final class ProjectsController
             'magazieItems' => $magazieItems,
             'deliveries' => $deliveries,
             'deliveryItems' => $deliveryItems,
+            'projectFiles' => $projectFiles,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
@@ -888,6 +895,122 @@ final class ProjectsController
         }
 
         Response::redirect('/projects/' . $projectId . '?tab=deliveries');
+    }
+
+    public static function uploadProjectFile(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        if (empty($_FILES['file']['name'] ?? '')) {
+            Session::flash('toast_error', 'Alege un fișier.');
+            Response::redirect('/projects/' . $projectId . '?tab=files');
+        }
+
+        $category = trim((string)($_POST['category'] ?? ''));
+        $entityType = trim((string)($_POST['entity_type'] ?? 'projects'));
+        $entityId = Validator::int(trim((string)($_POST['entity_id'] ?? (string)$projectId)), 1) ?? $projectId;
+
+        // Validate entity ownership
+        if ($entityType === 'projects') {
+            $entityId = $projectId;
+        } elseif ($entityType === 'project_products') {
+            $pp = ProjectProduct::find($entityId);
+            if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+                Session::flash('toast_error', 'Produs proiect invalid.');
+                Response::redirect('/projects/' . $projectId . '?tab=files');
+            }
+        } else {
+            Session::flash('toast_error', 'Tip entitate invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=files');
+        }
+
+        try {
+            $up = Upload::saveEntityFile($_FILES['file']);
+            $fid = EntityFile::create([
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'category' => $category !== '' ? $category : null,
+                'original_name' => $up['original_name'],
+                'stored_name' => $up['stored_name'],
+                'mime' => $up['mime'],
+                'size_bytes' => $up['size_bytes'],
+                'uploaded_by' => Auth::id(),
+            ]);
+            Audit::log('FILE_UPLOAD', 'entity_files', $fid, null, null, [
+                'message' => 'Upload fișier: ' . $up['original_name'],
+                'project_id' => $projectId,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'category' => $category !== '' ? $category : null,
+                'stored_name' => $up['stored_name'],
+            ]);
+            Session::flash('toast_success', 'Fișier încărcat.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot încărca fișierul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=files');
+    }
+
+    public static function deleteProjectFile(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $fileId = (int)($params['fileId'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $file = EntityFile::find($fileId);
+        if (!$file) {
+            Session::flash('toast_error', 'Fișier inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=files');
+        }
+
+        $etype = (string)($file['entity_type'] ?? '');
+        $eid = (int)($file['entity_id'] ?? 0);
+        if ($etype === 'projects') {
+            if ($eid !== $projectId) {
+                Session::flash('toast_error', 'Fișier invalid.');
+                Response::redirect('/projects/' . $projectId . '?tab=files');
+            }
+        } elseif ($etype === 'project_products') {
+            $pp = ProjectProduct::find($eid);
+            if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+                Session::flash('toast_error', 'Fișier invalid.');
+                Response::redirect('/projects/' . $projectId . '?tab=files');
+            }
+        } else {
+            Session::flash('toast_error', 'Fișier invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=files');
+        }
+
+        $stored = (string)($file['stored_name'] ?? '');
+        $fs = dirname(__DIR__, 2) . '/storage/uploads/files/' . $stored;
+        try {
+            EntityFile::delete($fileId);
+            if ($stored !== '' && is_file($fs)) {
+                @unlink($fs);
+            }
+            Audit::log('FILE_DELETE', 'entity_files', $fileId, $file, null, [
+                'message' => 'Ștergere fișier: ' . (string)($file['original_name'] ?? ''),
+                'project_id' => $projectId,
+                'entity_type' => $etype,
+                'entity_id' => $eid,
+                'stored_name' => $stored,
+            ]);
+            Session::flash('toast_success', 'Fișier șters.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge fișierul.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=files');
     }
 }
 

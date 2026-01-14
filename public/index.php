@@ -145,6 +145,35 @@ $router->get('/uploads/finishes/{name}', function (array $params) {
     exit;
 }, [Auth::requireLogin()]);
 
+// ---- Uploads files (servite din storage/uploads/files)
+$router->get('/uploads/files/{name}', function (array $params) {
+    $name = (string)($params['name'] ?? '');
+    if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $name)) {
+        http_response_code(404);
+        exit;
+    }
+    $fs = __DIR__ . '/../storage/uploads/files/' . $name;
+    if (!is_file($fs)) {
+        http_response_code(404);
+        exit;
+    }
+    $ext = strtolower(pathinfo($fs, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'pdf' => 'application/pdf',
+        'jpg','jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'dxf' => 'application/dxf',
+        'nc','gcode','tap' => 'text/plain',
+        default => 'application/octet-stream',
+    };
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($name) . '"');
+    header('Cache-Control: private, max-age=86400');
+    readfile($fs);
+    exit;
+}, [Auth::requireLogin()]);
+
 // ---- Catalog (Admin, Gestionar)
 $catalogMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $hplReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
@@ -216,6 +245,8 @@ $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsControl
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/deliveries/create', fn($p) => ProjectsController::createDelivery($p), $projectsWriteMW);
+$router->post('/projects/{id}/files/upload', fn($p) => ProjectsController::uploadProjectFile($p), $projectsWriteMW);
+$router->post('/projects/{id}/files/{fileId}/delete', fn($p) => ProjectsController::deleteProjectFile($p), $projectsWriteMW);
 
 $router->get('/products', fn() => ProductsController::index(), $projectsReadMW);
 
