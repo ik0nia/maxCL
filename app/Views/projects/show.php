@@ -21,6 +21,7 @@ $deliveryItems = $deliveryItems ?? [];
 $projectFiles = $projectFiles ?? [];
 $workLogs = $workLogs ?? [];
 $history = $history ?? [];
+$projectLabels = $projectLabels ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -194,6 +195,47 @@ ob_start();
             <input class="form-control" name="note" maxlength="255" placeholder="motiv / observații…">
             <button class="btn btn-outline-secondary w-100 mt-3" type="submit">
               <i class="bi bi-arrow-repeat me-1"></i> Schimbă status
+            </button>
+          </form>
+        <?php endif; ?>
+      </div>
+
+      <div class="card app-card p-3 mt-3">
+        <div class="h5 m-0">Etichete (labels)</div>
+        <div class="text-muted">Se propagă automat la produsele din proiect</div>
+
+        <?php if (!$projectLabels): ?>
+          <div class="text-muted mt-2">Nu există etichete încă.</div>
+        <?php else: ?>
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            <?php foreach ($projectLabels as $l): ?>
+              <?php
+                $lid = (int)($l['label_id'] ?? 0);
+                $lname = (string)($l['name'] ?? '');
+                $src = (string)($l['source'] ?? '');
+              ?>
+              <span class="badge app-badge">
+                <?= htmlspecialchars($lname) ?>
+                <?php if ($src === 'DIRECT' && $canWrite): ?>
+                  <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/labels/' . $lid . '/remove')) ?>" class="d-inline m-0"
+                        onsubmit="return confirm('Ștergi eticheta?');">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                    <button class="btn btn-sm p-0 ms-1" style="border:0;background:transparent" type="submit" aria-label="Șterge">
+                      <i class="bi bi-x-circle"></i>
+                    </button>
+                  </form>
+                <?php endif; ?>
+              </span>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($canWrite): ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/labels/add')) ?>" class="mt-3 d-flex gap-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <input class="form-control" name="label_name" placeholder="Adaugă etichetă…" maxlength="64">
+            <button class="btn btn-outline-secondary" type="submit">
+              <i class="bi bi-plus-lg"></i>
             </button>
           </form>
         <?php endif; ?>

@@ -26,6 +26,8 @@ use App\Models\EntityFile;
 use App\Core\Upload;
 use App\Models\ProjectWorkLog;
 use App\Models\AuditLog;
+use App\Models\Label;
+use App\Models\EntityLabel;
 
 final class ProjectsController
 {
@@ -194,6 +196,7 @@ final class ProjectsController
         $deliveryItems = [];
         $projectFiles = [];
         $workLogs = [];
+        $projectLabels = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -229,6 +232,8 @@ final class ProjectsController
         } elseif ($tab === 'history') {
             // no heavy joins; filter in PHP
             try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
+        } elseif ($tab === 'general') {
+            try { $projectLabels = EntityLabel::labelsForEntity('projects', $id); } catch (\Throwable $e) { $projectLabels = []; }
         }
 
         $history = [];
@@ -255,6 +260,7 @@ final class ProjectsController
             'projectFiles' => $projectFiles,
             'workLogs' => $workLogs,
             'history' => $history,
+            'projectLabels' => $projectLabels,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
@@ -426,6 +432,11 @@ final class ProjectsController
                 'delivered_qty' => 0,
                 'notes' => null,
             ]);
+            // Propagă etichetele proiectului către produs (INHERITED)
+            try {
+                $labelIds = EntityLabel::labelIdsForEntity('projects', $projectId, 'DIRECT');
+                EntityLabel::propagateToProjectProducts([$ppId], $labelIds, Auth::id());
+            } catch (\Throwable $e) {}
             Audit::log('PROJECT_PRODUCT_ATTACH', 'project_products', $ppId, null, null, [
                 'message' => 'A atașat produs la proiect: ' . (string)($prod['name'] ?? ''),
                 'project_id' => $projectId,
@@ -491,6 +502,10 @@ final class ProjectsController
                 'delivered_qty' => 0,
                 'notes' => null,
             ]);
+            try {
+                $labelIds = EntityLabel::labelIdsForEntity('projects', $projectId, 'DIRECT');
+                EntityLabel::propagateToProjectProducts([$ppId], $labelIds, Auth::id());
+            } catch (\Throwable $e) {}
             Audit::log('PROJECT_PRODUCT_ATTACH', 'project_products', $ppId, null, null, [
                 'message' => 'A atașat produs nou la proiect: ' . $name,
                 'project_id' => $projectId,
@@ -1122,6 +1137,87 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot șterge.');
         }
         Response::redirect('/projects/' . $projectId . '?tab=hours');
+    }
+
+    public static function addProjectLabel(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $name = trim((string)($_POST['label_name'] ?? ''));
+        if ($name === '') {
+            Session::flash('toast_error', 'Etichetă invalidă.');
+            Response::redirect('/projects/' . $projectId . '?tab=general');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $lid = Label::upsert($name, null);
+            if ($lid <= 0) throw new \RuntimeException('Nu pot crea eticheta.');
+            EntityLabel::attach('projects', $projectId, $lid, 'DIRECT', Auth::id());
+
+            // propagare pe toate produsele proiectului
+            $pps = ProjectProduct::forProject($projectId);
+            $ppIds = array_map(fn($pp) => (int)($pp['id'] ?? 0), $pps);
+            EntityLabel::propagateToProjectProducts($ppIds, [$lid], Auth::id());
+
+            $pdo->commit();
+            Audit::log('PROJECT_LABEL_ADD', 'projects', $projectId, null, null, [
+                'message' => 'A adăugat etichetă: ' . $name,
+                'project_id' => $projectId,
+                'label_id' => $lid,
+                'label_name' => $name,
+            ]);
+            Session::flash('toast_success', 'Etichetă adăugată.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot adăuga eticheta.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=general');
+    }
+
+    public static function removeProjectLabel(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $labelId = (int)($params['labelId'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        if ($labelId <= 0) {
+            Session::flash('toast_error', 'Etichetă invalidă.');
+            Response::redirect('/projects/' . $projectId . '?tab=general');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            EntityLabel::detach('projects', $projectId, $labelId, 'DIRECT');
+            $pps = ProjectProduct::forProject($projectId);
+            $ppIds = array_map(fn($pp) => (int)($pp['id'] ?? 0), $pps);
+            EntityLabel::removeInheritedFromProjectProducts($ppIds, $labelId);
+            $pdo->commit();
+
+            Audit::log('PROJECT_LABEL_REMOVE', 'projects', $projectId, null, null, [
+                'message' => 'A șters etichetă de pe proiect.',
+                'project_id' => $projectId,
+                'label_id' => $labelId,
+            ]);
+            Session::flash('toast_success', 'Etichetă ștearsă.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot șterge eticheta.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=general');
     }
 }
 

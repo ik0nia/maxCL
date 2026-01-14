@@ -4,21 +4,26 @@ use App\Core\View;
 
 $rows = $rows ?? [];
 $q = trim((string)($q ?? ''));
+$label = trim((string)($label ?? ''));
 
 ob_start();
 ?>
 <div class="app-page-title">
   <div>
     <h1 class="m-0">Produse</h1>
-    <div class="text-muted">Produsele sunt piesele folosite în proiecte</div>
+    <div class="text-muted">Produsele sunt piesele folosite în proiecte (status controlat din proiect)</div>
   </div>
 </div>
 
 <div class="card app-card p-3 mb-3">
-  <form method="get" action="<?= htmlspecialchars(Url::to('/products')) ?>" class="d-flex gap-2 flex-wrap align-items-end">
+  <form method="get" action="<?= htmlspecialchars(Url::to('/products')) ?>" class="row g-2 align-items-end">
     <div style="min-width:320px;flex:1">
       <label class="form-label fw-semibold mb-1">Caută</label>
       <input class="form-control" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Cod sau nume…">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label fw-semibold mb-1">Etichetă (label)</label>
+      <input class="form-control" name="label" value="<?= htmlspecialchars($label) ?>" placeholder="ex: urgent">
     </div>
     <div class="d-flex gap-2">
       <button class="btn btn-outline-secondary" type="submit">
@@ -35,26 +40,31 @@ ob_start();
   <table class="table table-hover align-middle mb-0" id="productsTable">
     <thead>
       <tr>
-        <th style="width:160px">Cod</th>
-        <th>Denumire</th>
-        <th style="width:160px">Dimensiuni</th>
-        <th style="width:160px">Creat</th>
+        <th style="width:160px">Proiect</th>
+        <th>Produs</th>
+        <th style="width:140px">Status</th>
+        <th class="text-end" style="width:130px">Cant.</th>
+        <th class="text-end" style="width:130px">Livrat</th>
+        <th style="width:220px">Etichete</th>
       </tr>
     </thead>
     <tbody>
       <?php foreach ($rows as $r): ?>
         <tr>
-          <td class="fw-semibold"><?= htmlspecialchars((string)($r['code'] ?? '')) ?></td>
-          <td><?= htmlspecialchars((string)($r['name'] ?? '')) ?></td>
-          <td class="text-muted">
-            <?php
-              $w = $r['width_mm'] ?? null;
-              $h = $r['height_mm'] ?? null;
-              if ($w && $h) echo (int)$h . '×' . (int)$w . ' mm';
-              else echo '—';
-            ?>
+          <td>
+            <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0))) ?>">
+              <?= htmlspecialchars((string)($r['project_code'] ?? '')) ?>
+            </a>
+            <div class="text-muted small"><?= htmlspecialchars((string)($r['project_status'] ?? '')) ?></div>
           </td>
-          <td class="text-muted"><?= htmlspecialchars((string)($r['created_at'] ?? '')) ?></td>
+          <td>
+            <div class="fw-semibold"><?= htmlspecialchars((string)($r['product_name'] ?? '')) ?></div>
+            <div class="text-muted small"><?= htmlspecialchars((string)($r['product_code'] ?? '')) ?></div>
+          </td>
+          <td class="fw-semibold"><?= htmlspecialchars((string)($r['production_status'] ?? '')) ?></td>
+          <td class="text-end"><?= number_format((float)($r['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($r['unit'] ?? '')) ?></td>
+          <td class="text-end fw-semibold"><?= number_format((float)($r['delivered_qty'] ?? 0), 2, '.', '') ?></td>
+          <td class="text-muted"><?= htmlspecialchars((string)($r['labels'] ?? '')) ?></td>
         </tr>
       <?php endforeach; ?>
     </tbody>
