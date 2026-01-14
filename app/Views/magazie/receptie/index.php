@@ -30,32 +30,51 @@ ob_start();
   </div>
 <?php else: ?>
   <div class="card app-card p-3 mb-3">
-    <form method="post" action="<?= htmlspecialchars(Url::to('/magazie/receptie/create')) ?>" class="row g-3">
+    <form method="post" action="<?= htmlspecialchars(Url::to('/magazie/receptie/create')) ?>" class="row g-3" id="magazieReceptionForm">
       <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
-      <div class="col-12 col-md-3">
-        <label class="form-label fw-semibold">Cod WinMentor</label>
-        <input class="form-control" name="winmentor_code" required maxlength="64" placeholder="ex: ACC-123">
-      </div>
-      <div class="col-12 col-md-5">
-        <label class="form-label fw-semibold">Denumire</label>
-        <input class="form-control" name="name" required maxlength="190" placeholder="ex: Balamale, șuruburi…">
-      </div>
-      <div class="col-6 col-md-1">
-        <label class="form-label fw-semibold">Unit</label>
-        <select class="form-select" name="unit" required>
-          <?php foreach (['buc','ml','set','kg','l'] as $u): ?>
-            <option value="<?= htmlspecialchars($u) ?>" <?= $u === 'buc' ? 'selected' : '' ?>><?= htmlspecialchars($u) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Bucăți</label>
-        <input class="form-control" type="number" name="qty" required min="0.001" step="0.001" value="1">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Preț/buc</label>
-        <input class="form-control" name="unit_price" required placeholder="0.00">
+      <div class="col-12">
+        <label class="form-label fw-semibold">Poziții recepție</label>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0" id="magazieReceptionLines">
+            <thead>
+              <tr>
+                <th style="width:220px">Cod WinMentor</th>
+                <th>Denumire</th>
+                <th class="text-end" style="width:140px">Bucăți</th>
+                <th class="text-end" style="width:140px">Preț/buc</th>
+                <th style="width:64px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="mag-line">
+                <td>
+                  <input class="form-control" name="winmentor_code[]" required maxlength="64" placeholder="ex: 8997...">
+                </td>
+                <td>
+                  <input class="form-control" name="name[]" required maxlength="190" placeholder="ex: Șuruburi, balamale…">
+                </td>
+                <td class="text-end">
+                  <input class="form-control text-end" type="number" name="qty[]" required min="0.001" step="0.001" value="1">
+                </td>
+                <td class="text-end">
+                  <input class="form-control text-end" name="unit_price[]" required placeholder="0.00">
+                </td>
+                <td class="text-end">
+                  <button class="btn btn-outline-secondary btn-sm mag-remove" type="button" title="Șterge rând">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-end mt-2">
+          <button class="btn btn-outline-secondary" type="button" id="magazieAddLine">
+            <i class="bi bi-plus-lg me-1"></i> Adaugă poziție
+          </button>
+        </div>
+        <div class="text-muted small mt-2">Unitatea este implicit <span class="fw-semibold">buc</span>.</div>
       </div>
 
       <div class="col-12">
@@ -70,6 +89,50 @@ ob_start();
       </div>
     </form>
   </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      const table = document.getElementById('magazieReceptionLines');
+      const addBtn = document.getElementById('magazieAddLine');
+      if (!table || !addBtn) return;
+
+      function bindRemove(btn){
+        btn.addEventListener('click', function(){
+          const tr = btn.closest('tr');
+          if (!tr) return;
+          const body = table.querySelector('tbody');
+          if (!body) return;
+          const rows = body.querySelectorAll('tr.mag-line');
+          if (rows.length <= 1) {
+            // dacă e singurul rând, doar îl golim
+            tr.querySelectorAll('input').forEach(function(inp){ inp.value = ''; });
+            const qty = tr.querySelector('input[name="qty[]"]');
+            if (qty) qty.value = '1';
+            return;
+          }
+          tr.remove();
+        });
+      }
+
+      table.querySelectorAll('.mag-remove').forEach(bindRemove);
+
+      addBtn.addEventListener('click', function(){
+        const body = table.querySelector('tbody');
+        if (!body) return;
+        const tpl = body.querySelector('tr.mag-line');
+        if (!tpl) return;
+        const tr = tpl.cloneNode(true);
+        tr.querySelectorAll('input').forEach(function(inp){ inp.value = ''; });
+        const qty = tr.querySelector('input[name="qty[]"]');
+        if (qty) qty.value = '1';
+        const rm = tr.querySelector('.mag-remove');
+        if (rm) bindRemove(rm);
+        body.appendChild(tr);
+        const code = tr.querySelector('input[name="winmentor_code[]"]');
+        if (code) code.focus();
+      });
+    });
+  </script>
 <?php endif; ?>
 
 <div class="card app-card p-3">

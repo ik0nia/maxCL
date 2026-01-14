@@ -61,84 +61,136 @@ final class ReceptionController
     {
         Csrf::verify($_POST['_csrf'] ?? null);
 
-        $check = Validator::required($_POST, [
-            'winmentor_code' => 'Cod WinMentor',
-            'name' => 'Denumire',
-            'qty' => 'Bucăți',
-            'unit' => 'Unit',
-            'unit_price' => 'Preț/bucată',
-        ]);
-        $errors = $check['errors'];
-
-        $code = trim((string)($_POST['winmentor_code'] ?? ''));
-        $name = trim((string)($_POST['name'] ?? ''));
-        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '')));
-        $unit = trim((string)($_POST['unit'] ?? 'buc'));
-        $unitPriceRaw = trim((string)($_POST['unit_price'] ?? ''));
-        $unitPrice = Validator::dec($unitPriceRaw);
+        // Recepție cu multiple poziții (rânduri). Unitatea se setează implicit (nu se selectează în UI).
+        $codes = $_POST['winmentor_code'] ?? [];
+        $names = $_POST['name'] ?? [];
+        $qtys = $_POST['qty'] ?? [];
+        $prices = $_POST['unit_price'] ?? [];
         $note = trim((string)($_POST['note'] ?? ''));
 
-        if ($code !== '' && mb_strlen($code) > 64) $errors['winmentor_code'] = 'Cod prea lung.';
-        if ($name !== '' && mb_strlen($name) > 190) $errors['name'] = 'Denumire prea lungă.';
-        if ($qty === null || $qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
-        $allowedUnits = ['buc','ml','set','kg','l'];
-        if (!in_array($unit, $allowedUnits, true)) $errors['unit'] = 'Unitate invalidă.';
-        if ($unitPrice === null || $unitPrice < 0 || $unitPrice > 100000000) $errors['unit_price'] = 'Preț invalid.';
+        $errors = [];
+        if (!is_array($codes) || !is_array($names) || !is_array($qtys) || !is_array($prices)) {
+            Session::flash('toast_error', 'Formular invalid.');
+            Response::redirect('/magazie/receptie');
+        }
         if ($note !== '' && mb_strlen($note) > 255) $errors['note'] = 'Notă prea lungă.';
 
+        /** @var array<int, array{code:string,name:string,qty:float,unit_price:float|null}> $lines */
+        $lines = [];
+        $n = max(count($codes), count($names), count($qtys), count($prices));
+        for ($i = 0; $i < $n; $i++) {
+            $code = is_scalar($codes[$i] ?? null) ? trim((string)$codes[$i]) : '';
+            $name = is_scalar($names[$i] ?? null) ? trim((string)$names[$i]) : '';
+            $qtyRaw = is_scalar($qtys[$i] ?? null) ? trim((string)$qtys[$i]) : '';
+            $priceRaw = is_scalar($prices[$i] ?? null) ? trim((string)$prices[$i]) : '';
+
+            // Sari peste rând complet gol
+            if ($code === '' && $name === '' && $qtyRaw === '' && $priceRaw === '') {
+                continue;
+            }
+
+            $qty = Validator::dec($qtyRaw);
+            $unitPrice = Validator::dec($priceRaw);
+
+            if ($code === '') $errors['row_' . $i] = 'Cod WinMentor lipsă (rând ' . ($i + 1) . ').';
+            if ($name === '') $errors['row_' . $i] = 'Denumire lipsă (rând ' . ($i + 1) . ').';
+            if ($code !== '' && mb_strlen($code) > 64) $errors['row_' . $i] = 'Cod prea lung (rând ' . ($i + 1) . ').';
+            if ($name !== '' && mb_strlen($name) > 190) $errors['row_' . $i] = 'Denumire prea lungă (rând ' . ($i + 1) . ').';
+            if ($qty === null || $qty <= 0) $errors['row_' . $i] = 'Cantitate invalidă (rând ' . ($i + 1) . ').';
+            if ($unitPrice === null || $unitPrice < 0 || $unitPrice > 100000000) $errors['row_' . $i] = 'Preț invalid (rând ' . ($i + 1) . ').';
+
+            if (!$errors) {
+                $lines[] = [
+                    'code' => $code,
+                    'name' => $name,
+                    'qty' => (float)$qty,
+                    'unit_price' => $unitPrice,
+                ];
+            }
+        }
+
+        if (!$lines) {
+            Session::flash('toast_error', 'Adaugă cel puțin o poziție la recepție.');
+            Response::redirect('/magazie/receptie');
+        }
         if ($errors) {
             Session::flash('toast_error', 'Completează corect câmpurile pentru recepție.');
             Response::redirect('/magazie/receptie');
         }
 
+        // Agregare pe cod (dacă același cod e introdus de mai multe ori în aceeași recepție)
+        $byCode = [];
+        foreach ($lines as $ln) {
+            $c = $ln['code'];
+            if (!isset($byCode[$c])) {
+                $byCode[$c] = $ln;
+            } else {
+                $byCode[$c]['qty'] += (float)$ln['qty'];
+                // păstrăm ultima denumire/preț dacă sunt diferite (WinMentor poate actualiza)
+                $byCode[$c]['name'] = $ln['name'];
+                $byCode[$c]['unit_price'] = $ln['unit_price'];
+            }
+        }
+        $lines = array_values($byCode);
+        $unit = 'buc';
+
         /** @var \PDO $pdo */
         $pdo = DB::pdo();
         $pdo->beginTransaction();
         try {
-            $existing = MagazieItem::findByWinmentorForUpdate($code);
-            if ($existing) {
-                $before = $existing;
-                MagazieItem::updateFields((int)$existing['id'], [
-                    'name' => $name,
-                    'unit' => $unit,
-                    'unit_price' => $unitPrice,
-                ]);
-                MagazieItem::adjustStock((int)$existing['id'], (float)$qty);
-                $itemId = (int)$existing['id'];
-                $after = MagazieItem::findForUpdate($itemId) ?: $before;
-            } else {
-                $itemId = MagazieItem::create([
-                    'winmentor_code' => $code,
-                    'name' => $name,
-                    'unit' => $unit,
-                    'unit_price' => $unitPrice,
-                    'stock_qty' => (float)$qty,
-                ]);
-                $before = null;
-                $after = MagazieItem::findForUpdate($itemId);
-            }
+            $createdMovements = 0;
+            foreach ($lines as $ln) {
+                $code = $ln['code'];
+                $name = $ln['name'];
+                $qty = (float)$ln['qty'];
+                $unitPrice = $ln['unit_price'];
 
-            $movementId = MagazieMovement::create([
-                'item_id' => $itemId,
-                'direction' => 'IN',
-                'qty' => (float)$qty,
-                'unit_price' => $unitPrice,
-                'project_id' => null,
-                'project_code' => null,
-                'note' => $note !== '' ? $note : null,
-                'created_by' => Auth::id(),
-            ]);
+                $existing = MagazieItem::findByWinmentorForUpdate($code);
+                if ($existing) {
+                    $before = $existing;
+                    MagazieItem::updateFields((int)$existing['id'], [
+                        'name' => $name,
+                        'unit' => $unit,
+                        'unit_price' => $unitPrice,
+                    ]);
+                    MagazieItem::adjustStock((int)$existing['id'], (float)$qty);
+                    $itemId = (int)$existing['id'];
+                    $after = MagazieItem::findForUpdate($itemId) ?: $before;
+                } else {
+                    $itemId = MagazieItem::create([
+                        'winmentor_code' => $code,
+                        'name' => $name,
+                        'unit' => $unit,
+                        'unit_price' => $unitPrice,
+                        'stock_qty' => (float)$qty,
+                    ]);
+                    $before = null;
+                    $after = MagazieItem::findForUpdate($itemId);
+                }
+
+                $movementId = MagazieMovement::create([
+                    'item_id' => $itemId,
+                    'direction' => 'IN',
+                    'qty' => (float)$qty,
+                    'unit_price' => $unitPrice,
+                    'project_id' => null,
+                    'project_code' => null,
+                    'note' => $note !== '' ? $note : null,
+                    'created_by' => Auth::id(),
+                ]);
+                $createdMovements++;
+
+                Audit::log('MAGAZIE_IN', 'magazie_items', $itemId, is_array($before) ? $before : null, is_array($after) ? $after : null, [
+                    'movement_id' => $movementId,
+                    'qty' => (float)$qty,
+                    'unit_price' => $unitPrice,
+                    'note' => $note !== '' ? $note : null,
+                ]);
+            }
 
             $pdo->commit();
 
-            Audit::log('MAGAZIE_IN', 'magazie_items', $itemId, is_array($before) ? $before : null, is_array($after) ? $after : null, [
-                'movement_id' => $movementId,
-                'qty' => (float)$qty,
-                'unit_price' => $unitPrice,
-                'note' => $note !== '' ? $note : null,
-            ]);
-
-            Session::flash('toast_success', 'Recepție salvată.');
+            Session::flash('toast_success', 'Recepție salvată (' . $createdMovements . ' poziții).');
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva recepția.');
