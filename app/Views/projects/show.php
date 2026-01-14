@@ -16,6 +16,8 @@ $hplConsum = $hplConsum ?? [];
 $hplAlloc = $hplAlloc ?? [];
 $hplBoards = $hplBoards ?? [];
 $magazieItems = $magazieItems ?? [];
+$deliveries = $deliveries ?? [];
+$deliveryItems = $deliveryItems ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -546,6 +548,131 @@ ob_start();
                 </tbody>
               </table>
             </div>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php elseif ($tab === 'deliveries'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Livrare nouă</div>
+        <div class="text-muted">Livrări multiple, cu cantități pe produs</div>
+
+        <?php if (!$canWrite): ?>
+          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
+        <?php else: ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/deliveries/create')) ?>" class="mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold">Data livrare</label>
+                <input class="form-control" type="date" name="delivery_date" value="<?= htmlspecialchars(date('Y-m-d')) ?>">
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold">Notă (opțional)</label>
+                <input class="form-control" name="note" maxlength="255">
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="fw-semibold">Produse</div>
+              <div class="text-muted small">Introdu cantitatea livrată acum (nu depăși “rămas”).</div>
+              <div class="table-responsive mt-2">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Produs</th>
+                      <th class="text-end" style="width:120px">Total</th>
+                      <th class="text-end" style="width:120px">Livrat</th>
+                      <th class="text-end" style="width:120px">Rămas</th>
+                      <th class="text-end" style="width:160px">Livrare acum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($projectProducts as $pp): ?>
+                      <?php
+                        $ppId = (int)($pp['id'] ?? 0);
+                        $total = (float)($pp['qty'] ?? 0);
+                        $del = (float)($pp['delivered_qty'] ?? 0);
+                        $left = max(0.0, $total - $del);
+                      ?>
+                      <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars((string)($pp['product_name'] ?? '')) ?></td>
+                        <td class="text-end"><?= number_format($total, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
+                        <td class="text-end"><?= number_format($del, 2, '.', '') ?></td>
+                        <td class="text-end fw-semibold"><?= number_format($left, 2, '.', '') ?></td>
+                        <td class="text-end">
+                          <input class="form-control form-control-sm text-end" type="number" step="0.01" min="0" max="<?= htmlspecialchars((string)$left) ?>"
+                                 name="delivery_qty[<?= $ppId ?>]" value="0">
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end mt-3">
+              <button class="btn btn-primary" type="submit" onclick="return confirm('Salvez livrarea?');">
+                <i class="bi bi-truck me-1"></i> Salvează livrarea
+              </button>
+            </div>
+          </form>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Livrări existente</div>
+        <div class="text-muted">Istoric livrări (cantități pe produse)</div>
+
+        <?php if (!$deliveries): ?>
+          <div class="text-muted mt-2">Nu există livrări încă.</div>
+        <?php else: ?>
+          <div class="accordion mt-2" id="deliveriesAcc">
+            <?php foreach ($deliveries as $d): ?>
+              <?php
+                $did = (int)($d['id'] ?? 0);
+                $items = is_array($deliveryItems[$did] ?? null) ? $deliveryItems[$did] : [];
+              ?>
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="h<?= $did ?>">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c<?= $did ?>">
+                    <?= htmlspecialchars((string)($d['delivery_date'] ?? '')) ?> · <?= count($items) ?> produse
+                    <?php if (!empty($d['note'])): ?>
+                      <span class="text-muted ms-2"><?= htmlspecialchars((string)$d['note']) ?></span>
+                    <?php endif; ?>
+                  </button>
+                </h2>
+                <div id="c<?= $did ?>" class="accordion-collapse collapse" data-bs-parent="#deliveriesAcc">
+                  <div class="accordion-body">
+                    <?php if (!$items): ?>
+                      <div class="text-muted">Fără produse.</div>
+                    <?php else: ?>
+                      <table class="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Produs</th>
+                            <th class="text-end" style="width:140px">Cantitate</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($items as $it): ?>
+                            <tr>
+                              <td class="fw-semibold"><?= htmlspecialchars((string)($it['product_name'] ?? '')) ?></td>
+                              <td class="text-end fw-semibold"><?= number_format((float)($it['qty'] ?? 0), 2, '.', '') ?></td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
         <?php endif; ?>
       </div>

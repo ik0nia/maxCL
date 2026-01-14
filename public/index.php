@@ -215,6 +215,7 @@ $router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsControl
 $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);
+$router->post('/projects/{id}/deliveries/create', fn($p) => ProjectsController::createDelivery($p), $projectsWriteMW);
 
 $router->get('/products', fn() => ProductsController::index(), $projectsReadMW);
 

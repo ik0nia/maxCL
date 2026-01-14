@@ -16,6 +16,8 @@ use App\Models\HplBoard;
 use App\Models\MagazieItem;
 use App\Models\Product;
 use App\Models\Project;
+use App\Models\ProjectDelivery;
+use App\Models\ProjectDeliveryItem;
 use App\Models\ProjectHplAllocation;
 use App\Models\ProjectHplConsumption;
 use App\Models\ProjectMagazieConsumption;
@@ -184,6 +186,8 @@ final class ProjectsController
         $hplAlloc = [];
         $hplBoards = [];
         $magazieItems = [];
+        $deliveries = [];
+        $deliveryItems = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -197,6 +201,19 @@ final class ProjectsController
             try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
             try { $hplBoards = HplBoard::allWithTotals(null, null); } catch (\Throwable $e) { $hplBoards = []; }
             try { $magazieItems = MagazieItem::all(null, 5000); } catch (\Throwable $e) { $magazieItems = []; }
+        } elseif ($tab === 'deliveries') {
+            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+            try { $deliveries = ProjectDelivery::forProject($id); } catch (\Throwable $e) { $deliveries = []; }
+            $deliveryItems = [];
+            foreach ($deliveries as $d) {
+                $did = (int)($d['id'] ?? 0);
+                if ($did <= 0) continue;
+                try {
+                    $deliveryItems[$did] = ProjectDelivery::itemsForDelivery($did);
+                } catch (\Throwable $e) {
+                    $deliveryItems[$did] = [];
+                }
+            }
         }
 
         echo View::render('projects/show', [
@@ -209,6 +226,8 @@ final class ProjectsController
             'hplAlloc' => $hplAlloc,
             'hplBoards' => $hplBoards,
             'magazieItems' => $magazieItems,
+            'deliveries' => $deliveries,
+            'deliveryItems' => $deliveryItems,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
@@ -729,6 +748,146 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot salva consumul HPL: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=consum');
+    }
+
+    public static function createDelivery(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $date = trim((string)($_POST['delivery_date'] ?? ''));
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($date === '') {
+            Session::flash('toast_error', 'Data livrării este obligatorie.');
+            Response::redirect('/projects/' . $projectId . '?tab=deliveries');
+        }
+
+        // qty per project_product_id: delivery_qty[ppId] => val
+        $qtyMap = $_POST['delivery_qty'] ?? [];
+        if (!is_array($qtyMap)) $qtyMap = [];
+
+        $pps = ProjectProduct::forProject($projectId);
+        $ppById = [];
+        foreach ($pps as $pp) {
+            $ppById[(int)$pp['id']] = $pp;
+        }
+
+        $items = [];
+        foreach ($qtyMap as $k => $v) {
+            $ppId = is_numeric($k) ? (int)$k : 0;
+            if ($ppId <= 0 || !isset($ppById[$ppId])) continue;
+            $qty = Validator::dec(is_scalar($v) ? (string)$v : '') ?? 0.0;
+            if ($qty <= 0) continue;
+
+            $pp = $ppById[$ppId];
+            $max = max(0.0, (float)($pp['qty'] ?? 0) - (float)($pp['delivered_qty'] ?? 0));
+            if ($qty > $max + 1e-9) {
+                Session::flash('toast_error', 'Nu poți livra peste cantitatea rămasă pentru produsul ' . (string)($pp['product_name'] ?? '') . '.');
+                Response::redirect('/projects/' . $projectId . '?tab=deliveries');
+            }
+            $items[] = ['pp_id' => $ppId, 'qty' => $qty];
+        }
+
+        if (!$items) {
+            Session::flash('toast_error', 'Nu ai selectat nicio cantitate de livrat.');
+            Response::redirect('/projects/' . $projectId . '?tab=deliveries');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $deliveryId = ProjectDelivery::create([
+                'project_id' => $projectId,
+                'delivery_date' => $date,
+                'note' => $note !== '' ? $note : null,
+                'created_by' => Auth::id(),
+            ]);
+
+            foreach ($items as $it) {
+                $ppId = (int)$it['pp_id'];
+                $qty = (float)$it['qty'];
+
+                ProjectDeliveryItem::create([
+                    'delivery_id' => $deliveryId,
+                    'project_product_id' => $ppId,
+                    'qty' => $qty,
+                ]);
+
+                $pp = $ppById[$ppId];
+                $beforePP = $pp;
+                $newDelivered = (float)($pp['delivered_qty'] ?? 0) + $qty;
+                $totalQty = (float)($pp['qty'] ?? 0);
+                if ($newDelivered > $totalQty) $newDelivered = $totalQty;
+
+                // update status based on delivered
+                $newStatus = (string)($pp['production_status'] ?? 'DE_PREGATIT');
+                if ($newDelivered >= $totalQty - 1e-9) $newStatus = 'LIVRAT_COMPLET';
+                elseif ($newDelivered > 0) $newStatus = 'LIVRAT_PARTIAL';
+
+                ProjectProduct::updateFields($ppId, [
+                    'qty' => $totalQty,
+                    'unit' => (string)($pp['unit'] ?? 'buc'),
+                    'production_status' => $newStatus,
+                    'delivered_qty' => $newDelivered,
+                    'notes' => $pp['notes'] ?? null,
+                ]);
+
+                Audit::log('PROJECT_DELIVERY_ITEM', 'project_products', $ppId, $beforePP, null, [
+                    'message' => 'Livrare produs: +' . $qty . ' (total livrat ' . $newDelivered . '/' . $totalQty . ')',
+                    'project_id' => $projectId,
+                    'delivery_id' => $deliveryId,
+                    'qty' => $qty,
+                ]);
+            }
+
+            // update project status based on product deliveries
+            $ppsNow = ProjectProduct::forProject($projectId);
+            $allDelivered = true;
+            $anyDelivered = false;
+            foreach ($ppsNow as $pp) {
+                $t = (float)($pp['qty'] ?? 0);
+                $d = (float)($pp['delivered_qty'] ?? 0);
+                if ($d > 0) $anyDelivered = true;
+                if ($t > 0 && $d < $t - 1e-9) $allDelivered = false;
+            }
+            $beforeProj = $project;
+            $afterProj = $project;
+            if ($allDelivered && $ppsNow) {
+                $afterProj['status'] = 'LIVRAT_COMPLET';
+                $afterProj['completed_at'] = date('Y-m-d H:i:s');
+            } elseif ($anyDelivered) {
+                $afterProj['status'] = 'LIVRAT_PARTIAL';
+            }
+            if ((string)($beforeProj['status'] ?? '') !== (string)($afterProj['status'] ?? '')) {
+                Project::update($projectId, $afterProj);
+                Audit::log('PROJECT_STATUS_CHANGE', 'projects', $projectId, $beforeProj, $afterProj, [
+                    'message' => 'Status proiect actualizat automat după livrare.',
+                    'delivery_id' => $deliveryId,
+                ]);
+            }
+
+            $pdo->commit();
+
+            Audit::log('PROJECT_DELIVERY_CREATE', 'project_deliveries', $deliveryId, null, null, [
+                'message' => 'A creat livrare pentru proiect.',
+                'project_id' => $projectId,
+                'delivery_date' => $date,
+                'note' => $note !== '' ? $note : null,
+                'items_count' => count($items),
+            ]);
+            Session::flash('toast_success', 'Livrare salvată.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot salva livrarea: ' . $e->getMessage());
+        }
+
+        Response::redirect('/projects/' . $projectId . '?tab=deliveries');
     }
 }
 
