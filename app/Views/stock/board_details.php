@@ -3,6 +3,8 @@ use App\Core\Csrf;
 use App\Core\Auth;
 use App\Core\Url;
 use App\Core\View;
+use App\Models\Finish;
+use App\Models\Texture;
 
 $board = $board ?? [];
 $pieces = $pieces ?? [];
@@ -23,6 +25,30 @@ foreach ($pieces as $p) {
 $availableValueLei = ($isAdmin && $salePerM2 !== null && is_finite($salePerM2) && $salePerM2 >= 0)
   ? ($availableM2 * $salePerM2)
   : null;
+
+// Culori + finisaje (texturi) pentru față/verso
+$faceFinish = null;
+$backFinish = null;
+$faceTex = null;
+$backTex = null;
+try {
+  $faceFinish = !empty($board['face_color_id']) ? Finish::find((int)$board['face_color_id']) : null;
+  $backFinish = !empty($board['back_color_id']) ? Finish::find((int)$board['back_color_id']) : null;
+  if (!$backFinish) $backFinish = $faceFinish;
+
+  $faceTex = !empty($board['face_texture_id']) ? Texture::find((int)$board['face_texture_id']) : null;
+  $backTex = !empty($board['back_texture_id']) ? Texture::find((int)$board['back_texture_id']) : null;
+  if (!$backTex) $backTex = $faceTex;
+} catch (\Throwable $e) {
+  // ignore - fallback to empty
+}
+
+function _normImg(string $p): string {
+  $p = trim($p);
+  if ($p === '') return '';
+  if (str_starts_with($p, '/uploads/')) return Url::to($p);
+  return $p;
+}
 
 ob_start();
 ?>
@@ -53,6 +79,70 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <div class="h5 m-0">Detalii placă</div>
       <div class="text-muted">Dimensiuni standard și prețuri</div>
+
+      <div class="mt-3">
+        <?php
+          $fThumb = $faceFinish ? _normImg((string)($faceFinish['thumb_path'] ?? '')) : '';
+          $bThumb = $backFinish ? _normImg((string)($backFinish['thumb_path'] ?? '')) : '';
+          $fBig = $faceFinish ? _normImg((string)($faceFinish['image_path'] ?? '')) : '';
+          $bBig = $backFinish ? _normImg((string)($backFinish['image_path'] ?? '')) : '';
+          if ($fBig === '') $fBig = $fThumb;
+          if ($bBig === '') $bBig = $bThumb;
+          $fCode = $faceFinish ? (string)($faceFinish['code'] ?? '') : '';
+          $bCode = $backFinish ? (string)($backFinish['code'] ?? '') : '';
+          $fFin = $faceTex ? (string)($faceTex['name'] ?? '') : '';
+          $bFin = $backTex ? (string)($backTex['name'] ?? '') : '';
+        ?>
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="text-center">
+              <div class="text-muted small mb-1"><span class="badge app-badge">Față</span></div>
+              <a href="#"
+                 data-bs-toggle="modal" data-bs-target="#appLightbox"
+                 data-lightbox-src="<?= htmlspecialchars($fBig) ?>"
+                 data-lightbox-fallback="<?= htmlspecialchars($fThumb) ?>"
+                 data-lightbox-title="<?= htmlspecialchars($fCode !== '' ? $fCode : 'Față') ?>"
+                 style="display:inline-block;cursor:zoom-in">
+                <img src="<?= htmlspecialchars($fThumb) ?>"
+                     alt=""
+                     style="width:170px;height:170px;object-fit:cover;border-radius:18px;border:1px solid #D9E3E6;">
+              </a>
+              <div class="mt-2">
+                <div class="fw-semibold" style="font-size:1.05rem;line-height:1.1;color:#111">
+                  <?= htmlspecialchars($fCode !== '' ? $fCode : '—') ?>
+                </div>
+                <div class="text-muted" style="font-weight:600">
+                  <?= htmlspecialchars($fFin !== '' ? $fFin : '—') ?>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-center">
+              <div class="text-muted small mb-1"><span class="badge app-badge">Verso</span></div>
+              <a href="#"
+                 data-bs-toggle="modal" data-bs-target="#appLightbox"
+                 data-lightbox-src="<?= htmlspecialchars($bBig) ?>"
+                 data-lightbox-fallback="<?= htmlspecialchars($bThumb) ?>"
+                 data-lightbox-title="<?= htmlspecialchars($bCode !== '' ? $bCode : 'Verso') ?>"
+                 style="display:inline-block;cursor:zoom-in">
+                <img src="<?= htmlspecialchars($bThumb) ?>"
+                     alt=""
+                     style="width:170px;height:170px;object-fit:cover;border-radius:18px;border:1px solid #D9E3E6;">
+              </a>
+              <div class="mt-2">
+                <div class="fw-semibold" style="font-size:1.05rem;line-height:1.1;color:#111">
+                  <?= htmlspecialchars($bCode !== '' ? $bCode : '—') ?>
+                </div>
+                <div class="text-muted" style="font-weight:600">
+                  <?= htmlspecialchars($bFin !== '' ? $bFin : '—') ?>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="mt-2">
         <div class="d-flex justify-content-between border-bottom py-2">
           <div class="text-muted">Brand</div>
