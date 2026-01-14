@@ -25,6 +25,7 @@ use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
+use App\Controllers\ProjectsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\System\DbUpdateController;
@@ -198,9 +199,15 @@ $auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
 $router->get('/audit', fn() => AuditController::index(), $auditMW);
 $router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW);
 
-$router->get('/projects', fn() => print View::render('system/placeholder', ['title' => 'Proiecte']), [
-    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
-]);
+$projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+
+$router->get('/projects', fn() => ProjectsController::index(), $projectsReadMW);
+$router->get('/projects/create', fn() => ProjectsController::createForm(), $projectsWriteMW);
+$router->post('/projects/create', fn() => ProjectsController::create(), $projectsWriteMW);
+$router->get('/projects/{id}', fn($p) => ProjectsController::show($p), $projectsReadMW);
+$router->post('/projects/{id}/edit', fn($p) => ProjectsController::update($p), $projectsWriteMW);
+$router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatus($p), $projectsWriteMW);
 
 $clientsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
