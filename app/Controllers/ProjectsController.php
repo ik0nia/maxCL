@@ -896,10 +896,9 @@ final class ProjectsController
             $target = $mode === 'CONSUMED' ? 'CONSUMED' : 'RESERVED';
             $projCode = (string)($project['code'] ?? '');
             $projName = (string)($project['name'] ?? '');
-            $noteAppend = 'Rezervat pentru Proiect: ' . $projCode . ($projName !== '' ? (' · ' . $projName) : '') . ' (consum HPL #' . $cid . ')';
-            if ($mode === 'CONSUMED') {
-                $noteAppend = 'Consumat pentru Proiect: ' . $projCode . ($projName !== '' ? (' · ' . $projName) : '') . ' (consum HPL #' . $cid . ')';
-            }
+            // IMPORTANT (cerință): nota afișată pe piesa din stoc trebuie să coincidă cu nota din proiect.
+            // Păstrăm mesajul tehnic (proiect/consumption id) în Audit, nu în notes.
+            $noteAppend = ($note !== '') ? $note : ('Proiect ' . $projCode . ' · consum HPL #' . $cid);
             self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend);
 
             // Auto-alocare pe produse (dacă nu e blocată distribuția și există produse)
