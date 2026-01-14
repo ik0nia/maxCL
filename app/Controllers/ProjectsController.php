@@ -623,7 +623,6 @@ final class ProjectsController
         $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
-        $unit = trim((string)($_POST['unit'] ?? 'buc'));
         $mode = trim((string)($_POST['mode'] ?? 'CONSUMED'));
         $note = trim((string)($_POST['note'] ?? ''));
         if ($itemId === null || $qty === null || $qty <= 0) {
@@ -637,6 +636,7 @@ final class ProjectsController
             Session::flash('toast_error', 'Accesoriu inexistent.');
             Response::redirect('/projects/' . $projectId . '?tab=consum');
         }
+        $unit = trim((string)($item['unit'] ?? 'buc'));
 
         // dacă e consumat, verificăm stoc
         if ($mode === 'CONSUMED') {

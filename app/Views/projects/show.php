@@ -438,11 +438,8 @@ ob_start();
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Unit</label>
-              <select class="form-select" name="unit" id="magazieUnit">
-                <?php foreach (['buc','ml','set','kg','l'] as $u): ?>
-                  <option value="<?= htmlspecialchars($u) ?>" <?= $u === 'buc' ? 'selected' : '' ?>><?= htmlspecialchars($u) ?></option>
-                <?php endforeach; ?>
-              </select>
+              <input class="form-control" id="magazieUnitPreview" value="buc" readonly>
+              <div class="text-muted small mt-1">Se ia automat din produsul de Magazie.</div>
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Mod</label>
@@ -478,7 +475,7 @@ ob_start();
               const el = document.getElementById('magazieItemSelect');
               if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
               const $el = window.jQuery(el);
-              const unitEl = document.getElementById('magazieUnit');
+              const unitEl = document.getElementById('magazieUnitPreview');
 
               $el.select2({
                 width: '100%',

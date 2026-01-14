@@ -194,13 +194,15 @@ final class MagazieItem
             return $st->rowCount() > 0;
         }
 
+        // IMPORTANT: pe unele setări PDO, folosirea aceluiași placeholder (:d) de 2 ori
+        // poate arunca SQLSTATE[HY093] "Invalid parameter number". Folosim parametri poziționali.
         $st = $pdo->prepare('
             UPDATE magazie_items
-            SET stock_qty = stock_qty + :d
-            WHERE id = :id
-              AND (stock_qty + :d) >= 0
+            SET stock_qty = stock_qty + ?
+            WHERE id = ?
+              AND (stock_qty + ?) >= 0
         ');
-        $st->execute([':d' => $delta, ':id' => $id]);
+        $st->execute([$delta, $id, $delta]);
         return $st->rowCount() > 0;
     }
 }
