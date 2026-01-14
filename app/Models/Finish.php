@@ -51,16 +51,54 @@ final class Finish
             return self::all();
         }
 
+        // Căutare tolerantă (inclusiv fără spații în cod / cod culoare)
+        $qNoSpace = str_replace(["\xC2\xA0", ' '], '', $q);
+        $like = '%' . $q . '%';
+        $like2 = '%' . $qNoSpace . '%';
+        $prefix2 = $qNoSpace . '%';
+
         $conds = [];
         $params = [];
-        $like = '%' . $q . '%';
-        if (self::hasColumn('code')) { $conds[] = 'code LIKE ?'; $params[] = $like; }
-        $conds[] = 'color_name LIKE ?'; $params[] = $like;
-        if (self::hasColumn('color_code')) { $conds[] = 'color_code LIKE ?'; $params[] = $like; }
+        $hasCode = self::hasColumn('code');
+        $hasColorCode = self::hasColumn('color_code');
+        $hasTextureName = self::hasColumn('texture_name');
+        $hasTextureCode = self::hasColumn('texture_code');
+
+        if ($hasCode) {
+            $conds[] = 'code LIKE ?';
+            $params[] = $like;
+            $conds[] = "REPLACE(code, ' ', '') LIKE ?";
+            $params[] = $like2;
+        }
+        $conds[] = 'color_name LIKE ?';
+        $params[] = $like;
+        if ($hasColorCode) {
+            $conds[] = 'color_code LIKE ?';
+            $params[] = $like;
+            $conds[] = "REPLACE(COALESCE(color_code,''), ' ', '') LIKE ?";
+            $params[] = $like2;
+        }
+        if ($hasTextureName) {
+            $conds[] = 'texture_name LIKE ?';
+            $params[] = $like;
+        }
+        if ($hasTextureCode) {
+            $conds[] = 'texture_code LIKE ?';
+            $params[] = $like;
+        }
+
         $where = $conds ? ('WHERE ' . implode(' OR ', $conds)) : '';
 
-        $order = ['color_name ASC'];
-        if (self::hasColumn('code')) $order[] = 'code ASC';
+        $order = [];
+        if ($hasCode) {
+            // aducem mai sus codurile care încep cu ce se tastează (ignorând spațiile)
+            $order[] = "CASE WHEN REPLACE(code, ' ', '') LIKE ? THEN 0 ELSE 1 END";
+            $params[] = $prefix2;
+        }
+        $order[] = 'color_name ASC';
+        if ($hasCode) $order[] = 'code ASC';
+        if ($hasTextureName) $order[] = 'texture_name ASC';
+
         $sql = "SELECT * FROM finishes $where ORDER BY " . implode(', ', $order);
         $st = $pdo->prepare($sql);
         $st->execute($params);
