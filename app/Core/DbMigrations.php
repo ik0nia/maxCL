@@ -376,6 +376,334 @@ final class DbMigrations
                     try { if (self::tableExists($pdo, 'users')) $pdo->exec("ALTER TABLE magazie_movements ADD CONSTRAINT fk_mag_mov_user FOREIGN KEY (created_by) REFERENCES users(id)"); } catch (\Throwable $e) {}
                 },
             ],
+            [
+                'id' => '2026-01-14_07_extend_projects_for_production',
+                'label' => 'ALTER TABLE projects add production fields',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'projects')) return;
+
+                    // câmpuri generale proiect producție
+                    if (!self::columnExists($pdo, 'projects', 'description')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN description TEXT NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'category')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN category VARCHAR(190) NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'priority')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN priority INT NOT NULL DEFAULT 0");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'completed_at')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN completed_at DATETIME NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'cancelled_at')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN cancelled_at DATETIME NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'technical_notes')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN technical_notes TEXT NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'tags')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN tags TEXT NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'client_group_id')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN client_group_id INT UNSIGNED NULL");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'allocation_mode')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN allocation_mode ENUM('by_qty','by_area','manual') NOT NULL DEFAULT 'by_area'");
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'allocations_locked')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN allocations_locked TINYINT(1) NOT NULL DEFAULT 0");
+                    }
+
+                    // index + FK best-effort
+                    try { $pdo->exec("ALTER TABLE projects ADD INDEX idx_projects_group (client_group_id)"); } catch (\Throwable $e) {}
+                    try { if (self::tableExists($pdo, 'client_groups')) $pdo->exec("ALTER TABLE projects ADD CONSTRAINT fk_projects_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id)"); } catch (\Throwable $e) {}
+
+                    // Extinde ENUM status (best-effort) păstrând valorile vechi.
+                    try {
+                        $pdo->exec("
+                          ALTER TABLE projects
+                          MODIFY status ENUM(
+                            'DRAFT','CONFIRMAT','IN_PRODUCTIE','IN_ASTEPTARE','FINALIZAT_TEHNIC',
+                            'LIVRAT_PARTIAL','LIVRAT_COMPLET','ANULAT',
+                            'NOU','IN_LUCRU','FINALIZAT','ARHIVAT'
+                          ) NOT NULL DEFAULT 'DRAFT'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore (hosting / permisiuni / DB vechi)
+                    }
+                },
+            ],
+            [
+                'id' => '2026-01-14_08_create_products',
+                'label' => 'CREATE TABLE products',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'products')) return;
+                    $pdo->exec("
+                        CREATE TABLE products (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          code VARCHAR(64) NULL,
+                          name VARCHAR(190) NOT NULL,
+                          width_mm INT NULL,
+                          height_mm INT NULL,
+                          notes TEXT NULL,
+                          cnc_settings_json JSON NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          UNIQUE KEY uq_products_code (code),
+                          KEY idx_products_name (name)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_09_create_project_products',
+                'label' => 'CREATE TABLE project_products',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'project_products')) return;
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    if (!self::tableExists($pdo, 'products')) return;
+                    $pdo->exec("
+                        CREATE TABLE project_products (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          project_id INT UNSIGNED NOT NULL,
+                          product_id INT UNSIGNED NOT NULL,
+                          qty DECIMAL(12,2) NOT NULL DEFAULT 1,
+                          unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+                          production_status ENUM('DE_PREGATIT','CNC','ATELIER','FINISARE','GATA','LIVRAT_PARTIAL','LIVRAT_COMPLET','REBUT') NOT NULL DEFAULT 'DE_PREGATIT',
+                          delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
+                          notes TEXT NULL,
+                          cnc_override_json JSON NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          UNIQUE KEY uq_proj_prod (project_id, product_id),
+                          KEY idx_proj_prod_project (project_id),
+                          KEY idx_proj_prod_status (production_status),
+                          CONSTRAINT fk_proj_prod_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_proj_prod_product FOREIGN KEY (product_id) REFERENCES products(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_10_create_labels',
+                'label' => 'CREATE TABLE labels + entity_labels',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'labels')) {
+                        $pdo->exec("
+                            CREATE TABLE labels (
+                              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                              name VARCHAR(64) NOT NULL,
+                              color VARCHAR(32) NULL,
+                              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                              PRIMARY KEY (id),
+                              UNIQUE KEY uq_labels_name (name)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ");
+                    }
+                    if (!self::tableExists($pdo, 'entity_labels')) {
+                        $pdo->exec("
+                            CREATE TABLE entity_labels (
+                              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                              entity_type VARCHAR(64) NOT NULL,
+                              entity_id BIGINT UNSIGNED NOT NULL,
+                              label_id INT UNSIGNED NOT NULL,
+                              source ENUM('DIRECT','INHERITED') NOT NULL DEFAULT 'DIRECT',
+                              created_by INT UNSIGNED NULL,
+                              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              PRIMARY KEY (id),
+                              UNIQUE KEY uq_entity_label (entity_type, entity_id, label_id, source),
+                              KEY idx_entity_labels_entity (entity_type, entity_id),
+                              KEY idx_entity_labels_label (label_id),
+                              CONSTRAINT fk_entity_labels_label FOREIGN KEY (label_id) REFERENCES labels(id),
+                              CONSTRAINT fk_entity_labels_user FOREIGN KEY (created_by) REFERENCES users(id)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ");
+                    }
+                },
+            ],
+            [
+                'id' => '2026-01-14_11_create_project_deliveries',
+                'label' => 'CREATE TABLE project_deliveries + items',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_deliveries')) {
+                        if (!self::tableExists($pdo, 'projects')) return;
+                        $pdo->exec("
+                            CREATE TABLE project_deliveries (
+                              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                              project_id INT UNSIGNED NOT NULL,
+                              delivery_date DATE NOT NULL,
+                              note VARCHAR(255) NULL,
+                              created_by INT UNSIGNED NULL,
+                              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              PRIMARY KEY (id),
+                              KEY idx_deliv_project (project_id),
+                              KEY idx_deliv_date (delivery_date),
+                              CONSTRAINT fk_deliv_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                              CONSTRAINT fk_deliv_user FOREIGN KEY (created_by) REFERENCES users(id)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ");
+                    }
+                    if (!self::tableExists($pdo, 'project_delivery_items')) {
+                        if (!self::tableExists($pdo, 'project_deliveries')) return;
+                        if (!self::tableExists($pdo, 'project_products')) return;
+                        $pdo->exec("
+                            CREATE TABLE project_delivery_items (
+                              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                              delivery_id BIGINT UNSIGNED NOT NULL,
+                              project_product_id BIGINT UNSIGNED NOT NULL,
+                              qty DECIMAL(12,2) NOT NULL,
+                              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              PRIMARY KEY (id),
+                              UNIQUE KEY uq_delivery_item (delivery_id, project_product_id),
+                              KEY idx_delivery_items_delivery (delivery_id),
+                              KEY idx_delivery_items_pp (project_product_id),
+                              CONSTRAINT fk_delivery_items_delivery FOREIGN KEY (delivery_id) REFERENCES project_deliveries(id) ON DELETE CASCADE,
+                              CONSTRAINT fk_delivery_items_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ");
+                    }
+                },
+            ],
+            [
+                'id' => '2026-01-14_12_create_entity_files',
+                'label' => 'CREATE TABLE entity_files',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'entity_files')) return;
+                    $pdo->exec("
+                        CREATE TABLE entity_files (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          entity_type VARCHAR(64) NOT NULL,
+                          entity_id BIGINT UNSIGNED NOT NULL,
+                          category VARCHAR(64) NULL,
+                          original_name VARCHAR(255) NOT NULL,
+                          stored_name VARCHAR(255) NOT NULL,
+                          mime VARCHAR(128) NULL,
+                          size_bytes BIGINT UNSIGNED NULL,
+                          uploaded_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_entity_files_entity (entity_type, entity_id),
+                          KEY idx_entity_files_created (created_at),
+                          CONSTRAINT fk_entity_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_13_create_project_work_logs',
+                'label' => 'CREATE TABLE project_work_logs',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'project_work_logs')) return;
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    $pdo->exec("
+                        CREATE TABLE project_work_logs (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          project_id INT UNSIGNED NOT NULL,
+                          project_product_id BIGINT UNSIGNED NULL,
+                          work_type ENUM('CNC','ATELIER') NOT NULL,
+                          hours_estimated DECIMAL(10,2) NULL,
+                          hours_actual DECIMAL(10,2) NULL,
+                          cost_per_hour DECIMAL(12,2) NULL,
+                          note VARCHAR(255) NULL,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_work_project (project_id),
+                          KEY idx_work_pp (project_product_id),
+                          KEY idx_work_type (work_type),
+                          CONSTRAINT fk_work_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_work_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
+                          CONSTRAINT fk_work_user FOREIGN KEY (created_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_14_create_project_magazie_consumptions',
+                'label' => 'CREATE TABLE project_magazie_consumptions',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'project_magazie_consumptions')) return;
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    if (!self::tableExists($pdo, 'magazie_items')) return;
+                    $pdo->exec("
+                        CREATE TABLE project_magazie_consumptions (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          project_id INT UNSIGNED NOT NULL,
+                          project_product_id BIGINT UNSIGNED NULL,
+                          item_id INT UNSIGNED NOT NULL,
+                          qty DECIMAL(12,3) NOT NULL,
+                          unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+                          mode ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'CONSUMED',
+                          note VARCHAR(255) NULL,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_pmc_project (project_id),
+                          KEY idx_pmc_pp (project_product_id),
+                          KEY idx_pmc_item (item_id),
+                          KEY idx_pmc_mode (mode),
+                          CONSTRAINT fk_pmc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_pmc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
+                          CONSTRAINT fk_pmc_item FOREIGN KEY (item_id) REFERENCES magazie_items(id),
+                          CONSTRAINT fk_pmc_user FOREIGN KEY (created_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_15_create_project_hpl_consumptions',
+                'label' => 'CREATE TABLE project_hpl_consumptions + allocations',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_hpl_consumptions')) {
+                        if (!self::tableExists($pdo, 'projects')) return;
+                        if (!self::tableExists($pdo, 'hpl_boards')) return;
+                        $pdo->exec("
+                            CREATE TABLE project_hpl_consumptions (
+                              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                              project_id INT UNSIGNED NOT NULL,
+                              board_id INT UNSIGNED NOT NULL,
+                              qty_m2 DECIMAL(12,4) NOT NULL,
+                              mode ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'RESERVED',
+                              note VARCHAR(255) NULL,
+                              created_by INT UNSIGNED NULL,
+                              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                              PRIMARY KEY (id),
+                              KEY idx_phc_project (project_id),
+                              KEY idx_phc_board (board_id),
+                              KEY idx_phc_mode (mode),
+                              CONSTRAINT fk_phc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                              CONSTRAINT fk_phc_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+                              CONSTRAINT fk_phc_user FOREIGN KEY (created_by) REFERENCES users(id)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ");
+                    }
+                    if (!self::tableExists($pdo, 'project_hpl_allocations')) {
+                        if (!self::tableExists($pdo, 'project_hpl_consumptions')) return;
+                        if (!self::tableExists($pdo, 'project_products')) return;
+                        $pdo->exec("
+                            CREATE TABLE project_hpl_allocations (
+                              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                              consumption_id BIGINT UNSIGNED NOT NULL,
+                              project_product_id BIGINT UNSIGNED NOT NULL,
+                              qty_m2 DECIMAL(12,4) NOT NULL,
+                              created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              PRIMARY KEY (id),
+                              UNIQUE KEY uq_ph_alloc (consumption_id, project_product_id),
+                              KEY idx_ph_alloc_cons (consumption_id),
+                              KEY idx_ph_alloc_pp (project_product_id),
+                              CONSTRAINT fk_ph_alloc_cons FOREIGN KEY (consumption_id) REFERENCES project_hpl_consumptions(id) ON DELETE CASCADE,
+                              CONSTRAINT fk_ph_alloc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ");
+                    }
+                },
+            ],
         ];
     }
 
