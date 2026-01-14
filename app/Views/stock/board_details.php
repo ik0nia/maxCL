@@ -257,10 +257,12 @@ ob_start();
               <td>
                 <?= htmlspecialchars((string)$p['status']) ?>
                 <?php if ($noteTooltip !== ''): ?>
-                  <i class="bi bi-chat-left-text ms-1 text-muted"
-                     style="cursor:help"
+                  <i class="bi bi-chat-left-text ms-1 text-muted js-piece-notes"
+                     style="cursor:pointer"
                      data-bs-toggle="tooltip"
+                     data-bs-container="body"
                      data-bs-title="<?= htmlspecialchars($noteTooltip) ?>"
+                     data-notes="<?= htmlspecialchars((string)($p['notes'] ?? ''), ENT_QUOTES) ?>"
                      title="<?= htmlspecialchars($noteTooltip) ?>"></i>
                 <?php endif; ?>
               </td>
@@ -315,10 +317,12 @@ ob_start();
                 <td>
                   <?= htmlspecialchars((string)$p['status']) ?>
                   <?php if ($noteTooltip !== ''): ?>
-                    <i class="bi bi-chat-left-text ms-1 text-muted"
-                       style="cursor:help"
+                    <i class="bi bi-chat-left-text ms-1 text-muted js-piece-notes"
+                       style="cursor:pointer"
                        data-bs-toggle="tooltip"
+                       data-bs-container="body"
                        data-bs-title="<?= htmlspecialchars($noteTooltip) ?>"
+                       data-notes="<?= htmlspecialchars((string)($p['notes'] ?? ''), ENT_QUOTES) ?>"
                        title="<?= htmlspecialchars($noteTooltip) ?>"></i>
                   <?php endif; ?>
                 </td>
