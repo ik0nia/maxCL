@@ -70,7 +70,7 @@ ob_start();
     </thead>
     <tbody>
       <?php foreach ($rows as $r): ?>
-        <tr>
+        <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/projects/' . (int)$r['id'])) ?>" role="button" tabindex="0">
           <td class="fw-semibold"><?= htmlspecialchars((string)($r['code'] ?? '')) ?></td>
           <td><?= htmlspecialchars((string)($r['name'] ?? '')) ?></td>
           <td class="text-muted">
@@ -110,6 +110,23 @@ ob_start();
         }
       });
     }
+
+    // Click oriunde pe rând -> intră în proiect (fără să strice butoanele/link-urile).
+    document.querySelectorAll('tr.js-row-link[data-href]').forEach(function (tr) {
+      function go(e) {
+        const t = (e && e.target) ? e.target : null;
+        if (t && t.closest && t.closest('a,button,input,select,textarea,label,form')) return;
+        const href = tr.getAttribute('data-href');
+        if (href) window.location.href = href;
+      }
+      tr.addEventListener('click', go);
+      tr.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          go(e);
+        }
+      });
+    });
   });
 </script>
 <?php
