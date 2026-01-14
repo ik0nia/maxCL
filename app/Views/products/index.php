@@ -50,9 +50,9 @@ ob_start();
     </thead>
     <tbody>
       <?php foreach ($rows as $r): ?>
-        <tr>
+        <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0) . '?tab=products')) ?>" role="button" tabindex="0">
           <td>
-            <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0))) ?>">
+            <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0) . '?tab=products')) ?>">
               <?= htmlspecialchars((string)($r['project_name'] ?? '')) ?>
             </a>
             <div class="text-muted small"><?= htmlspecialchars((string)($r['project_status'] ?? '')) ?></div>
@@ -85,6 +85,23 @@ ob_start();
         }
       });
     }
+
+    // Click oriunde pe rând -> intră în Proiect -> tab Produse (fără să strice link-urile).
+    document.querySelectorAll('#productsTable tbody tr.js-row-link[data-href]').forEach(function (tr) {
+      function go(e) {
+        const t = (e && e.target) ? e.target : null;
+        if (t && t.closest && t.closest('a,button,input,select,textarea,label,form')) return;
+        const href = tr.getAttribute('data-href');
+        if (href) window.location.href = href;
+      }
+      tr.addEventListener('click', go);
+      tr.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          go(e);
+        }
+      });
+    });
   });
 </script>
 <?php
