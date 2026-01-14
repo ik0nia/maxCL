@@ -32,6 +32,13 @@ function _statusLabel(string $s): string {
   };
 }
 
+function _ratioLabel(?float $pct): string {
+  if ($pct === null) return '—';
+  if ($pct <= 0) return '<1% din standard';
+  if ($pct < 1) return '<1% din standard';
+  return number_format($pct, 0, '.', '') . '% din standard';
+}
+
 ob_start();
 ?>
 <div class="app-page-title">
@@ -140,13 +147,13 @@ ob_start();
           <div class="d-flex justify-content-between align-items-start gap-2">
             <div class="offcut-badges">
               <span class="badge <?= $isInternal ? 'text-bg-secondary' : 'text-bg-success' ?>">
-                <?= $isInternal ? 'Intern' : 'Stocabil' ?>
+                <?= $isInternal ? 'Rest intern' : 'Contabil (stocabil)' ?>
               </span>
               <span class="badge text-bg-light"><?= htmlspecialchars(_statusLabel($status)) ?></span>
               <span class="badge text-bg-light"><?= htmlspecialchars($location) ?></span>
             </div>
-            <div class="text-muted small text-end">
-              <?= $ratioPct !== null ? number_format($ratioPct, 0, '.', '') . '%' : '—' ?>
+            <div class="text-muted small text-end" title="Suprafață piesă raportată la placa standard">
+              <?= htmlspecialchars(_ratioLabel($ratioPct !== null ? (float)$ratioPct : null)) ?>
             </div>
           </div>
 
@@ -165,12 +172,16 @@ ob_start();
                 <div class="text-center">
                   <img src="<?= htmlspecialchars($fThumb) ?>" alt="">
                   <div class="lbl mt-1"><?= htmlspecialchars($fCode !== '' ? $fCode : '—') ?></div>
-                  <div class="offcut-sub"><?= htmlspecialchars($fTex !== '' ? $fTex : '—') ?></div>
+                  <div class="offcut-sub">
+                    <?= htmlspecialchars($fTex !== '' ? ('Textură: ' . $fTex) : 'Textură: —') ?>
+                  </div>
                 </div>
                 <div class="text-center">
                   <img src="<?= htmlspecialchars($bThumb) ?>" alt="">
                   <div class="lbl mt-1"><?= htmlspecialchars($bCode !== '' ? $bCode : '—') ?></div>
-                  <div class="offcut-sub"><?= htmlspecialchars($bTex !== '' ? $bTex : '—') ?></div>
+                  <div class="offcut-sub">
+                    <?= htmlspecialchars($bTex !== '' ? ('Textură: ' . $bTex) : 'Textură: —') ?>
+                  </div>
                 </div>
               </div>
             </div>
