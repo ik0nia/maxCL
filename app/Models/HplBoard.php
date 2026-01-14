@@ -87,7 +87,34 @@ final class HplBoard
             : "NULL AS face_texture_name,
                NULL AS back_texture_name,";
 
-        $sql = "
+        // IMPORTANT: ignorăm piesele interne (nestocabile) din totaluri, dacă există coloana is_accounting.
+        $sqlWithAccounting = "
+            SELECT
+              b.*,
+              fc.color_name AS face_color_name,
+              fc.code AS face_color_code,
+              fc.thumb_path AS face_thumb_path,
+              fc.image_path AS face_image_path,
+              $selTextures
+              bc.color_name AS back_color_name,
+              bc.code AS back_color_code,
+              bc.thumb_path AS back_thumb_path,
+              bc.image_path AS back_image_path,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS stock_qty_available,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' AND sp.piece_type='FULL' THEN sp.qty ELSE 0 END),0) AS stock_qty_full_available,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' AND sp.piece_type='OFFCUT' THEN sp.qty ELSE 0 END),0) AS stock_qty_offcut_available,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS stock_m2_available
+            FROM hpl_boards b
+            JOIN finishes fc ON fc.id = b.face_color_id
+            LEFT JOIN finishes bc ON bc.id = b.back_color_id
+            $joinTextures
+            LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+            $where
+            GROUP BY b.id
+            ORDER BY b.brand ASC, b.name ASC
+        ";
+
+        $sqlNoAccounting = "
             SELECT
               b.*,
               fc.color_name AS face_color_name,
@@ -112,9 +139,72 @@ final class HplBoard
             GROUP BY b.id
             ORDER BY b.brand ASC, b.name ASC
         ";
+
+        try {
+            $st = $pdo->prepare($sqlWithAccounting);
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            // Compat: dacă încă nu există coloana, nu blocăm.
+            if (!self::isUnknownColumn($e, 'is_accounting')) {
+                throw $e;
+            }
+            $st = $pdo->prepare($sqlNoAccounting);
+            $st->execute($params);
+            return $st->fetchAll();
+        }
+    }
+
+    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int}> */
+    public static function searchForSelect(?string $q, int $limit = 25): array
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $q = $q !== null ? trim($q) : '';
+        if ($limit < 1) $limit = 1;
+        if ($limit > 200) $limit = 200;
+
+        $where = '';
+        $params = [];
+        if ($q !== '') {
+            $like = '%' . $q . '%';
+            $where = 'WHERE (code LIKE ? OR name LIKE ? OR brand LIKE ?)';
+            $params = [$like, $like, $like];
+        }
+
+        $sql = "
+            SELECT id, code, name, brand, thickness_mm, std_width_mm, std_height_mm
+            FROM hpl_boards
+            $where
+            ORDER BY code ASC
+            LIMIT $limit
+        ";
         $st = $pdo->prepare($sql);
         $st->execute($params);
-        return $st->fetchAll();
+        $rows = $st->fetchAll();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int)$r['id'];
+            $code = (string)($r['code'] ?? '');
+            $name = (string)($r['name'] ?? '');
+            $brand = (string)($r['brand'] ?? '');
+            $th = (int)($r['thickness_mm'] ?? 0);
+            $w = (int)($r['std_width_mm'] ?? 0);
+            $h = (int)($r['std_height_mm'] ?? 0);
+            $text = trim($code . ' · ' . $name . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
+            $out[] = [
+                'id' => $id,
+                'text' => $text,
+                'code' => $code,
+                'name' => $name,
+                'brand' => $brand,
+                'thickness_mm' => $th,
+                'std_width_mm' => $w,
+                'std_height_mm' => $h,
+            ];
+        }
+        return $out;
     }
 
     /** @return array<int,int> */

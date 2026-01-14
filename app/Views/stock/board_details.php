@@ -8,6 +8,7 @@ use App\Models\Texture;
 
 $board = $board ?? [];
 $pieces = $pieces ?? [];
+$internalPieces = $internalPieces ?? [];
 $history = $history ?? [];
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
@@ -265,6 +266,43 @@ ob_start();
           <?php endforeach; ?>
         </tbody>
       </table>
+    </div>
+
+    <div class="card app-card p-3 mt-3">
+      <div class="h5 m-0">Piese interne (nestocabile)</div>
+      <div class="text-muted">Uz intern · nu intră în totalurile stocului / valoare / mp disponibil</div>
+      <?php if (!$internalPieces): ?>
+        <div class="text-muted mt-2">Nu există piese interne încă.</div>
+      <?php else: ?>
+        <table class="table table-hover align-middle mb-0 mt-2">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Dimensiuni</th>
+              <th class="text-end">Buc</th>
+              <th>Locație</th>
+              <th class="text-end">mp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($internalPieces as $p): ?>
+              <tr>
+                <td><?= htmlspecialchars((string)$p['status']) ?></td>
+                <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
+                <td class="text-end"><?= (int)$p['qty'] ?></td>
+                <td><?= htmlspecialchars((string)$p['location']) ?></td>
+                <td class="text-end fw-semibold"><?= number_format((float)$p['area_total_m2'], 2, '.', '') ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
+
+      <div class="mt-2">
+        <a class="btn btn-outline-secondary w-100" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
+          <i class="bi bi-plus-lg me-1"></i> Adaugă piese interne (nestocabile)
+        </a>
+      </div>
     </div>
 
     <?php if ($canMove): ?>

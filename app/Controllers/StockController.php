@@ -378,7 +378,8 @@ final class StockController
                 Session::flash('toast_error', 'Placă inexistentă.');
                 Response::redirect('/stock');
             }
-            $pieces = HplStockPiece::forBoard($id);
+            $pieces = HplStockPiece::forBoard($id, true); // doar piese "în contabilitate"
+            $internalPieces = HplStockPiece::forBoard($id, false); // piese interne (nestocabile)
             $history = [];
             try {
                 $history = AuditLog::forBoard($id, 120);
@@ -389,6 +390,7 @@ final class StockController
                 'title' => 'Stoc · Placă',
                 'board' => $board,
                 'pieces' => $pieces,
+                'internalPieces' => $internalPieces,
                 'history' => $history,
             ]);
         } catch (\Throwable $e) {
@@ -475,7 +477,8 @@ final class StockController
                 (string)$data['status'],
                 (int)$data['width_mm'],
                 (int)$data['height_mm'],
-                (string)$data['location']
+                (string)$data['location'],
+                1
             );
             if ($existing) {
                 $before = $existing;
@@ -607,6 +610,7 @@ final class StockController
                 (int)$from['width_mm'],
                 (int)$from['height_mm'],
                 $toLocation,
+                1,
                 (int)$from['id']
             );
 

@@ -9,13 +9,30 @@ use PDO;
 final class HplStockPiece
 {
     /** @return array<int, array<string,mixed>> */
-    public static function forBoard(int $boardId): array
+    public static function forBoard(int $boardId, ?bool $isAccounting = null): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('SELECT * FROM hpl_stock_pieces WHERE board_id = ? ORDER BY created_at DESC');
-        $st->execute([$boardId]);
-        return $st->fetchAll();
+        if ($isAccounting === null) {
+            $st = $pdo->prepare('SELECT * FROM hpl_stock_pieces WHERE board_id = ? ORDER BY created_at DESC');
+            $st->execute([$boardId]);
+            return $st->fetchAll();
+        }
+
+        // Compat: dacă nu există coloana is_accounting încă, returnăm tot.
+        try {
+            if ($isAccounting) {
+                $st = $pdo->prepare('SELECT * FROM hpl_stock_pieces WHERE board_id = ? AND (is_accounting = 1 OR is_accounting IS NULL) ORDER BY created_at DESC');
+            } else {
+                $st = $pdo->prepare('SELECT * FROM hpl_stock_pieces WHERE board_id = ? AND is_accounting = 0 ORDER BY created_at DESC');
+            }
+            $st->execute([$boardId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            $st = $pdo->prepare('SELECT * FROM hpl_stock_pieces WHERE board_id = ? ORDER BY created_at DESC');
+            $st->execute([$boardId]);
+            return $st->fetchAll();
+        }
     }
 
     public static function find(int $id): ?array
@@ -28,14 +45,37 @@ final class HplStockPiece
         return $r ?: null;
     }
 
-    public static function countForBoard(int $boardId): int
+    public static function countForBoard(int $boardId, ?bool $isAccounting = null): int
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('SELECT COUNT(*) AS c FROM hpl_stock_pieces WHERE board_id = ?');
-        $st->execute([$boardId]);
-        $r = $st->fetch();
-        return (int)($r['c'] ?? 0);
+        if ($isAccounting === null) {
+            $st = $pdo->prepare('SELECT COUNT(*) AS c FROM hpl_stock_pieces WHERE board_id = ?');
+            $st->execute([$boardId]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        }
+        try {
+            if ($isAccounting) {
+                $st = $pdo->prepare('SELECT COUNT(*) AS c FROM hpl_stock_pieces WHERE board_id = ? AND (is_accounting = 1 OR is_accounting IS NULL)');
+            } else {
+                $st = $pdo->prepare('SELECT COUNT(*) AS c FROM hpl_stock_pieces WHERE board_id = ? AND is_accounting = 0');
+            }
+            $st->execute([$boardId]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        } catch (\Throwable $e) {
+            $st = $pdo->prepare('SELECT COUNT(*) AS c FROM hpl_stock_pieces WHERE board_id = ?');
+            $st->execute([$boardId]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        }
+    }
+
+    private static function isUnknownColumn(\Throwable $e, string $col): bool
+    {
+        $m = strtolower($e->getMessage());
+        return str_contains($m, 'unknown column') && str_contains($m, strtolower($col));
     }
 
     /** @param array<string,mixed> $data */
@@ -43,20 +83,43 @@ final class HplStockPiece
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare(
-            'INSERT INTO hpl_stock_pieces (board_id, piece_type, status, width_mm, height_mm, qty, location, notes)
-             VALUES (:board_id,:piece_type,:status,:width_mm,:height_mm,:qty,:location,:notes)'
-        );
-        $st->execute([
-            ':board_id' => (int)$data['board_id'],
-            ':piece_type' => $data['piece_type'],
-            ':status' => $data['status'],
-            ':width_mm' => (int)$data['width_mm'],
-            ':height_mm' => (int)$data['height_mm'],
-            ':qty' => (int)$data['qty'],
-            ':location' => $data['location'] ?? '',
-            ':notes' => $data['notes'] ?: null,
-        ]);
+        $isAccounting = array_key_exists('is_accounting', $data) ? (int)$data['is_accounting'] : 1;
+        try {
+            $st = $pdo->prepare(
+                'INSERT INTO hpl_stock_pieces (board_id, is_accounting, piece_type, status, width_mm, height_mm, qty, location, notes)
+                 VALUES (:board_id,:is_accounting,:piece_type,:status,:width_mm,:height_mm,:qty,:location,:notes)'
+            );
+            $st->execute([
+                ':board_id' => (int)$data['board_id'],
+                ':is_accounting' => $isAccounting,
+                ':piece_type' => $data['piece_type'],
+                ':status' => $data['status'],
+                ':width_mm' => (int)$data['width_mm'],
+                ':height_mm' => (int)$data['height_mm'],
+                ':qty' => (int)$data['qty'],
+                ':location' => $data['location'] ?? '',
+                ':notes' => $data['notes'] ?: null,
+            ]);
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'is_accounting')) {
+                throw $e;
+            }
+            // Compat: vechi schema fără is_accounting
+            $st = $pdo->prepare(
+                'INSERT INTO hpl_stock_pieces (board_id, piece_type, status, width_mm, height_mm, qty, location, notes)
+                 VALUES (:board_id,:piece_type,:status,:width_mm,:height_mm,:qty,:location,:notes)'
+            );
+            $st->execute([
+                ':board_id' => (int)$data['board_id'],
+                ':piece_type' => $data['piece_type'],
+                ':status' => $data['status'],
+                ':width_mm' => (int)$data['width_mm'],
+                ':height_mm' => (int)$data['height_mm'],
+                ':qty' => (int)$data['qty'],
+                ':location' => $data['location'] ?? '',
+                ':notes' => $data['notes'] ?: null,
+            ]);
+        }
         return (int)$pdo->lastInsertId();
     }
 
@@ -71,12 +134,17 @@ final class HplStockPiece
         int $widthMm,
         int $heightMm,
         string $location,
+        int $isAccounting = 1,
         ?int $excludeId = null
     ): ?array {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        $accCond = ($isAccounting === 1)
+            ? '(is_accounting = 1 OR is_accounting IS NULL)' // vechi schema => NULL tratat ca "în contabilitate"
+            : 'is_accounting = 0';
         $sql = 'SELECT * FROM hpl_stock_pieces
                 WHERE board_id = ?
+                  AND ' . $accCond . '
                   AND piece_type = ?
                   AND status = ?
                   AND width_mm = ?
@@ -88,10 +156,34 @@ final class HplStockPiece
             $params[] = $excludeId;
         }
         $sql .= ' LIMIT 1';
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        $r = $st->fetch();
-        return $r ?: null;
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $r = $st->fetch();
+            return $r ?: null;
+        } catch (\Throwable $e) {
+            // Compat: vechi schema fără is_accounting -> căutăm fără filtrare
+            if (!self::isUnknownColumn($e, 'is_accounting')) {
+                throw $e;
+            }
+            $sql2 = 'SELECT * FROM hpl_stock_pieces
+                     WHERE board_id = ?
+                       AND piece_type = ?
+                       AND status = ?
+                       AND width_mm = ?
+                       AND height_mm = ?
+                       AND location = ?';
+            $params2 = [$boardId, $pieceType, $status, $widthMm, $heightMm, $location];
+            if ($excludeId !== null && $excludeId > 0) {
+                $sql2 .= ' AND id <> ?';
+                $params2[] = $excludeId;
+            }
+            $sql2 .= ' LIMIT 1';
+            $st = $pdo->prepare($sql2);
+            $st->execute($params2);
+            $r = $st->fetch();
+            return $r ?: null;
+        }
     }
 
     public static function delete(int $id): void

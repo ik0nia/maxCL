@@ -17,11 +17,13 @@ use App\Controllers\Catalog\VariantsController;
 use App\Controllers\StockController;
 use App\Controllers\Hpl\InlineTexturesController;
 use App\Controllers\Hpl\CatalogController as HplCatalogController;
+use App\Controllers\Hpl\InternalPiecesController as HplInternalPiecesController;
 use App\Controllers\DashboardController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
+use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\System\DbUpdateController;
 
 require __DIR__ . '/../vendor_stub.php';
@@ -146,6 +148,10 @@ $hplReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::R
 $router->get('/hpl/catalog', fn() => HplCatalogController::index(), $hplReadMW);
 $router->get('/api/hpl/catalog', fn() => HplCatalogController::apiGrid(), $hplReadMW);
 
+// Plăci HPL: Adăugare plăci mici (nestocabile)
+$router->get('/hpl/piese-interne', fn() => HplInternalPiecesController::index(), $hplReadMW);
+$router->post('/hpl/piese-interne/create', fn() => HplInternalPiecesController::create(), $hplReadMW);
+
 // Plăci HPL: Tip culoare (folosește tabela finishes, dar fără texturi)
 $router->get('/hpl/tip-culoare', fn() => FinishesController::index(), $catalogMW);
 $router->get('/hpl/tip-culoare/create', fn() => FinishesController::createForm(), $catalogMW);
@@ -223,6 +229,7 @@ $router->get('/api/health', function () {
 });
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
+$router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);
 
 $router->get('/system/db-update', fn() => DbUpdateController::index(), [Auth::requireLogin()]);
 $router->post('/system/db-update/run', fn() => DbUpdateController::runNow(), [Auth::requireLogin()]);

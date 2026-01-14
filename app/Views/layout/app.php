@@ -86,6 +86,14 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= str_starts_with($p, '/stock') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
           <i class="bi bi-box-seam me-2"></i> Stoc
         </a>
+        <?php
+          $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        ?>
+        <?php if ($canInternal): ?>
+          <a class="app-nav-link <?= str_starts_with($p, '/hpl/piese-interne') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
+            <i class="bi bi-scissors me-2"></i> Adăugare plăci mici (nestocabile)
+          </a>
+        <?php endif; ?>
 
         <div class="app-nav-section">Sistem</div>
         <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">

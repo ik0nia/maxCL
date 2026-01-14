@@ -159,6 +159,7 @@ final class DbMigrations
                         CREATE TABLE hpl_stock_pieces (
                           id INT UNSIGNED NOT NULL AUTO_INCREMENT,
                           board_id INT UNSIGNED NOT NULL,
+                          is_accounting TINYINT(1) NOT NULL DEFAULT 1,
                           piece_type ENUM('FULL','OFFCUT') NOT NULL,
                           status ENUM('AVAILABLE','RESERVED','CONSUMED','SCRAP') NOT NULL DEFAULT 'AVAILABLE',
                           width_mm INT NOT NULL,
@@ -172,12 +173,29 @@ final class DbMigrations
                           area_total_m2 DECIMAL(12,4) AS (((width_mm * height_mm) / 1000000.0) * qty) STORED,
                           PRIMARY KEY (id),
                           KEY idx_hpl_stock_board (board_id),
+                          KEY idx_hpl_stock_accounting (is_accounting),
                           KEY idx_hpl_stock_status (status),
                           KEY idx_hpl_stock_piece_type (piece_type),
                           KEY idx_hpl_stock_location (location),
                           CONSTRAINT fk_hpl_stock_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     ");
+                },
+            ],
+            [
+                'id' => '2026-01-14_01_add_hpl_stock_pieces_is_accounting',
+                'label' => 'ALTER TABLE hpl_stock_pieces ADD is_accounting',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'hpl_stock_pieces')) return;
+                    if (!self::columnExists($pdo, 'hpl_stock_pieces', 'is_accounting')) {
+                        $pdo->exec("ALTER TABLE hpl_stock_pieces ADD COLUMN is_accounting TINYINT(1) NOT NULL DEFAULT 1");
+                    }
+                    // index best-effort
+                    try {
+                        $pdo->exec("ALTER TABLE hpl_stock_pieces ADD INDEX idx_hpl_stock_accounting (is_accounting)");
+                    } catch (\Throwable $e) {
+                        // ignore (poate exista deja)
+                    }
                 },
             ],
             [

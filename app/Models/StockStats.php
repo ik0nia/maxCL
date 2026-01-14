@@ -8,12 +8,35 @@ use PDO;
 
 final class StockStats
 {
+    private static function hasAccountingColumn(): bool
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        try {
+            $st = $pdo->prepare("SHOW COLUMNS FROM hpl_stock_pieces LIKE ?");
+            $st->execute(['is_accounting']);
+            return (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /** @return array<int, array{thickness_mm:int, qty:int, m2:float}> */
     public static function availableByThickness(): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $sql = "
+        $hasAcc = self::hasAccountingColumn();
+        $sql = $hasAcc ? "
+            SELECT
+              b.thickness_mm AS thickness_mm,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS m2
+            FROM hpl_boards b
+            LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+            GROUP BY b.thickness_mm
+            ORDER BY b.thickness_mm ASC
+        " : "
             SELECT
               b.thickness_mm AS thickness_mm,
               COALESCE(SUM(CASE WHEN sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty,
@@ -56,6 +79,7 @@ final class StockStats
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        $hasAcc = self::hasAccountingColumn();
         $q = $q !== null ? trim($q) : null;
         $where = '';
         $params = [];
@@ -68,7 +92,23 @@ final class StockStats
             $params[':q3'] = $like;
         }
 
-        $sql = "
+        $sql = $hasAcc ? "
+            SELECT
+              b.face_color_id AS face_color_id,
+              f.color_name AS color_name,
+              f.code AS color_code,
+              f.thumb_path AS thumb_path,
+              f.image_path AS image_path,
+              b.thickness_mm AS thickness_mm,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty,
+              COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS m2
+            FROM hpl_boards b
+            JOIN finishes f ON f.id = b.face_color_id
+            LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+            $where
+            GROUP BY b.face_color_id, b.thickness_mm
+            ORDER BY m2 DESC
+        " : "
             SELECT
               b.face_color_id AS face_color_id,
               f.color_name AS color_name,
@@ -129,6 +169,7 @@ final class StockStats
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        $hasAcc = self::hasAccountingColumn();
         $q = $q !== null ? trim($q) : null;
         $where = '';
         $params = [];
@@ -141,7 +182,43 @@ final class StockStats
             $params[':q3'] = $like;
         }
 
-        $sql = "
+        $sql = $hasAcc ? "
+            SELECT
+              x.color_id AS face_color_id,
+              f.color_name AS color_name,
+              f.code AS color_code,
+              f.thumb_path AS thumb_path,
+              f.image_path AS image_path,
+              x.thickness_mm AS thickness_mm,
+              COALESCE(SUM(x.qty),0) AS qty,
+              COALESCE(SUM(x.m2),0) AS m2
+            FROM (
+              SELECT
+                b.face_color_id AS color_id,
+                b.thickness_mm AS thickness_mm,
+                COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty,
+                COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS m2
+              FROM hpl_boards b
+              LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+              GROUP BY b.face_color_id, b.thickness_mm
+
+              UNION ALL
+
+              SELECT
+                b.back_color_id AS color_id,
+                b.thickness_mm AS thickness_mm,
+                COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.qty ELSE 0 END),0) AS qty,
+                COALESCE(SUM(CASE WHEN sp.is_accounting=1 AND sp.status='AVAILABLE' THEN sp.area_total_m2 ELSE 0 END),0) AS m2
+              FROM hpl_boards b
+              LEFT JOIN hpl_stock_pieces sp ON sp.board_id = b.id
+              WHERE b.back_color_id IS NOT NULL AND b.back_color_id <> b.face_color_id
+              GROUP BY b.back_color_id, b.thickness_mm
+            ) x
+            JOIN finishes f ON f.id = x.color_id
+            $where
+            GROUP BY x.color_id, x.thickness_mm
+            ORDER BY m2 DESC
+        " : "
             SELECT
               x.color_id AS face_color_id,
               f.color_name AS color_name,
