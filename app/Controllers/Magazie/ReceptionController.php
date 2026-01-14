@@ -48,7 +48,7 @@ final class ReceptionController
             $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro');
             $msg = 'Recepția nu este disponibilă momentan. Rulează Update DB ca să creezi tabelele necesare.';
             if ($debug) {
-                $msg .= ' Eroare: ' . $e->getMessage();
+                $msg .= ' Eroare: ' . get_class($e) . ' · ' . $e->getMessage() . ' · ' . basename((string)$e->getFile()) . ':' . (int)$e->getLine();
             }
             echo View::render('system/placeholder', [
                 'title' => 'Recepție marfă',
