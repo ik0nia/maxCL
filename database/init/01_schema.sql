@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS hpl_boards (
 CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   board_id INT UNSIGNED NOT NULL,
+  -- 1 = intră în contabilitate / totaluri stoc; 0 = piese interne (nestocabile), nu intră în totaluri
+  is_accounting TINYINT(1) NOT NULL DEFAULT 1,
   piece_type ENUM('FULL','OFFCUT') NOT NULL,
   status ENUM('AVAILABLE','RESERVED','CONSUMED','SCRAP') NOT NULL DEFAULT 'AVAILABLE',
   width_mm INT NOT NULL,
@@ -100,6 +102,7 @@ CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   area_total_m2 DECIMAL(12,4) AS (((width_mm * height_mm) / 1000000.0) * qty) STORED,
   PRIMARY KEY (id),
   KEY idx_hpl_stock_board (board_id),
+  KEY idx_hpl_stock_accounting (is_accounting),
   KEY idx_hpl_stock_status (status),
   KEY idx_hpl_stock_piece_type (piece_type),
   KEY idx_hpl_stock_location (location),
