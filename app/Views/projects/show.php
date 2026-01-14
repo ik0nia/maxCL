@@ -400,12 +400,12 @@ ob_start();
               <input class="form-control" name="unit" value="buc">
             </div>
             <div class="col-6">
-              <label class="form-label fw-semibold">Lățime (mm)</label>
-              <input class="form-control" type="number" name="width_mm" min="1">
-            </div>
-            <div class="col-6">
               <label class="form-label fw-semibold">Lungime (mm)</label>
               <input class="form-control" type="number" name="height_mm" min="1">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Lățime (mm)</label>
+              <input class="form-control" type="number" name="width_mm" min="1">
             </div>
             <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-primary" type="submit">
