@@ -35,6 +35,18 @@
     });
   }
 
+  // Bootstrap tooltips (global)
+  try {
+    if (window.bootstrap && window.bootstrap.Tooltip) {
+      const tooltipTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.forEach(function (el) {
+        window.bootstrap.Tooltip.getOrCreateInstance(el);
+      });
+    }
+  } catch (e) {
+    // ignore
+  }
+
   // Lightbox: click on elements with data-lightbox-src
   function ensureLightbox() {
     let modalEl = document.getElementById('appLightbox');

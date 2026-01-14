@@ -244,9 +244,26 @@ ob_start();
         </thead>
         <tbody>
           <?php foreach ($pieces as $p): ?>
+            <?php
+              $noteRaw = trim((string)($p['notes'] ?? ''));
+              $noteTooltip = '';
+              if ($noteRaw !== '') {
+                $noteTooltip = preg_replace('/\s+/u', ' ', $noteRaw) ?: $noteRaw;
+                $noteTooltip = mb_substr((string)$noteTooltip, 0, 400);
+              }
+            ?>
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
-              <td><?= htmlspecialchars((string)$p['status']) ?></td>
+              <td>
+                <?= htmlspecialchars((string)$p['status']) ?>
+                <?php if ($noteTooltip !== ''): ?>
+                  <i class="bi bi-chat-left-text ms-1 text-muted"
+                     style="cursor:help"
+                     data-bs-toggle="tooltip"
+                     data-bs-title="<?= htmlspecialchars($noteTooltip) ?>"
+                     title="<?= htmlspecialchars($noteTooltip) ?>"></i>
+                <?php endif; ?>
+              </td>
               <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
               <td class="text-end"><?= (int)$p['qty'] ?></td>
               <td><?= htmlspecialchars((string)$p['location']) ?></td>
@@ -286,8 +303,25 @@ ob_start();
           </thead>
           <tbody>
             <?php foreach ($internalPieces as $p): ?>
+              <?php
+                $noteRaw = trim((string)($p['notes'] ?? ''));
+                $noteTooltip = '';
+                if ($noteRaw !== '') {
+                  $noteTooltip = preg_replace('/\s+/u', ' ', $noteRaw) ?: $noteRaw;
+                  $noteTooltip = mb_substr((string)$noteTooltip, 0, 400);
+                }
+              ?>
               <tr>
-                <td><?= htmlspecialchars((string)$p['status']) ?></td>
+                <td>
+                  <?= htmlspecialchars((string)$p['status']) ?>
+                  <?php if ($noteTooltip !== ''): ?>
+                    <i class="bi bi-chat-left-text ms-1 text-muted"
+                       style="cursor:help"
+                       data-bs-toggle="tooltip"
+                       data-bs-title="<?= htmlspecialchars($noteTooltip) ?>"
+                       title="<?= htmlspecialchars($noteTooltip) ?>"></i>
+                  <?php endif; ?>
+                </td>
                 <td><?= (int)$p['height_mm'] ?> × <?= (int)$p['width_mm'] ?> mm</td>
                 <td class="text-end"><?= (int)$p['qty'] ?></td>
                 <td><?= htmlspecialchars((string)$p['location']) ?></td>
