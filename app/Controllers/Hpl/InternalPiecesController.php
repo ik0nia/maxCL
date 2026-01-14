@@ -23,8 +23,15 @@ final class InternalPiecesController
 
     public static function index(): void
     {
+        $boards = [];
+        try {
+            $boards = HplBoard::allWithTotals(null, null);
+        } catch (\Throwable $e) {
+            $boards = [];
+        }
         echo View::render('hpl/internal_pieces/index', [
             'title' => 'Adăugare plăci mici (nestocabile)',
+            'boards' => $boards,
         ]);
     }
 
