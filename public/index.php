@@ -247,6 +247,8 @@ $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::
 $router->post('/projects/{id}/deliveries/create', fn($p) => ProjectsController::createDelivery($p), $projectsWriteMW);
 $router->post('/projects/{id}/files/upload', fn($p) => ProjectsController::uploadProjectFile($p), $projectsWriteMW);
 $router->post('/projects/{id}/files/{fileId}/delete', fn($p) => ProjectsController::deleteProjectFile($p), $projectsWriteMW);
+$router->post('/projects/{id}/hours/create', fn($p) => ProjectsController::addWorkLog($p), $projectsWriteMW);
+$router->post('/projects/{id}/hours/{workId}/delete', fn($p) => ProjectsController::deleteWorkLog($p), $projectsWriteMW);
 
 $router->get('/products', fn() => ProductsController::index(), $projectsReadMW);
 

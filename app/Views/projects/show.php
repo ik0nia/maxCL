@@ -19,6 +19,7 @@ $magazieItems = $magazieItems ?? [];
 $deliveries = $deliveries ?? [];
 $deliveryItems = $deliveryItems ?? [];
 $projectFiles = $projectFiles ?? [];
+$workLogs = $workLogs ?? [];
 $statuses = $statuses ?? [];
 $allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
@@ -779,6 +780,141 @@ ob_start();
                 <?php endif; ?>
               </div>
             <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php elseif ($tab === 'hours'): ?>
+  <?php
+    $totEst = 0.0;
+    $totAct = 0.0;
+    foreach ($workLogs as $w) {
+      $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
+      $ha = isset($w['hours_actual']) && $w['hours_actual'] !== null && $w['hours_actual'] !== '' ? (float)$w['hours_actual'] : 0.0;
+      $totEst += $he;
+      $totAct += $ha;
+    }
+  ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Adaugă ore</div>
+        <div class="text-muted">CNC / Atelier (estimate + reale)</div>
+
+        <?php if (!$canWrite): ?>
+          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
+        <?php else: ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hours/create')) ?>" class="row g-2 mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Tip</label>
+              <select class="form-select" name="work_type">
+                <option value="CNC">CNC</option>
+                <option value="ATELIER">Atelier</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Produs (opțional)</label>
+              <select class="form-select" name="project_product_id">
+                <option value="">—</option>
+                <?php foreach ($projectProducts as $pp): ?>
+                  <option value="<?= (int)($pp['id'] ?? 0) ?>"><?= htmlspecialchars((string)($pp['product_name'] ?? '')) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Ore estimate</label>
+              <input class="form-control" type="number" step="0.01" min="0" name="hours_estimated">
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Ore reale</label>
+              <input class="form-control" type="number" step="0.01" min="0" name="hours_actual">
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Cost/oră</label>
+              <input class="form-control" type="number" step="0.01" min="0" name="cost_per_hour">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Notă</label>
+              <input class="form-control" name="note" maxlength="255">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă
+              </button>
+            </div>
+          </form>
+        <?php endif; ?>
+      </div>
+
+      <div class="card app-card p-3 mt-3">
+        <div class="h5 m-0">Total</div>
+        <div class="text-muted">Sumar ore pe proiect</div>
+        <div class="d-flex justify-content-between mt-2">
+          <div class="text-muted">Estimate</div>
+          <div class="fw-semibold"><?= number_format($totEst, 2, '.', '') ?> h</div>
+        </div>
+        <div class="d-flex justify-content-between mt-2">
+          <div class="text-muted">Reale</div>
+          <div class="fw-semibold"><?= number_format($totAct, 2, '.', '') ?> h</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Istoric ore</div>
+        <div class="text-muted">Toate modificările sunt logate</div>
+
+        <?php if (!$workLogs): ?>
+          <div class="text-muted mt-2">Nu există înregistrări încă.</div>
+        <?php else: ?>
+          <div class="table-responsive mt-2">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Dată</th>
+                  <th>Tip</th>
+                  <th>Produs</th>
+                  <th class="text-end">Est.</th>
+                  <th class="text-end">Real</th>
+                  <th class="text-end">Cost/oră</th>
+                  <th>Notă</th>
+                  <th class="text-end">Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($workLogs as $w): ?>
+                  <?php
+                    $wid = (int)($w['id'] ?? 0);
+                    $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : null;
+                    $ha = isset($w['hours_actual']) && $w['hours_actual'] !== null && $w['hours_actual'] !== '' ? (float)$w['hours_actual'] : null;
+                    $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
+                  ?>
+                  <tr>
+                    <td class="text-muted"><?= htmlspecialchars((string)($w['created_at'] ?? '')) ?></td>
+                    <td class="fw-semibold"><?= htmlspecialchars((string)($w['work_type'] ?? '')) ?></td>
+                    <td><?= htmlspecialchars((string)($w['product_name'] ?? '')) ?></td>
+                    <td class="text-end"><?= $he !== null ? number_format($he, 2, '.', '') : '—' ?></td>
+                    <td class="text-end"><?= $ha !== null ? number_format($ha, 2, '.', '') : '—' ?></td>
+                    <td class="text-end"><?= $cph !== null ? number_format($cph, 2, '.', '') : '—' ?></td>
+                    <td class="text-muted"><?= htmlspecialchars((string)($w['note'] ?? '')) ?></td>
+                    <td class="text-end">
+                      <?php if ($canWrite): ?>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hours/' . $wid . '/delete')) ?>" class="m-0"
+                              onsubmit="return confirm('Ștergi înregistrarea?');">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <button class="btn btn-outline-secondary btn-sm" type="submit">
+                            <i class="bi bi-trash me-1"></i> Șterge
+                          </button>
+                        </form>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
           </div>
         <?php endif; ?>
       </div>

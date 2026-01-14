@@ -24,6 +24,7 @@ use App\Models\ProjectMagazieConsumption;
 use App\Models\ProjectProduct;
 use App\Models\EntityFile;
 use App\Core\Upload;
+use App\Models\ProjectWorkLog;
 
 final class ProjectsController
 {
@@ -191,6 +192,7 @@ final class ProjectsController
         $deliveries = [];
         $deliveryItems = [];
         $projectFiles = [];
+        $workLogs = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -220,6 +222,9 @@ final class ProjectsController
         } elseif ($tab === 'files') {
             try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
             try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
+        } elseif ($tab === 'hours') {
+            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+            try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
         }
 
         echo View::render('projects/show', [
@@ -235,6 +240,7 @@ final class ProjectsController
             'deliveries' => $deliveries,
             'deliveryItems' => $deliveryItems,
             'projectFiles' => $projectFiles,
+            'workLogs' => $workLogs,
             'statuses' => self::statuses(),
             'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(),
@@ -1011,6 +1017,97 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot șterge fișierul.');
         }
         Response::redirect('/projects/' . $projectId . '?tab=files');
+    }
+
+    public static function addWorkLog(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $type = trim((string)($_POST['work_type'] ?? ''));
+        if (!in_array($type, ['CNC','ATELIER'], true)) {
+            Session::flash('toast_error', 'Tip invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=hours');
+        }
+        $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
+        $he = Validator::dec(trim((string)($_POST['hours_estimated'] ?? '')));
+        $ha = Validator::dec(trim((string)($_POST['hours_actual'] ?? '')));
+        $cph = Validator::dec(trim((string)($_POST['cost_per_hour'] ?? '')));
+        $note = trim((string)($_POST['note'] ?? ''));
+
+        if ($he !== null && $he < 0) $he = null;
+        if ($ha !== null && $ha < 0) $ha = null;
+        if ($cph !== null && $cph < 0) $cph = null;
+
+        // validate pp belongs to project if set
+        if ($ppId !== null) {
+            $pp = ProjectProduct::find($ppId);
+            if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+                Session::flash('toast_error', 'Produs proiect invalid.');
+                Response::redirect('/projects/' . $projectId . '?tab=hours');
+            }
+        }
+
+        try {
+            $wid = ProjectWorkLog::create([
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'work_type' => $type,
+                'hours_estimated' => $he,
+                'hours_actual' => $ha,
+                'cost_per_hour' => $cph,
+                'note' => $note !== '' ? $note : null,
+                'created_by' => Auth::id(),
+            ]);
+            Audit::log('PROJECT_WORK_LOG_CREATE', 'project_work_logs', $wid, null, null, [
+                'message' => 'A adăugat ore ' . $type,
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'hours_estimated' => $he,
+                'hours_actual' => $ha,
+                'cost_per_hour' => $cph,
+                'note' => $note !== '' ? $note : null,
+            ]);
+            Session::flash('toast_success', 'Înregistrare salvată.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot salva: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=hours');
+    }
+
+    public static function deleteWorkLog(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $workId = (int)($params['workId'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $before = ProjectWorkLog::find($workId);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Înregistrare inexistentă.');
+            Response::redirect('/projects/' . $projectId . '?tab=hours');
+        }
+
+        try {
+            ProjectWorkLog::delete($workId);
+            Audit::log('PROJECT_WORK_LOG_DELETE', 'project_work_logs', $workId, $before, null, [
+                'message' => 'A șters înregistrare ore.',
+                'project_id' => $projectId,
+            ]);
+            Session::flash('toast_success', 'Înregistrare ștearsă.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=hours');
     }
 }
 
