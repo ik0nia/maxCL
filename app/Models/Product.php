@@ -26,7 +26,7 @@ final class Product
             WHERE name LIKE :q OR code LIKE :q
             ORDER BY created_at DESC
             LIMIT ' . (int)$limit
-        ');
+        );
         $st->execute([':q' => $like]);
         return $st->fetchAll();
     }

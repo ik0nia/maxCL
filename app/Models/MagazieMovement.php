@@ -65,7 +65,7 @@ final class MagazieMovement
                 INNER JOIN magazie_items i ON i.id = m.item_id
                 ORDER BY m.created_at DESC, m.id DESC
                 LIMIT ' . (int)$limit
-            ');
+            );
             $st->execute();
             return $st->fetchAll();
         } catch (\Throwable $e) {
