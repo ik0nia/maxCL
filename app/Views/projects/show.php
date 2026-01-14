@@ -672,11 +672,24 @@ ob_start();
                 if (!opt.id) return opt.text;
                 const thumb = opt.thumb || null;
                 const thumbBack = opt.thumb_back || null;
-                if (!thumb && !thumbBack) return opt.text;
+                const fc = opt.face_color_code || '';
+                const bc = opt.back_color_code || '';
+                let colors = fc ? String(fc) : '';
+                if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
+
+                if (!thumb && !thumbBack && !colors) return opt.text;
                 const $row = $('<span class="s2-row"></span>');
                 if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
                 if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
-                $row.append($('<span></span>').text(opt.text || ''));
+                const $txt = $('<span></span>');
+                const safeText = String(opt.text || '');
+                if (colors) {
+                  // opt.text nu conține codurile de culoare; le afișăm bold în față.
+                  $txt.html('<strong>' + String(colors).replace(/</g,'&lt;') + '</strong> · ' + safeText.replace(/</g,'&lt;'));
+                } else {
+                  $txt.text(safeText);
+                }
+                $row.append($txt);
                 return $row;
               }
               $el.select2({

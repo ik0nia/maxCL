@@ -207,8 +207,10 @@ final class HplBoard
             $bc = (string)($r['back_color_code'] ?? '');
             $colors = $fc !== '' ? $fc : '';
             if ($bc !== '' && $bc !== $fc) $colors = $colors !== '' ? ($colors . '/' . $bc) : $bc;
-            $base = trim($code . ' · ' . $name . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
-            $text = $colors !== '' ? ($colors . ' · ' . $base) : $base;
+            // UI: în select, nu afișăm denumirea (name), doar cod + detalii.
+            $base = trim($code . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
+            // Codurile de culoare se vor afișa (și bold) în formatter-ul Select2.
+            $text = $base;
             $out[] = [
                 'id' => $id,
                 'text' => $text,
