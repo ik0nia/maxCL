@@ -14,7 +14,7 @@ final class CatalogController
     /**
      * @return array{finishes: array<int, array<string,mixed>>, stockByFinish: array<int, array<int, float>>, totalByFinish: array<int, float>}
      */
-    private static function build(?string $q): array
+    private static function build(?string $q, bool $inStockOnly): array
     {
         // Pentru catalog folosim o căutare robustă (compat hosting/DB),
         // ca să găsească inclusiv după o singură cifră în cod.
@@ -47,6 +47,13 @@ final class CatalogController
             ksort($m);
         }
 
+        if ($inStockOnly) {
+            $finishes = array_values(array_filter($finishes, function ($f) use ($tot): bool {
+                $id = (int)($f['id'] ?? 0);
+                return ($tot[$id] ?? 0.0) > 0.00001;
+            }));
+        }
+
         return [
             'finishes' => $finishes,
             'stockByFinish' => $by,
@@ -57,7 +64,7 @@ final class CatalogController
     public static function index(): void
     {
         try {
-            $data = self::build(null);
+            $data = self::build(null, false);
             echo View::render('hpl/catalog/index', [
                 'title' => 'Catalog',
                 'finishes' => $data['finishes'],
@@ -75,8 +82,9 @@ final class CatalogController
     public static function apiGrid(): void
     {
         $q = isset($_GET['q']) ? (string)$_GET['q'] : null;
+        $inStockOnly = isset($_GET['in_stock']) && (string)$_GET['in_stock'] !== '' && (string)$_GET['in_stock'] !== '0';
         try {
-            $data = self::build($q);
+            $data = self::build($q, $inStockOnly);
             $html = View::render('hpl/catalog/_grid', [
                 'finishes' => $data['finishes'],
                 'stockByFinish' => $data['stockByFinish'],

@@ -27,9 +27,15 @@ ob_start();
         <i class="bi bi-x-lg"></i>
       </button>
     </div>
-    <div class="text-muted small" id="hplCatalogLoading" style="display:none">
-      <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-      Se caută…
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" id="hplCatalogToggleInStock">
+        <label class="form-check-label" for="hplCatalogToggleInStock" style="font-weight:600;color:#5F6B72">Doar cu stoc</label>
+      </div>
+      <div class="text-muted small" id="hplCatalogLoading" style="display:none">
+        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+        Se caută…
+      </div>
     </div>
   </div>
 </div>
@@ -42,6 +48,7 @@ ob_start();
   document.addEventListener('DOMContentLoaded', function(){
     const input = document.getElementById('hplCatalogSearch');
     const clear = document.getElementById('hplCatalogClear');
+    const tStock = document.getElementById('hplCatalogToggleInStock');
     const grid = document.getElementById('hplCatalogGrid');
     const loading = document.getElementById('hplCatalogLoading');
     const endpoint = grid ? (grid.getAttribute('data-endpoint') || '') : '';
@@ -89,7 +96,8 @@ ob_start();
     async function load(q){
       setLoading(true);
       try {
-        const data = await fetchJson(endpoint, { q: q || '' });
+        const inStock = !!(tStock && tStock.checked);
+        const data = await fetchJson(endpoint, { q: q || '', in_stock: inStock ? '1' : '0' });
         if (!data || data.ok !== true) {
           const extra = data && (data.debug || data.error) ? ('<div class="text-muted small mt-1">' + String(data.debug || data.error) + '</div>') : '';
           grid.innerHTML = '<div class="text-muted">Nu am putut încărca catalogul.</div>' + extra;
@@ -105,6 +113,11 @@ ob_start();
         setLoading(false);
       }
     }
+
+    // persist toggle in localStorage (default OFF)
+    try {
+      if (tStock) tStock.checked = (localStorage.getItem('hpl_catalog_in_stock') === '1');
+    } catch (e) {}
 
     input.addEventListener('input', function(){
       const q = String(input.value || '');
@@ -122,6 +135,18 @@ ob_start();
         input.dispatchEvent(new Event('input'));
         input.focus();
       });
+    }
+
+    if (tStock) {
+      tStock.addEventListener('change', function(){
+        try { localStorage.setItem('hpl_catalog_in_stock', tStock.checked ? '1' : '0'); } catch (e) {}
+        // reload using current input
+        input.dispatchEvent(new Event('input'));
+      });
+      // if ON from localStorage, trigger first load to apply filter
+      if (tStock.checked) {
+        input.dispatchEvent(new Event('input'));
+      }
     }
   });
 </script>
