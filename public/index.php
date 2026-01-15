@@ -30,6 +30,7 @@ use App\Controllers\ProjectsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
+use App\Controllers\System\CostSettingsController;
 use App\Controllers\System\DbUpdateController;
 
 require __DIR__ . '/../vendor_stub.php';
@@ -229,6 +230,9 @@ $router->post('/users/{id}/edit', fn($p) => UsersController::update($p), $usersM
 $auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
 $router->get('/audit', fn() => AuditController::index(), $auditMW);
 $router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW);
+
+$router->get('/system/costuri', fn() => CostSettingsController::index(), $usersMW);
+$router->post('/system/costuri', fn() => CostSettingsController::save(), $usersMW);
 
 $projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];

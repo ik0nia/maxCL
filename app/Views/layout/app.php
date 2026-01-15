@@ -116,6 +116,11 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
           <i class="bi bi-person-gear me-2"></i> Utilizatori
         </a>
+        <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
+          <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
+            <i class="bi bi-cash-coin me-2"></i> Setări costuri
+          </a>
+        <?php endif; ?>
         <?php if ($user && strtolower((string)($user['email'] ?? '')) === 'sacodrut@ikonia.ro'): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/system/db-update') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/db-update')) ?>">
             <i class="bi bi-database-gear me-2"></i> Update DB

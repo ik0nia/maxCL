@@ -1205,6 +1205,8 @@ ob_start();
   <?php
     $totEst = 0.0;
     $totAct = 0.0;
+    $laborRate = isset($costSettings['labor']) && $costSettings['labor'] !== null ? (float)$costSettings['labor'] : null;
+    $cncRate = isset($costSettings['cnc']) && $costSettings['cnc'] !== null ? (float)$costSettings['cnc'] : null;
     foreach ($workLogs as $w) {
       $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
       $ha = isset($w['hours_actual']) && $w['hours_actual'] !== null && $w['hours_actual'] !== '' ? (float)$w['hours_actual'] : 0.0;
@@ -1217,6 +1219,10 @@ ob_start();
       <div class="card app-card p-3">
         <div class="h5 m-0">Adaugă ore</div>
         <div class="text-muted">CNC / Atelier (estimate + reale)</div>
+        <div class="text-muted small mt-1">
+          Costuri din Setări: CNC <strong><?= $cncRate !== null ? number_format($cncRate, 2, '.', '') : '—' ?></strong> lei/h ·
+          Manoperă <strong><?= $laborRate !== null ? number_format($laborRate, 2, '.', '') : '—' ?></strong> lei/h
+        </div>
 
         <?php if (!$canWrite): ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
@@ -1247,10 +1253,7 @@ ob_start();
               <label class="form-label fw-semibold">Ore reale</label>
               <input class="form-control" type="number" step="0.01" min="0" name="hours_actual">
             </div>
-            <div class="col-4">
-              <label class="form-label fw-semibold">Cost/oră</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="cost_per_hour">
-            </div>
+            <div class="col-4"></div>
             <div class="col-12">
               <label class="form-label fw-semibold">Notă</label>
               <input class="form-control" name="note" maxlength="255">

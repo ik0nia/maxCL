@@ -753,6 +753,25 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-15_01_app_settings',
+                'label' => 'CREATE TABLE app_settings',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'app_settings')) return;
+                    $pdo->exec("
+                        CREATE TABLE app_settings (
+                          `key` VARCHAR(64) NOT NULL,
+                          value VARCHAR(255) NULL,
+                          updated_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (`key`),
+                          KEY idx_app_settings_updated (updated_at),
+                          CONSTRAINT fk_app_settings_user FOREIGN KEY (updated_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
         ];
     }
 

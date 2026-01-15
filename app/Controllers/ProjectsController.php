@@ -29,6 +29,7 @@ use App\Models\ProjectWorkLog;
 use App\Models\AuditLog;
 use App\Models\Label;
 use App\Models\EntityLabel;
+use App\Models\AppSetting;
 
 final class ProjectsController
 {
@@ -432,6 +433,14 @@ final class ProjectsController
             'deliveryItems' => $deliveryItems,
             'projectFiles' => $projectFiles,
             'workLogs' => $workLogs,
+            'costSettings' => [
+                'labor' => (function () {
+                    try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; }
+                })(),
+                'cnc' => (function () {
+                    try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; }
+                })(),
+            ],
             'history' => $history,
             'projectLabels' => $projectLabels,
             'cncFiles' => $cncFiles,
@@ -1473,12 +1482,24 @@ final class ProjectsController
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
         $he = Validator::dec(trim((string)($_POST['hours_estimated'] ?? '')));
         $ha = Validator::dec(trim((string)($_POST['hours_actual'] ?? '')));
-        $cph = Validator::dec(trim((string)($_POST['cost_per_hour'] ?? '')));
         $note = trim((string)($_POST['note'] ?? ''));
 
         if ($he !== null && $he < 0) $he = null;
         if ($ha !== null && $ha < 0) $ha = null;
-        if ($cph !== null && $cph < 0) $cph = null;
+
+        // Cost/oră din Setări costuri (admin-only)
+        $cph = null;
+        try {
+            $cph = ($type === 'CNC')
+                ? AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR)
+                : AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR);
+        } catch (\Throwable $e) {
+            $cph = null;
+        }
+        if ($cph === null || $cph < 0) {
+            Session::flash('toast_error', 'Costurile nu sunt setate. (Setări costuri)');
+            Response::redirect('/projects/' . $projectId . '?tab=hours');
+        }
 
         // validate pp belongs to project if set
         if ($ppId !== null) {
