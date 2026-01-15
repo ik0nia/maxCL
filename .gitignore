@@ -9,7 +9,3 @@
 # Logs
 *.log
 
-# Runtime / uploads (keep .gitkeep files tracked)
-storage/uploads/**
-!storage/uploads/**/.gitkeep
-
