@@ -33,6 +33,91 @@ use App\Models\AppSetting;
 
 final class ProjectsController
 {
+    /**
+     * Distribuie manopera estimată (CNC/ATELIER) pe produse:
+     * - înregistrările legate de produs rămân la produs
+     * - înregistrările la nivel de proiect (fără project_product_id) se împart egal la nr. de produse
+     *
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @param array<int, array<string,mixed>> $workLogs
+     * @return array<int, array{cnc_hours:float,cnc_cost:float,atelier_hours:float,atelier_cost:float,total_cost:float,cnc_rate:float,atelier_rate:float}>
+     */
+    private static function laborEstimateByProduct(array $projectProducts, array $workLogs): array
+    {
+        $ppIds = [];
+        foreach ($projectProducts as $pp) {
+            $id = (int)($pp['id'] ?? 0);
+            if ($id > 0) $ppIds[] = $id;
+        }
+        $n = count($ppIds);
+
+        // sum direct + project-level
+        $direct = [];
+        $projCncHours = 0.0;
+        $projCncCost = 0.0;
+        $projAtHours = 0.0;
+        $projAtCost = 0.0;
+
+        foreach ($workLogs as $w) {
+            $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
+            if ($he <= 0) continue;
+            $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
+            if ($cph === null || $cph < 0 || !is_finite($cph)) continue;
+            $cost = $he * $cph;
+
+            $type = (string)($w['work_type'] ?? '');
+            $ppId = isset($w['project_product_id']) && $w['project_product_id'] !== null && $w['project_product_id'] !== ''
+                ? (int)$w['project_product_id']
+                : 0;
+
+            if ($ppId > 0) {
+                if (!isset($direct[$ppId])) {
+                    $direct[$ppId] = ['cnc_hours' => 0.0, 'cnc_cost' => 0.0, 'atelier_hours' => 0.0, 'atelier_cost' => 0.0];
+                }
+                if ($type === 'CNC') {
+                    $direct[$ppId]['cnc_hours'] += $he;
+                    $direct[$ppId]['cnc_cost'] += $cost;
+                } elseif ($type === 'ATELIER') {
+                    $direct[$ppId]['atelier_hours'] += $he;
+                    $direct[$ppId]['atelier_cost'] += $cost;
+                }
+            } else {
+                if ($type === 'CNC') {
+                    $projCncHours += $he;
+                    $projCncCost += $cost;
+                } elseif ($type === 'ATELIER') {
+                    $projAtHours += $he;
+                    $projAtCost += $cost;
+                }
+            }
+        }
+
+        $shareCncHours = ($n > 0) ? ($projCncHours / $n) : 0.0;
+        $shareCncCost = ($n > 0) ? ($projCncCost / $n) : 0.0;
+        $shareAtHours = ($n > 0) ? ($projAtHours / $n) : 0.0;
+        $shareAtCost = ($n > 0) ? ($projAtCost / $n) : 0.0;
+
+        $out = [];
+        foreach ($ppIds as $ppId) {
+            $cncH = ($direct[$ppId]['cnc_hours'] ?? 0.0) + $shareCncHours;
+            $cncC = ($direct[$ppId]['cnc_cost'] ?? 0.0) + $shareCncCost;
+            $atH = ($direct[$ppId]['atelier_hours'] ?? 0.0) + $shareAtHours;
+            $atC = ($direct[$ppId]['atelier_cost'] ?? 0.0) + $shareAtCost;
+            $cncRate = $cncH > 0 ? ($cncC / $cncH) : 0.0;
+            $atRate = $atH > 0 ? ($atC / $atH) : 0.0;
+            $out[$ppId] = [
+                'cnc_hours' => $cncH,
+                'cnc_cost' => $cncC,
+                'atelier_hours' => $atH,
+                'atelier_cost' => $atC,
+                'total_cost' => $cncC + $atC,
+                'cnc_rate' => $cncRate,
+                'atelier_rate' => $atRate,
+            ];
+        }
+        return $out;
+    }
+
     private static function countFullBoardsAvailable(int $boardId): int
     {
         /** @var \PDO $pdo */
@@ -354,12 +439,15 @@ final class ProjectsController
         $workLogs = [];
         $projectLabels = [];
         $cncFiles = [];
+        $laborByProduct = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
             } catch (\Throwable $e) {
                 $projectProducts = [];
             }
+            try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
+            $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
         } elseif ($tab === 'consum') {
             try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
             try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
@@ -433,6 +521,7 @@ final class ProjectsController
             'deliveryItems' => $deliveryItems,
             'projectFiles' => $projectFiles,
             'workLogs' => $workLogs,
+            'laborByProduct' => $laborByProduct,
             'costSettings' => [
                 'labor' => (function () {
                     try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; }

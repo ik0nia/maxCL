@@ -272,11 +272,25 @@ ob_start();
                     $del = (float)($pp['delivered_qty'] ?? 0);
                     $pname = (string)($pp['product_name'] ?? '');
                     $pcode = (string)($pp['product_code'] ?? '');
+                    $lab = (isset($laborByProduct[$ppId]) && is_array($laborByProduct[$ppId])) ? $laborByProduct[$ppId] : null;
+                    $cncH = $lab ? (float)($lab['cnc_hours'] ?? 0.0) : 0.0;
+                    $cncC = $lab ? (float)($lab['cnc_cost'] ?? 0.0) : 0.0;
+                    $cncR = $lab ? (float)($lab['cnc_rate'] ?? 0.0) : 0.0;
+                    $atH = $lab ? (float)($lab['atelier_hours'] ?? 0.0) : 0.0;
+                    $atC = $lab ? (float)($lab['atelier_cost'] ?? 0.0) : 0.0;
+                    $atR = $lab ? (float)($lab['atelier_rate'] ?? 0.0) : 0.0;
+                    $totC = $lab ? (float)($lab['total_cost'] ?? 0.0) : 0.0;
                   ?>
                   <tr>
                     <td>
                       <div class="fw-semibold"><?= htmlspecialchars($pname) ?></div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
+                      <div class="text-muted small mt-1">
+                        Estimare:
+                        CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
+                        Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
+                        <span class="fw-semibold">Total <?= number_format($totC, 2, '.', '') ?> lei</span>
+                      </div>
                     </td>
                     <td class="text-end"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
                     <td class="fw-semibold"><?= htmlspecialchars((string)($pp['production_status'] ?? '')) ?></td>
