@@ -1364,6 +1364,11 @@ ob_start();
                 </thead>
                 <tbody>
                   <?php foreach ($hplConsum as $c): ?>
+                    <?php
+                      $note = (string)($c['note'] ?? '');
+                      // Nu afișăm resturile interne (jumătăți) aici; ele se văd în stoc (OFFCUT).
+                      if ($note !== '' && strpos($note, 'REST_JUMATATE') === 0) continue;
+                    ?>
                     <?php $cid = (int)($c['id'] ?? 0); ?>
                     <tr>
                       <?php $bid = (int)($c['board_id'] ?? 0); ?>
@@ -1382,7 +1387,7 @@ ob_start();
                         <div class="text-muted small"><?= number_format((float)($c['qty_m2'] ?? 0), 4, '.', '') ?> mp</div>
                       </td>
                       <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
-                      <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
+                      <td class="text-muted"><?= htmlspecialchars($note) ?></td>
                       <td class="text-end">
                         <?php if ($canWrite): ?>
                           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/' . $cid . '/delete')) ?>" class="m-0 d-inline"
