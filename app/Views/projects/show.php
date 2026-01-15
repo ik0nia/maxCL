@@ -21,6 +21,7 @@ $deliveryItems = $deliveryItems ?? [];
 $projectFiles = $projectFiles ?? [];
 $workLogs = $workLogs ?? [];
 $history = $history ?? [];
+$discussions = $discussions ?? [];
 $projectLabels = $projectLabels ?? [];
 $cncFiles = $cncFiles ?? [];
 $statuses = $statuses ?? [];
@@ -36,6 +37,7 @@ $tabs = [
   'hours' => 'Ore & Manoperă',
   'deliveries' => 'Livrări',
   'files' => 'Fișiere',
+  'discutii' => 'Discuții',
   'history' => 'Istoric / Log-uri',
 ];
 if (!isset($tabs[$tab])) $tab = 'general';
@@ -1551,6 +1553,51 @@ ob_start();
   <div class="card app-card p-4">
     <div class="h5 m-0"><?= htmlspecialchars($tabs[$tab]) ?></div>
     <div class="text-muted mt-1">Acest tab va fi completat în pasul următor.</div>
+  </div>
+<?php elseif ($tab === 'discutii'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-8">
+      <div class="card app-card p-3">
+        <div class="h5 m-0">Discuții</div>
+        <div class="text-muted">Mesaje pe proiect (cu user + dată/oră)</div>
+
+        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/discutii/create')) ?>" class="mt-3">
+          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+          <label class="form-label fw-semibold">Mesaj</label>
+          <textarea class="form-control" name="comment" rows="3" maxlength="4000" placeholder="Scrie mesajul…"></textarea>
+          <div class="d-flex justify-content-end mt-2">
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-send me-1"></i> Trimite
+            </button>
+          </div>
+        </form>
+
+        <hr class="my-3">
+
+        <?php if (!$discussions): ?>
+          <div class="text-muted">Nu există mesaje încă.</div>
+        <?php else: ?>
+          <div class="d-flex flex-column gap-2">
+            <?php foreach ($discussions as $m): ?>
+              <?php
+                $who = (string)($m['user_name'] ?? '');
+                if ($who === '') $who = (string)($m['user_email'] ?? '');
+                if ($who === '') $who = '—';
+                $dt = (string)($m['created_at'] ?? '');
+                $txt = (string)($m['comment'] ?? '');
+              ?>
+              <div class="p-3 rounded" style="background:#F7FAFB;border:1px solid #D9E3E6">
+                <div class="d-flex justify-content-between gap-2">
+                  <div class="fw-semibold"><?= htmlspecialchars($who) ?></div>
+                  <div class="text-muted small"><?= htmlspecialchars($dt) ?></div>
+                </div>
+                <div class="mt-1"><?= nl2br(htmlspecialchars($txt)) ?></div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
 <?php endif; ?>
 

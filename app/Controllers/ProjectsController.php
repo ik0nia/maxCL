@@ -30,6 +30,7 @@ use App\Models\AuditLog;
 use App\Models\Label;
 use App\Models\EntityLabel;
 use App\Models\AppSetting;
+use App\Models\EntityComment;
 
 final class ProjectsController
 {
@@ -764,6 +765,7 @@ final class ProjectsController
         $laborByProduct = [];
         $materialsByProduct = [];
         $projectCostSummary = [];
+        $discussions = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -815,6 +817,9 @@ final class ProjectsController
         } elseif ($tab === 'history') {
             // no heavy joins; filter in PHP
             try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
+        } elseif ($tab === 'discutii') {
+            // proiect discussions (conversație)
+            try { $discussions = EntityComment::forEntity('projects', $id, 800); } catch (\Throwable $e) { $discussions = []; }
         } elseif ($tab === 'general') {
             try { $projectLabels = EntityLabel::labelsForEntity('projects', $id); } catch (\Throwable $e) { $projectLabels = []; }
         } elseif ($tab === 'cnc') {
@@ -862,6 +867,7 @@ final class ProjectsController
             'laborByProduct' => $laborByProduct,
             'materialsByProduct' => $materialsByProduct,
             'projectCostSummary' => $projectCostSummary,
+            'discussions' => $discussions,
             'costSettings' => [
                 'labor' => (function () {
                     try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; }
@@ -1981,6 +1987,40 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot salva: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=hours');
+    }
+
+    public static function addDiscussion(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $msg = trim((string)($_POST['comment'] ?? ''));
+        if ($msg === '') {
+            Session::flash('toast_error', 'Mesaj gol.');
+            Response::redirect('/projects/' . $projectId . '?tab=discutii');
+        }
+        if (mb_strlen($msg) > 4000) {
+            $msg = mb_substr($msg, 0, 4000);
+        }
+        try {
+            $cid = EntityComment::create('projects', $projectId, $msg, Auth::id());
+            if ($cid > 0) {
+                Audit::log('PROJECT_DISCUSSION_ADD', 'entity_comments', $cid, null, null, [
+                    'message' => 'Mesaj în discuții proiect.',
+                    'project_id' => $projectId,
+                ]);
+                Session::flash('toast_success', 'Mesaj trimis.');
+            } else {
+                Session::flash('toast_error', 'Nu pot salva mesajul.');
+            }
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot salva mesajul.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=discutii');
     }
 
     public static function deleteWorkLog(array $params): void

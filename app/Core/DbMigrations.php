@@ -786,6 +786,28 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-15_03_entity_comments',
+                'label' => 'CREATE TABLE entity_comments',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'entity_comments')) return;
+                    if (!self::tableExists($pdo, 'users')) return;
+                    $pdo->exec("
+                        CREATE TABLE entity_comments (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          entity_type VARCHAR(64) NOT NULL,
+                          entity_id INT UNSIGNED NOT NULL,
+                          comment TEXT NOT NULL,
+                          user_id INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_comments_entity (entity_type, entity_id),
+                          KEY idx_comments_created (created_at),
+                          CONSTRAINT fk_comments_user FOREIGN KEY (user_id) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
         ];
     }
 

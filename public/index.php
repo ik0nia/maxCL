@@ -257,6 +257,7 @@ $router->post('/projects/{id}/files/upload', fn($p) => ProjectsController::uploa
 $router->post('/projects/{id}/files/{fileId}/delete', fn($p) => ProjectsController::deleteProjectFile($p), $projectsWriteMW);
 $router->post('/projects/{id}/hours/create', fn($p) => ProjectsController::addWorkLog($p), $projectsWriteMW);
 $router->post('/projects/{id}/hours/{workId}/delete', fn($p) => ProjectsController::deleteWorkLog($p), $projectsWriteMW);
+$router->post('/projects/{id}/discutii/create', fn($p) => ProjectsController::addDiscussion($p), $projectsReadMW);
 $router->post('/projects/{id}/labels/add', fn($p) => ProjectsController::addProjectLabel($p), $projectsWriteMW);
 $router->post('/projects/{id}/labels/{labelId}/remove', fn($p) => ProjectsController::removeProjectLabel($p), $projectsWriteMW);
 
