@@ -146,6 +146,21 @@ final class HplBoard
             $st->execute($params);
             return $st->fetchAll();
         } catch (\Throwable $e) {
+            // Compat: dacă nu există coloana calculată area_total_m2 (schema veche),
+            // refacem query-ul folosind expresie calculată din dimensiuni.
+            if (self::isUnknownColumn($e, 'area_total_m2')) {
+                $calc = '(((sp.width_mm * sp.height_mm) / 1000000.0) * sp.qty)';
+                $sqlWithAccounting = str_replace('sp.area_total_m2', $calc, $sqlWithAccounting);
+                $sqlNoAccounting = str_replace('sp.area_total_m2', $calc, $sqlNoAccounting);
+                try {
+                    $st = $pdo->prepare($sqlWithAccounting);
+                    $st->execute($params);
+                    return $st->fetchAll();
+                } catch (\Throwable $e2) {
+                    // continuă cu fallback pe is_accounting, mai jos
+                    $e = $e2;
+                }
+            }
             // Compat: dacă încă nu există coloana, nu blocăm.
             if (!self::isUnknownColumn($e, 'is_accounting')) {
                 throw $e;
