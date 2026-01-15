@@ -70,6 +70,97 @@ final class ProjectsController
     }
 
     /**
+     * Greutăți doar după cantitate (buc) — folosit pentru allocation_mode=by_qty.
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @return array{ppIds:array<int,int>,sumQty:float,weightById:array<int,float>}
+     */
+    private static function productQtyOnlyWeights(array $projectProducts): array
+    {
+        $ppIds = [];
+        $qtyById = [];
+        foreach ($projectProducts as $pp) {
+            $id = (int)($pp['id'] ?? 0);
+            if ($id <= 0) continue;
+            $ppIds[] = $id;
+            $q = (float)($pp['qty'] ?? 0);
+            $qtyById[$id] = ($q > 0) ? $q : 0.0;
+        }
+        $sum = 0.0;
+        foreach ($ppIds as $id) $sum += (float)($qtyById[$id] ?? 0.0);
+        $n = count($ppIds);
+        $weightById = [];
+        foreach ($ppIds as $id) {
+            if ($sum > 0.0) $weightById[$id] = ((float)($qtyById[$id] ?? 0.0)) / $sum;
+            elseif ($n > 0) $weightById[$id] = 1.0 / $n;
+            else $weightById[$id] = 0.0;
+        }
+        return ['ppIds' => $ppIds, 'sumQty' => $sum, 'weightById' => $weightById];
+    }
+
+    /**
+     * Recalculează alocările HPL (mp) pentru TOATE consumurile din proiect,
+     * în funcție de allocation_mode și produsele curente.
+     * - nu rulează dacă allocations_locked=1 sau allocation_mode=manual
+     */
+    private static function recalcHplAllocationsForProject(int $projectId): void
+    {
+        if ($projectId <= 0) return;
+        $project = Project::find($projectId);
+        if (!$project) return;
+
+        $locked = (int)($project['allocations_locked'] ?? 0) === 1;
+        if ($locked) return;
+
+        $allocMode = (string)($project['allocation_mode'] ?? 'by_area');
+        if ($allocMode === 'manual') return;
+
+        $pps = ProjectProduct::forProject($projectId);
+        if (!$pps) return;
+
+        $w = ($allocMode === 'by_qty') ? self::productQtyOnlyWeights($pps) : self::productQtyWeights($pps);
+        /** @var array<int,int> $ppIds */
+        $ppIds = $w['ppIds'];
+        if (!$ppIds) return;
+
+        $cons = ProjectHplConsumption::forProject($projectId);
+        foreach ($cons as $c) {
+            $cid = (int)($c['id'] ?? 0);
+            if ($cid <= 0) continue;
+            $qtyM2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
+            if ($qtyM2 <= 0) {
+                ProjectHplAllocation::replaceForConsumption($cid, []);
+                continue;
+            }
+
+            $rows = [];
+            $sumAlloc = 0.0;
+            $lastId = 0;
+            foreach ($ppIds as $ppId) {
+                $weight = (float)($w['weightById'][$ppId] ?? 0.0);
+                if ($weight <= 0) continue;
+                $m2 = $qtyM2 * $weight;
+                $rows[] = ['project_product_id' => $ppId, 'qty_m2' => $m2];
+                $sumAlloc += $m2;
+                $lastId = $ppId;
+            }
+            // Ajustare reziduală (floating point) pe ultima intrare, ca suma să fie exact qtyM2.
+            if ($rows && $lastId > 0) {
+                $diff = $qtyM2 - $sumAlloc;
+                if (abs($diff) > 0.0000001) {
+                    for ($i = count($rows) - 1; $i >= 0; $i--) {
+                        if ((int)$rows[$i]['project_product_id'] === $lastId) {
+                            $rows[$i]['qty_m2'] = max(0.0, (float)$rows[$i]['qty_m2'] + $diff);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            ProjectHplAllocation::replaceForConsumption($cid, $rows);
+        }
+    }
+
+    /**
      * Distribuie manopera estimată (CNC/ATELIER) pe produse:
      * - înregistrările legate de produs rămân la produs
      * - înregistrările la nivel de proiect (fără project_product_id) se împart proporțional cu cantitatea (nr. bucăți)
@@ -967,6 +1058,7 @@ final class ProjectsController
                 'unit' => $unit,
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
             ]);
+            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             Session::flash('toast_success', 'Produs adăugat în proiect.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot adăuga produsul: ' . $e->getMessage());
@@ -1038,6 +1130,7 @@ final class ProjectsController
                 'unit' => $unit,
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
             ]);
+            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
 
             Session::flash('toast_success', 'Produs creat și adăugat în proiect.');
         } catch (\Throwable $e) {
@@ -1087,6 +1180,7 @@ final class ProjectsController
                 'message' => 'A actualizat produs în proiect.',
                 'project_id' => $projectId,
             ]);
+            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             Session::flash('toast_success', 'Produs actualizat.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot actualiza produsul: ' . $e->getMessage());
@@ -1112,6 +1206,7 @@ final class ProjectsController
                 'project_id' => $projectId,
                 'product_id' => (int)($before['product_id'] ?? 0),
             ]);
+            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             Session::flash('toast_success', 'Produs scos din proiect.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot scoate produsul: ' . $e->getMessage());
@@ -1285,16 +1380,16 @@ final class ProjectsController
                 $pps = ProjectProduct::forProject($projectId);
                 $weights = [];
                 $sum = 0.0;
-                $byArea = ((string)($project['allocation_mode'] ?? 'by_area')) === 'by_area';
+                $allocMode = (string)($project['allocation_mode'] ?? 'by_area');
+                $byArea = ($allocMode === 'by_area');
                 foreach ($pps as $pp) {
                     $ppid = (int)($pp['id'] ?? 0);
                     if ($ppid <= 0) continue;
-                    $w = (int)($pp['product_width_mm'] ?? 0);
-                    $h = (int)($pp['product_height_mm'] ?? 0);
                     $qq = (float)($pp['qty'] ?? 0);
                     $weight = 0.0;
-                    if ($byArea && $w > 0 && $h > 0 && $qq > 0) {
-                        $weight = (($w * $h) / 1000000.0) * $qq;
+                    $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+                    if ($byArea && $m2u > 0 && $qq > 0) {
+                        $weight = ($m2u * $qq);
                     } elseif ($qq > 0) {
                         $weight = $qq;
                     }
