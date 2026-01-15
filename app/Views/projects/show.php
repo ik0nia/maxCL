@@ -287,6 +287,16 @@ ob_start();
                     $atHUnit = $showPerUnit ? ($atH / $qtyUnits) : $atH;
                     $atCUnit = $showPerUnit ? ($atC / $qtyUnits) : $atC;
                     $totCUnit = $showPerUnit ? ($totC / $qtyUnits) : $totC;
+
+                    $mat = (isset($materialsByProduct[$ppId]) && is_array($materialsByProduct[$ppId])) ? $materialsByProduct[$ppId] : null;
+                    $magCost = $mat ? (float)($mat['mag_cost'] ?? 0.0) : 0.0;
+                    $hplCost = $mat ? (float)($mat['hpl_cost'] ?? 0.0) : 0.0;
+                    $matCost = $magCost + $hplCost;
+                    $magCostUnit = $showPerUnit ? ($magCost / $qtyUnits) : $magCost;
+                    $hplCostUnit = $showPerUnit ? ($hplCost / $qtyUnits) : $hplCost;
+                    $matCostUnit = $showPerUnit ? ($matCost / $qtyUnits) : $matCost;
+                    $totalEst = $totC + $matCost;
+                    $totalEstUnit = $showPerUnit ? ($totalEst / $qtyUnits) : $totalEst;
                   ?>
                   <tr>
                     <td>
@@ -298,19 +308,42 @@ ob_start();
                             Estimare/buc:
                             CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncHUnit, 2, '.', '') ?>h = <?= number_format($cncCUnit, 2, '.', '') ?> lei ·
                             Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atHUnit, 2, '.', '') ?>h = <?= number_format($atCUnit, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Total <?= number_format($totCUnit, 2, '.', '') ?> lei</span>
+                            <span class="fw-semibold">Manoperă <?= number_format($totCUnit, 2, '.', '') ?> lei</span>
+                          </div>
+                          <div>
+                            Materiale/buc:
+                            Magazie <?= number_format($magCostUnit, 2, '.', '') ?> lei ·
+                            HPL <?= number_format($hplCostUnit, 2, '.', '') ?> lei ·
+                            <span class="fw-semibold">Total <?= number_format($matCostUnit, 2, '.', '') ?> lei</span>
+                          </div>
+                          <div class="fw-semibold">
+                            Total estimat/buc: <?= number_format($totalEstUnit, 2, '.', '') ?> lei
                           </div>
                           <div>
                             Total (<?= number_format($qtyUnits, 2, '.', '') ?> buc):
                             CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
                             Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Total <?= number_format($totC, 2, '.', '') ?> lei</span>
+                            <span class="fw-semibold">Manoperă <?= number_format($totC, 2, '.', '') ?> lei</span>
+                          </div>
+                          <div>
+                            Materiale total:
+                            Magazie <?= number_format($magCost, 2, '.', '') ?> lei ·
+                            HPL <?= number_format($hplCost, 2, '.', '') ?> lei ·
+                            <span class="fw-semibold">Total <?= number_format($matCost, 2, '.', '') ?> lei</span>
+                          </div>
+                          <div class="fw-semibold">
+                            Total estimat: <?= number_format($totalEst, 2, '.', '') ?> lei
                           </div>
                         <?php else: ?>
                           Estimare:
                           CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
                           Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
-                          <span class="fw-semibold">Total <?= number_format($totC, 2, '.', '') ?> lei</span>
+                          <span class="fw-semibold">Manoperă <?= number_format($totC, 2, '.', '') ?> lei</span>
+                          <div>
+                            Materiale: Magazie <?= number_format($magCost, 2, '.', '') ?> lei · HPL <?= number_format($hplCost, 2, '.', '') ?> lei ·
+                            <span class="fw-semibold">Total <?= number_format($matCost, 2, '.', '') ?> lei</span>
+                          </div>
+                          <div class="fw-semibold">Total estimat: <?= number_format($totalEst, 2, '.', '') ?> lei</div>
                         <?php endif; ?>
                       </div>
                     </td>

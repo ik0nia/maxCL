@@ -18,6 +18,7 @@ final class ProjectMagazieConsumption
               c.*,
               mi.winmentor_code,
               mi.name AS item_name,
+              mi.unit_price AS item_unit_price,
               pp.product_id AS linked_product_id,
               p.code AS linked_product_code,
               p.name AS linked_product_name

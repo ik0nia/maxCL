@@ -19,20 +19,46 @@ final class ProjectHplConsumption
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
+        $sqlWithPm2 = '
             SELECT
               c.*,
               b.code AS board_code,
               b.name AS board_name,
               b.brand AS board_brand,
-              b.thickness_mm AS board_thickness_mm
+              b.thickness_mm AS board_thickness_mm,
+              b.std_width_mm AS board_std_width_mm,
+              b.std_height_mm AS board_std_height_mm,
+              b.sale_price AS board_sale_price,
+              b.sale_price_per_m2 AS board_sale_price_per_m2
             FROM project_hpl_consumptions c
             INNER JOIN hpl_boards b ON b.id = c.board_id
             WHERE c.project_id = ?
             ORDER BY c.created_at DESC, c.id DESC
-        ');
-        $st->execute([(int)$projectId]);
-        return $st->fetchAll();
+        ';
+        try {
+            $st = $pdo->prepare($sqlWithPm2);
+            $st->execute([(int)$projectId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            $st = $pdo->prepare('
+                SELECT
+                  c.*,
+                  b.code AS board_code,
+                  b.name AS board_name,
+                  b.brand AS board_brand,
+                  b.thickness_mm AS board_thickness_mm,
+                  b.std_width_mm AS board_std_width_mm,
+                  b.std_height_mm AS board_std_height_mm,
+                  b.sale_price AS board_sale_price,
+                  NULL AS board_sale_price_per_m2
+                FROM project_hpl_consumptions c
+                INNER JOIN hpl_boards b ON b.id = c.board_id
+                WHERE c.project_id = ?
+                ORDER BY c.created_at DESC, c.id DESC
+            ');
+            $st->execute([(int)$projectId]);
+            return $st->fetchAll();
+        }
     }
 
     public static function find(int $id): ?array

@@ -13,13 +13,17 @@ final class ProjectHplAllocation
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
+        $sqlWithPm2 = '
             SELECT
               a.*,
               c.board_id,
               c.mode,
               b.code AS board_code,
               b.name AS board_name,
+              b.std_width_mm AS board_std_width_mm,
+              b.std_height_mm AS board_std_height_mm,
+              b.sale_price AS board_sale_price,
+              b.sale_price_per_m2 AS board_sale_price_per_m2,
               p.name AS product_name
             FROM project_hpl_allocations a
             INNER JOIN project_hpl_consumptions c ON c.id = a.consumption_id
@@ -28,9 +32,36 @@ final class ProjectHplAllocation
             INNER JOIN products p ON p.id = pp.product_id
             WHERE c.project_id = ?
             ORDER BY a.id DESC
-        ');
-        $st->execute([(int)$projectId]);
-        return $st->fetchAll();
+        ';
+        try {
+            $st = $pdo->prepare($sqlWithPm2);
+            $st->execute([(int)$projectId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            // Compat: dacă sale_price_per_m2 nu există (schema veche), calculăm din sale_price și dimensiuni.
+            $st = $pdo->prepare('
+                SELECT
+                  a.*,
+                  c.board_id,
+                  c.mode,
+                  b.code AS board_code,
+                  b.name AS board_name,
+                  b.std_width_mm AS board_std_width_mm,
+                  b.std_height_mm AS board_std_height_mm,
+                  b.sale_price AS board_sale_price,
+                  NULL AS board_sale_price_per_m2,
+                  p.name AS product_name
+                FROM project_hpl_allocations a
+                INNER JOIN project_hpl_consumptions c ON c.id = a.consumption_id
+                INNER JOIN hpl_boards b ON b.id = c.board_id
+                INNER JOIN project_products pp ON pp.id = a.project_product_id
+                INNER JOIN products p ON p.id = pp.product_id
+                WHERE c.project_id = ?
+                ORDER BY a.id DESC
+            ');
+            $st->execute([(int)$projectId]);
+            return $st->fetchAll();
+        }
     }
 
     /**

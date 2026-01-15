@@ -34,6 +34,34 @@ use App\Models\AppSetting;
 final class ProjectsController
 {
     /**
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @return array{ppIds:array<int,int>,qtyById:array<int,float>,sumQty:float,weightById:array<int,float>}
+     */
+    private static function productQtyWeights(array $projectProducts): array
+    {
+        $ppIds = [];
+        $qtyById = [];
+        foreach ($projectProducts as $pp) {
+            $id = (int)($pp['id'] ?? 0);
+            if ($id <= 0) continue;
+            $ppIds[] = $id;
+            $q = (float)($pp['qty'] ?? 0);
+            $qtyById[$id] = ($q > 0) ? $q : 0.0;
+        }
+        $sumQty = 0.0;
+        foreach ($ppIds as $id) $sumQty += (float)($qtyById[$id] ?? 0.0);
+
+        $weightById = [];
+        $n = count($ppIds);
+        foreach ($ppIds as $id) {
+            if ($sumQty > 0.0) $weightById[$id] = ((float)($qtyById[$id] ?? 0.0)) / $sumQty;
+            elseif ($n > 0) $weightById[$id] = 1.0 / $n;
+            else $weightById[$id] = 0.0;
+        }
+        return ['ppIds' => $ppIds, 'qtyById' => $qtyById, 'sumQty' => $sumQty, 'weightById' => $weightById];
+    }
+
+    /**
      * Distribuie manopera estimată (CNC/ATELIER) pe produse:
      * - înregistrările legate de produs rămân la produs
      * - înregistrările la nivel de proiect (fără project_product_id) se împart proporțional cu cantitatea (nr. bucăți)
@@ -44,19 +72,13 @@ final class ProjectsController
      */
     private static function laborEstimateByProduct(array $projectProducts, array $workLogs): array
     {
-        $ppIds = [];
-        $ppQty = [];
-        foreach ($projectProducts as $pp) {
-            $id = (int)($pp['id'] ?? 0);
-            if ($id > 0) {
-                $ppIds[] = $id;
-                $q = (float)($pp['qty'] ?? 0);
-                $ppQty[$id] = ($q > 0) ? $q : 0.0;
-            }
-        }
+        $w = self::productQtyWeights($projectProducts);
+        /** @var array<int,int> $ppIds */
+        $ppIds = $w['ppIds'];
+        /** @var array<int,float> $ppQty */
+        $ppQty = $w['qtyById'];
         $n = count($ppIds);
-        $sumQty = 0.0;
-        foreach ($ppIds as $ppId) $sumQty += (float)($ppQty[$ppId] ?? 0.0);
+        $sumQty = (float)$w['sumQty'];
 
         // sum direct + project-level
         $direct = [];
@@ -102,13 +124,7 @@ final class ProjectsController
         $out = [];
         foreach ($ppIds as $ppId) {
             $qty = (float)($ppQty[$ppId] ?? 0.0);
-            // Distribuție pe bucăți (dacă nu avem qty, fallback egal pe rânduri).
-            $weight = 0.0;
-            if ($sumQty > 0.0) {
-                $weight = $qty / $sumQty;
-            } elseif ($n > 0) {
-                $weight = 1.0 / $n;
-            }
+            $weight = (float)($w['weightById'][$ppId] ?? 0.0);
 
             $shareCncHours = $projCncHours * $weight;
             $shareCncCost = $projCncCost * $weight;
@@ -131,6 +147,100 @@ final class ProjectsController
                 'cnc_rate' => $cncRate,
                 'atelier_rate' => $atRate,
             ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @param array<int, array<string,mixed>> $magConsum
+     * @return array<int, array{mag_cost:float}>
+     */
+    private static function magazieCostByProduct(array $projectProducts, array $magConsum): array
+    {
+        $w = self::productQtyWeights($projectProducts);
+        /** @var array<int,int> $ppIds */
+        $ppIds = $w['ppIds'];
+        $out = [];
+        foreach ($ppIds as $ppId) $out[$ppId] = ['mag_cost' => 0.0];
+
+        foreach ($magConsum as $c) {
+            $qty = isset($c['qty']) ? (float)$c['qty'] : 0.0;
+            if ($qty <= 0) continue;
+            $unitPrice = isset($c['item_unit_price']) && $c['item_unit_price'] !== null && $c['item_unit_price'] !== '' && is_numeric($c['item_unit_price'])
+                ? (float)$c['item_unit_price']
+                : 0.0;
+            $cost = $qty * $unitPrice;
+            if ($cost <= 0) continue;
+
+            $ppId = isset($c['project_product_id']) && $c['project_product_id'] !== null && $c['project_product_id'] !== ''
+                ? (int)$c['project_product_id']
+                : 0;
+            if ($ppId > 0 && isset($out[$ppId])) {
+                $out[$ppId]['mag_cost'] += $cost;
+            } else {
+                // nivel proiect -> distribuim pe bucăți
+                foreach ($ppIds as $pid) {
+                    $weight = (float)($w['weightById'][$pid] ?? 0.0);
+                    if ($weight <= 0) continue;
+                    $out[$pid]['mag_cost'] += ($cost * $weight);
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @param array<int, array<string,mixed>> $hplAlloc
+     * @param array<int, array<string,mixed>> $hplConsum
+     * @return array<int, array{hpl_cost:float}>
+     */
+    private static function hplCostByProduct(array $projectProducts, array $hplAlloc, array $hplConsum): array
+    {
+        $w = self::productQtyWeights($projectProducts);
+        /** @var array<int,int> $ppIds */
+        $ppIds = $w['ppIds'];
+        $out = [];
+        foreach ($ppIds as $ppId) $out[$ppId] = ['hpl_cost' => 0.0];
+
+        $pricePm2 = function (array $row): float {
+            if (isset($row['board_sale_price_per_m2']) && $row['board_sale_price_per_m2'] !== null && $row['board_sale_price_per_m2'] !== '' && is_numeric($row['board_sale_price_per_m2'])) {
+                return (float)$row['board_sale_price_per_m2'];
+            }
+            $sale = (isset($row['board_sale_price']) && $row['board_sale_price'] !== null && $row['board_sale_price'] !== '' && is_numeric($row['board_sale_price']))
+                ? (float)$row['board_sale_price']
+                : null;
+            $wmm = (int)($row['board_std_width_mm'] ?? 0);
+            $hmm = (int)($row['board_std_height_mm'] ?? 0);
+            $area = ($wmm > 0 && $hmm > 0) ? (($wmm * $hmm) / 1000000.0) : 0.0;
+            if ($sale !== null && $sale >= 0 && $area > 0) return $sale / $area;
+            return 0.0;
+        };
+
+        if ($hplAlloc) {
+            foreach ($hplAlloc as $a) {
+                $ppId = (int)($a['project_product_id'] ?? 0);
+                if ($ppId <= 0 || !isset($out[$ppId])) continue;
+                $m2 = isset($a['qty_m2']) ? (float)$a['qty_m2'] : 0.0;
+                if ($m2 <= 0) continue;
+                $c = $m2 * $pricePm2($a);
+                if ($c > 0) $out[$ppId]['hpl_cost'] += $c;
+            }
+            return $out;
+        }
+
+        // Fallback: fără alocări -> distribuim consumul pe bucăți
+        foreach ($hplConsum as $c) {
+            $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
+            if ($m2 <= 0) continue;
+            $cost = $m2 * $pricePm2($c);
+            if ($cost <= 0) continue;
+            foreach ($ppIds as $pid) {
+                $weight = (float)($w['weightById'][$pid] ?? 0.0);
+                if ($weight <= 0) continue;
+                $out[$pid]['hpl_cost'] += ($cost * $weight);
+            }
         }
         return $out;
     }
@@ -457,6 +567,7 @@ final class ProjectsController
         $projectLabels = [];
         $cncFiles = [];
         $laborByProduct = [];
+        $materialsByProduct = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -465,6 +576,19 @@ final class ProjectsController
             }
             try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
             $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
+            try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
+            try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
+            try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
+            $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
+            $hplBy = self::hplCostByProduct($projectProducts, $hplAlloc, $hplConsum);
+            foreach ($projectProducts as $pp) {
+                $ppId = (int)($pp['id'] ?? 0);
+                if ($ppId <= 0) continue;
+                $materialsByProduct[$ppId] = [
+                    'mag_cost' => (float)($magBy[$ppId]['mag_cost'] ?? 0.0),
+                    'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
+                ];
+            }
         } elseif ($tab === 'consum') {
             try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
             try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
@@ -539,6 +663,7 @@ final class ProjectsController
             'projectFiles' => $projectFiles,
             'workLogs' => $workLogs,
             'laborByProduct' => $laborByProduct,
+            'materialsByProduct' => $materialsByProduct,
             'costSettings' => [
                 'labor' => (function () {
                     try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; }
