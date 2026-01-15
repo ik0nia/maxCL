@@ -370,12 +370,9 @@ ob_start();
                 const bt = String(opt.back_texture_name || '');
                 let tex = ft ? ft : '';
                 if (bt && bt !== ft) tex = tex ? (tex + '/' + bt) : bt;
-                const stock = (opt.stock_qty_full_available !== undefined && opt.stock_qty_full_available !== null)
-                  ? parseInt(String(opt.stock_qty_full_available), 10)
-                  : NaN;
-                const stockTxt = Number.isFinite(stock) ? stock : null;
+                // IMPORTANT: aici asociem doar tipul de placă (nu arătăm stoc global).
 
-                if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex && stockTxt === null) return opt.text;
+                if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex) return opt.text;
                 const $row = $('<span class="s2-row"></span>');
                 if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
                 if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
@@ -386,7 +383,6 @@ ob_start();
                 if (name) base += (base ? ' · ' : '') + '<strong>' + esc(name) + '</strong>';
                 if (dim) base += (base ? ' · ' : '') + esc(dim);
                 if (tex) base += (base ? ' · ' : '') + esc(tex);
-                if (stockTxt !== null) base += ' · <span class="text-muted">stoc: <strong>' + esc(String(stockTxt)) + '</strong> buc</span>';
 
                 if (colors) $txt.html('<strong>' + esc(colors) + '</strong> · ' + base);
                 else $txt.html(base);
