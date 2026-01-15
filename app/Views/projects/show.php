@@ -298,7 +298,7 @@ ob_start();
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">HPL pentru piesă (din rezervările proiectului)</label>
-              <select class="form-select" name="hpl_board_id" id="ppHplBoardSelect" style="width:100%"></select>
+              <select class="form-select js-pp-hpl-reserved-select" name="hpl_board_id" id="ppHplBoardSelect" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
               <div class="text-muted small mt-1">Alegi din plăcile HPL rezervate pe proiect. (Cu thumbnail)</div>
             </div>
             <div class="col-12 d-flex justify-content-end">
@@ -329,29 +329,27 @@ ob_start();
             .s2-thumb2{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px;margin-left:-8px}
             .s2-row{display:flex;align-items:center}
             /* Make this select2 field taller (scoped) */
-            #ppHplBoardSelect + .select2-container .select2-selection--single{
+            .js-pp-hpl-reserved-select + .select2-container .select2-selection--single{
               min-height: 54px;
               padding: 8px 10px;
             }
-            #ppHplBoardSelect + .select2-container .select2-selection--single .select2-selection__rendered{
+            .js-pp-hpl-reserved-select + .select2-container .select2-selection--single .select2-selection__rendered{
               line-height: 34px;
               padding-left: 0;
               padding-right: 22px;
               font-size: 1.05rem;
             }
-            #ppHplBoardSelect + .select2-container .select2-selection--single .select2-selection__arrow{
+            .js-pp-hpl-reserved-select + .select2-container .select2-selection--single .select2-selection__arrow{
               height: 52px;
             }
-            #ppHplBoardSelect + .select2-container .select2-selection--single .select2-selection__clear{
+            .js-pp-hpl-reserved-select + .select2-container .select2-selection--single .select2-selection__clear{
               margin-top: 6px;
             }
           </style>
           <script>
             document.addEventListener('DOMContentLoaded', function(){
-              const el = document.getElementById('ppHplBoardSelect');
-              if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
               const $ = window.jQuery;
-              const $el = $(el);
               function fmtBoard(opt){
                 if (!opt.id) return opt.text;
                 const thumb = opt.thumb || null;
@@ -389,59 +387,67 @@ ob_start();
                 $row.append($txt);
                 return $row;
               }
-              $el.select2({
-                width: '100%',
-                placeholder: 'Alege HPL rezervat…',
-                allowClear: true,
-                minimumInputLength: 0,
-                templateResult: fmtBoard,
-                templateSelection: fmtBoard,
-                escapeMarkup: m => m,
-                ajax: {
-                  url: "<?= htmlspecialchars(Url::to('/api/hpl/boards/search')) ?>",
-                  dataType: 'json',
-                  delay: 250,
-                  headers: { 'Accept': 'application/json' },
-                  data: function(params){
-                    return { q: params.term || '', project_id: <?= (int)$project['id'] ?>, reserved_only: 1 };
-                  },
-                  transport: function (params, success, failure) {
-                    const $ = window.jQuery;
-                    if (!$ || !$.ajax) return $.ajax(params).then(success).catch(failure);
-                    const req = $.ajax(params);
-                    req.done(function (resp) {
-                      if (resp && resp.ok === false) {
-                        let msg = String(resp.error || 'Nu pot încărca plăcile HPL rezervate.');
-                        if (resp.debug) msg += ' — ' + String(resp.debug);
+              function init(el){
+                const $el = $(el);
+                const projId = parseInt(String(el.getAttribute('data-project-id') || ''), 10) || 0;
+                $el.select2({
+                  width: '100%',
+                  placeholder: 'Alege HPL rezervat…',
+                  allowClear: true,
+                  minimumInputLength: 0,
+                  templateResult: fmtBoard,
+                  templateSelection: fmtBoard,
+                  escapeMarkup: m => m,
+                  ajax: {
+                    url: "<?= htmlspecialchars(Url::to('/api/hpl/boards/search')) ?>",
+                    dataType: 'json',
+                    delay: 250,
+                    headers: { 'Accept': 'application/json' },
+                    data: function(params){
+                      return { q: params.term || '', project_id: projId, reserved_only: 1 };
+                    },
+                    transport: function (params, success, failure) {
+                      const $ = window.jQuery;
+                      if (!$ || !$.ajax) return $.ajax(params).then(success).catch(failure);
+                      const req = $.ajax(params);
+                      req.done(function (resp) {
+                        if (resp && resp.ok === false) {
+                          let msg = String(resp.error || 'Nu pot încărca plăcile HPL rezervate.');
+                          if (resp.debug) msg += ' — ' + String(resp.debug);
+                          if (window.toastr) window.toastr.error(msg);
+                          success({ ok: true, items: [] });
+                          return;
+                        }
+                        success(resp);
+                      });
+                      req.fail(function (xhr) {
+                        let msg = 'Nu pot încărca plăcile HPL rezervate. (API)';
+                        try {
+                          const ct = String((xhr && xhr.getResponseHeader) ? (xhr.getResponseHeader('content-type') || '') : '');
+                          if (ct.toLowerCase().includes('application/json') && xhr.responseJSON) {
+                            msg = String(xhr.responseJSON.error || msg);
+                            if (xhr.responseJSON.debug) msg += ' — ' + String(xhr.responseJSON.debug);
+                          } else if (xhr && typeof xhr.status === 'number' && xhr.status) {
+                            msg += ' HTTP ' + String(xhr.status);
+                          }
+                        } catch (e) {}
                         if (window.toastr) window.toastr.error(msg);
                         success({ ok: true, items: [] });
-                        return;
-                      }
-                      success(resp);
-                    });
-                    req.fail(function (xhr) {
-                      let msg = 'Nu pot încărca plăcile HPL rezervate. (API)';
-                      try {
-                        const ct = String((xhr && xhr.getResponseHeader) ? (xhr.getResponseHeader('content-type') || '') : '');
-                        if (ct.toLowerCase().includes('application/json') && xhr.responseJSON) {
-                          msg = String(xhr.responseJSON.error || msg);
-                          if (xhr.responseJSON.debug) msg += ' — ' + String(xhr.responseJSON.debug);
-                        } else if (xhr && typeof xhr.status === 'number' && xhr.status) {
-                          msg += ' HTTP ' + String(xhr.status);
-                        }
-                      } catch (e) {}
-                      if (window.toastr) window.toastr.error(msg);
-                      success({ ok: true, items: [] });
-                      if (typeof failure === 'function') failure();
-                    });
-                    return req;
-                  },
-                  processResults: function(resp){
-                    const items = (resp && resp.items) ? resp.items : [];
-                    return { results: items };
-                  },
-                  cache: true
-                }
+                        if (typeof failure === 'function') failure();
+                      });
+                      return req;
+                    },
+                    processResults: function(resp){
+                      const items = (resp && resp.items) ? resp.items : [];
+                      return { results: items };
+                    },
+                    cache: true
+                  }
+                });
+              }
+
+              document.querySelectorAll('select.js-pp-hpl-reserved-select').forEach(function (el) {
+                init(el);
               });
             });
           </script>
@@ -640,31 +646,59 @@ ob_start();
                       </form>
                     </div>
                     <div class="collapse mt-3" id="ppEdit<?= $ppId ?>">
-                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/update')) ?>" class="row g-2 align-items-end">
+                      <?php
+                        $pDesc = (string)($pp['product_notes'] ?? '');
+                        $curM2 = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+                        $curHplId = isset($pp['hpl_board_id']) && $pp['hpl_board_id'] !== null && $pp['hpl_board_id'] !== '' ? (int)$pp['hpl_board_id'] : 0;
+                        $curHplText = trim((string)($pp['hpl_board_code'] ?? '') . ' · ' . (string)($pp['hpl_board_name'] ?? ''));
+                        if ($curHplText === '·' || $curHplText === '· ') $curHplText = '';
+                      ?>
+                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/update')) ?>" class="row g-2">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                        <div class="col-6 col-md-2">
-                          <label class="form-label fw-semibold mb-1">Cant.</label>
-                          <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>">
+                        <div class="col-12">
+                          <label class="form-label fw-semibold mb-1">Denumire</label>
+                          <input class="form-control form-control-sm" name="name" required value="<?= htmlspecialchars($pname) ?>">
                         </div>
-                        <div class="col-6 col-md-2">
-                          <label class="form-label fw-semibold mb-1">Unit</label>
-                          <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($pp['unit'] ?? 'buc')) ?>">
+                        <div class="col-12">
+                          <label class="form-label fw-semibold mb-1">Descriere</label>
+                          <textarea class="form-control form-control-sm" name="description" rows="2" maxlength="4000" placeholder="Opțional…"><?= htmlspecialchars($pDesc) ?></textarea>
                         </div>
-                        <div class="col-6 col-md-2">
-                          <label class="form-label fw-semibold mb-1">mp/buc</label>
-                          <input class="form-control form-control-sm" type="number" step="0.0001" min="0" name="m2_per_unit" value="<?= htmlspecialchars((string)($pp['m2_per_unit'] ?? '0')) ?>">
+                        <div class="col-12 col-md-6">
+                          <label class="form-label fw-semibold mb-1">Cod (opțional)</label>
+                          <input class="form-control form-control-sm" name="code" value="<?= htmlspecialchars($pcode) ?>">
                         </div>
-                        <div class="col-12 col-md-3">
-                          <label class="form-label fw-semibold mb-1">Status</label>
-                          <input class="form-control form-control-sm" value="<?= htmlspecialchars($stLbl) ?>" disabled>
+                        <div class="col-12 col-md-6">
+                          <label class="form-label fw-semibold mb-1">Cantitate</label>
+                          <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>" required>
                         </div>
-                        <div class="col-6 col-md-2">
-                          <label class="form-label fw-semibold mb-1">Livrat</label>
-                          <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="delivered_qty" value="<?= htmlspecialchars((string)$del) ?>">
+                        <div class="col-12">
+                          <label class="form-label fw-semibold mb-1">Suprafață</label>
+                          <div class="d-flex flex-wrap gap-3">
+                            <label class="form-check form-check-inline m-0">
+                              <input class="form-check-input" type="radio" name="surface_mode" value="HALF_BOARD" required>
+                              <span class="form-check-label">1/2 placă</span>
+                            </label>
+                            <label class="form-check form-check-inline m-0">
+                              <input class="form-check-input" type="radio" name="surface_mode" value="FULL_BOARD" required>
+                              <span class="form-check-label">1 placă</span>
+                            </label>
+                            <label class="form-check form-check-inline m-0">
+                              <input class="form-check-input" type="radio" name="surface_mode" value="M2" required checked>
+                              <span class="form-check-label">mp</span>
+                            </label>
+                          </div>
+                          <div class="mt-2" id="ppEditSurfaceM2Wrap<?= $ppId ?>">
+                            <input class="form-control form-control-sm" type="number" step="0.0001" min="0.0001" name="surface_m2" value="<?= htmlspecialchars(number_format(max(0.0001, $curM2 > 0 ? $curM2 : 0.0001), 4, '.', '')) ?>">
+                            <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
+                          </div>
                         </div>
-                        <div class="col-12 col-md-3">
-                          <label class="form-label fw-semibold mb-1">Notă</label>
-                          <input class="form-control form-control-sm" name="notes" value="<?= htmlspecialchars((string)($pp['notes'] ?? '')) ?>">
+                        <div class="col-12">
+                          <label class="form-label fw-semibold mb-1">HPL pentru piesă (din rezervările proiectului)</label>
+                          <select class="form-select form-select-sm js-pp-hpl-reserved-select" name="hpl_board_id" data-project-id="<?= (int)$project['id'] ?>" style="width:100%">
+                            <?php if ($curHplId > 0 && $curHplText !== ''): ?>
+                              <option value="<?= (int)$curHplId ?>" selected><?= htmlspecialchars($curHplText) ?></option>
+                            <?php endif; ?>
+                          </select>
                         </div>
                         <div class="col-12 d-flex justify-content-end">
                           <button class="btn btn-primary btn-sm" type="submit">

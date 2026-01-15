@@ -60,5 +60,25 @@ final class Product
         ]);
         return (int)$pdo->lastInsertId();
     }
+
+    /** @param array<string,mixed> $data */
+    public static function updateFields(int $id, array $data): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('
+            UPDATE products
+            SET code = :code,
+                name = :name,
+                notes = :notes
+            WHERE id = :id
+        ');
+        $st->execute([
+            ':id' => (int)$id,
+            ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
+            ':name' => trim((string)($data['name'] ?? '')),
+            ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
+        ]);
+    }
 }
 

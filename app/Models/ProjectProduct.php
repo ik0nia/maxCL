@@ -18,6 +18,7 @@ final class ProjectProduct
               pp.*,
               p.code AS product_code,
               p.name AS product_name,
+              p.notes AS product_notes,
               hb.code AS hpl_board_code,
               hb.name AS hpl_board_name
             FROM project_products pp

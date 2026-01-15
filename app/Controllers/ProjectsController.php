@@ -1436,28 +1436,71 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
+        $name = trim((string)($_POST['name'] ?? ''));
+        $desc = trim((string)($_POST['description'] ?? ''));
+        $code = trim((string)($_POST['code'] ?? ''));
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
-        $del = Validator::dec(trim((string)($_POST['delivered_qty'] ?? '0'))) ?? 0.0;
-        $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
-        $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
-        $note = trim((string)($_POST['notes'] ?? ''));
+        $hplBoardId = Validator::int(trim((string)($_POST['hpl_board_id'] ?? '')), 1);
+        $surfaceMode = trim((string)($_POST['surface_mode'] ?? ''));
+        $surfaceM2 = Validator::dec(trim((string)($_POST['surface_m2'] ?? ''))) ?? null;
+        if ($surfaceM2 !== null && $surfaceM2 < 0) $surfaceM2 = null;
 
-        if ($qty <= 0) $qty = 1.0;
-        if ($del < 0) $del = 0.0;
-        if ($del > $qty) $del = $qty;
-        if ($m2 !== null && $m2 < 0) $m2 = null;
+        $errors = [];
+        if ($name === '') $errors['name'] = 'Denumire invalidă.';
+        if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
+        if ($surfaceMode === '') $errors['surface_mode'] = 'Suprafață invalidă.';
+
+        // Calculăm m2/buc din "Suprafață"
+        $m2 = null;
+        if ($surfaceMode === 'HALF_BOARD' || $surfaceMode === 'FULL_BOARD') {
+            $boardArea = self::defaultBoardAreaM2ForProject($projectId);
+            if ($boardArea <= 0) $boardArea = 5.796; // fallback 2800×2070
+            $m2 = ($surfaceMode === 'HALF_BOARD') ? ($boardArea / 2.0) : $boardArea;
+        } elseif ($surfaceMode === 'M2') {
+            $m2 = $surfaceM2;
+        }
+        if ($m2 === null || $m2 <= 0) $errors['surface_mode'] = 'Suprafață invalidă.';
+        if ($surfaceMode === 'M2' && ($surfaceM2 === null || $surfaceM2 <= 0)) $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
+
+        if ($hplBoardId !== null) {
+            if (!self::isHplBoardReservedForProject($projectId, (int)$hplBoardId)) {
+                $errors['hpl_board_id'] = 'Placa HPL selectată nu este rezervată pe acest proiect.';
+            }
+        }
+
+        if ($errors) {
+            Session::flash('toast_error', 'Completează corect produsul.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $prodId = (int)($before['product_id'] ?? 0);
+        $prodBefore = $prodId > 0 ? Product::find($prodId) : null;
 
         $after = [
             'qty' => $qty,
-            'unit' => $unit !== '' ? $unit : 'buc',
-            'm2_per_unit' => $m2 !== null ? (float)$m2 : (float)($before['m2_per_unit'] ?? 0),
+            'unit' => 'buc',
+            'm2_per_unit' => (float)$m2,
             // Statusul se schimbă doar pe flow (pas cu pas), nu din edit.
             'production_status' => (string)($before['production_status'] ?? 'CREAT'),
-            'delivered_qty' => $del,
-            'notes' => $note !== '' ? $note : null,
+            'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,
+            'delivered_qty' => (float)($before['delivered_qty'] ?? 0),
+            'notes' => $before['notes'] ?? null,
         ];
 
         try {
+            if ($prodId > 0) {
+                Product::updateFields($prodId, [
+                    'code' => $code !== '' ? $code : null,
+                    'name' => $name,
+                    'notes' => $desc !== '' ? $desc : null,
+                ]);
+                $prodAfter = Product::find($prodId);
+                Audit::log('PRODUCT_UPDATE', 'products', $prodId, $prodBefore, $prodAfter, [
+                    'message' => 'A actualizat produs (din proiect).',
+                    'project_id' => $projectId,
+                    'project_product_id' => $ppId,
+                ]);
+            }
             ProjectProduct::updateFields($ppId, $after);
             Audit::log('PROJECT_PRODUCT_UPDATE', 'project_products', $ppId, $before, $after, [
                 'message' => 'A actualizat produs în proiect.',
