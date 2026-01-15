@@ -367,15 +367,6 @@ ob_start();
                             <?php endforeach; ?>
                           </div>
 
-                          <?php if ($nextLbl !== null): ?>
-                            <div class="text-muted small mt-1">
-                              Următorul: <strong><?= htmlspecialchars($nextLbl) ?></strong>
-                              <?php if (!$canAdvance): ?>
-                                · <span>nu ai drepturi / nu se poate avansa</span>
-                              <?php endif; ?>
-                            </div>
-                          <?php endif; ?>
-
                           <?php if (!$canSetPPFinal): ?>
                             <div class="text-muted small">Avizat/Livrat: doar Admin/Gestionar.</div>
                           <?php endif; ?>
@@ -390,15 +381,11 @@ ob_start();
                       <div class="fw-semibold"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></div>
                     </div>
                     <div class="col-6 col-md-3">
-                      <div class="text-muted small">Livrat</div>
-                      <div class="fw-semibold"><?= number_format($del, 2, '.', '') ?></div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                      <div class="text-muted small">mp/buc</div>
+                      <div class="text-muted small">Suprafață/buc</div>
                       <div class="fw-semibold"><?= number_format($m2u, 4, '.', '') ?></div>
                     </div>
                     <div class="col-6 col-md-3">
-                      <div class="text-muted small">mp total</div>
+                      <div class="text-muted small">Suprafață totală</div>
                       <div class="fw-semibold"><?= number_format($m2t, 4, '.', '') ?></div>
                     </div>
                   </div>
