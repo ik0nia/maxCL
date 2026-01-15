@@ -1204,14 +1204,32 @@ ob_start();
 <?php elseif ($tab === 'hours'): ?>
   <?php
     $totEst = 0.0;
-    $totAct = 0.0;
+    $totCostEst = 0.0;
+    $totEstCnc = 0.0;
+    $totEstAtelier = 0.0;
+    $totCostEstCnc = 0.0;
+    $totCostEstAtelier = 0.0;
     $laborRate = isset($costSettings['labor']) && $costSettings['labor'] !== null ? (float)$costSettings['labor'] : null;
     $cncRate = isset($costSettings['cnc']) && $costSettings['cnc'] !== null ? (float)$costSettings['cnc'] : null;
     foreach ($workLogs as $w) {
       $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
-      $ha = isset($w['hours_actual']) && $w['hours_actual'] !== null && $w['hours_actual'] !== '' ? (float)$w['hours_actual'] : 0.0;
+      $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
       $totEst += $he;
-      $totAct += $ha;
+      if ($cph !== null && $cph >= 0 && is_finite($cph) && $he > 0) {
+        $totCostEst += ($he * $cph);
+        $wt = (string)($w['work_type'] ?? '');
+        if ($wt === 'CNC') {
+          $totEstCnc += $he;
+          $totCostEstCnc += ($he * $cph);
+        } elseif ($wt === 'ATELIER') {
+          $totEstAtelier += $he;
+          $totCostEstAtelier += ($he * $cph);
+        }
+      } else {
+        $wt = (string)($w['work_type'] ?? '');
+        if ($wt === 'CNC') $totEstCnc += $he;
+        elseif ($wt === 'ATELIER') $totEstAtelier += $he;
+      }
     }
   ?>
   <div class="row g-3">
@@ -1269,14 +1287,23 @@ ob_start();
 
       <div class="card app-card p-3 mt-3">
         <div class="h5 m-0">Total</div>
-        <div class="text-muted">Sumar ore pe proiect</div>
+        <div class="text-muted">Sumar estimări + costuri</div>
         <div class="d-flex justify-content-between mt-2">
-          <div class="text-muted">Estimate</div>
+          <div class="text-muted">Estimate (total)</div>
           <div class="fw-semibold"><?= number_format($totEst, 2, '.', '') ?> h</div>
         </div>
         <div class="d-flex justify-content-between mt-2">
-          <div class="text-muted">Reale</div>
-          <div class="fw-semibold"><?= number_format($totAct, 2, '.', '') ?> h</div>
+          <div class="text-muted">Cost estimat (total)</div>
+          <div class="fw-semibold"><?= number_format($totCostEst, 2, '.', '') ?> lei</div>
+        </div>
+        <hr class="my-3">
+        <div class="d-flex justify-content-between mt-2">
+          <div class="text-muted">CNC (estim.)</div>
+          <div class="fw-semibold"><?= number_format($totEstCnc, 2, '.', '') ?> h · <?= number_format($totCostEstCnc, 2, '.', '') ?> lei</div>
+        </div>
+        <div class="d-flex justify-content-between mt-2">
+          <div class="text-muted">Atelier (estim.)</div>
+          <div class="fw-semibold"><?= number_format($totEstAtelier, 2, '.', '') ?> h · <?= number_format($totCostEstAtelier, 2, '.', '') ?> lei</div>
         </div>
       </div>
     </div>
