@@ -7,7 +7,6 @@ $mode = (string)($mode ?? 'create');
 $row = is_array($row ?? null) ? $row : [];
 $errors = is_array($errors ?? null) ? $errors : [];
 $statuses = $statuses ?? [];
-$allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
 
@@ -98,22 +97,7 @@ ob_start();
       <div class="text-muted small mt-1">Alege fie client, fie grup.</div>
     </div>
 
-    <div class="col-12 col-md-6">
-      <label class="form-label fw-semibold">Allocation mode</label>
-      <select class="form-select <?= isset($errors['allocation_mode']) ? 'is-invalid' : '' ?>" name="allocation_mode">
-        <?php foreach ($allocationModes as $m): ?>
-          <option value="<?= htmlspecialchars((string)$m['value']) ?>" <?= ((string)($row['allocation_mode'] ?? '') === (string)$m['value']) ? 'selected' : '' ?>>
-            <?= htmlspecialchars((string)$m['label']) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-      <?php if (isset($errors['allocation_mode'])): ?><div class="invalid-feedback"><?= htmlspecialchars((string)$errors['allocation_mode']) ?></div><?php endif; ?>
-      <div class="form-check mt-2">
-        <input class="form-check-input" type="checkbox" name="allocations_locked" id="allocLocked" <?= !empty($row['allocations_locked']) ? 'checked' : '' ?>>
-        <label class="form-check-label" for="allocLocked">Lock distribuție</label>
-      </div>
-    </div>
-    <div class="col-12 col-md-6">
+    <div class="col-12">
       <label class="form-label fw-semibold">Etichete (tags)</label>
       <input class="form-control" name="tags" value="<?= htmlspecialchars((string)($row['tags'] ?? '')) ?>" placeholder="ex: urgent, client VIP, etc">
       <div class="text-muted small mt-1">Separă cu virgulă.</div>

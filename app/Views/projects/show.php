@@ -13,7 +13,6 @@ $tab = (string)($tab ?? 'general');
 $projectProducts = $projectProducts ?? [];
 $magazieConsum = $magazieConsum ?? [];
 $hplConsum = $hplConsum ?? [];
-$hplAlloc = $hplAlloc ?? [];
 $projectHplPieces = $projectHplPieces ?? [];
 $hplBoards = $hplBoards ?? [];
 $magazieItems = $magazieItems ?? [];
@@ -29,7 +28,6 @@ $projectCostSummary = $projectCostSummary ?? [];
 $projectLabels = $projectLabels ?? [];
 $cncFiles = $cncFiles ?? [];
 $statuses = $statuses ?? [];
-$allocationModes = $allocationModes ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
 
@@ -75,7 +73,7 @@ ob_start();
     <div class="col-12 col-lg-8">
       <div class="card app-card p-3">
         <div class="h5 m-0">General</div>
-        <div class="text-muted">Date proiect + setări distribuție</div>
+        <div class="text-muted">Date proiect</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/edit')) ?>" class="row g-3 mt-1">
@@ -137,22 +135,7 @@ ob_start();
               <div class="text-muted small mt-1">Alege fie client, fie grup.</div>
             </div>
 
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Allocation mode</label>
-              <select class="form-select" name="allocation_mode">
-                <?php foreach ($allocationModes as $m): ?>
-                  <option value="<?= htmlspecialchars((string)$m['value']) ?>" <?= ((string)($project['allocation_mode'] ?? '') === (string)$m['value']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string)$m['label']) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-              <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" name="allocations_locked" id="allocLocked" <?= !empty($project['allocations_locked']) ? 'checked' : '' ?>>
-                <label class="form-check-label" for="allocLocked">Lock distribuție</label>
-              </div>
-            </div>
-
-            <div class="col-12 col-md-6">
+            <div class="col-12">
               <label class="form-label fw-semibold">Etichete (tags)</label>
               <input class="form-control" name="tags" value="<?= htmlspecialchars((string)($project['tags'] ?? '')) ?>">
               <div class="text-muted small mt-1">Separă cu virgulă.</div>
@@ -1465,43 +1448,6 @@ ob_start();
           <?php endif; ?>
         </div>
 
-        <?php if ($hplAlloc): ?>
-          <div class="mt-3">
-            <div class="fw-semibold">Alocare HPL pe produse (auto)</div>
-            <div class="text-muted small">Suma alocărilor per consum ≈ mp</div>
-            <div class="table-responsive mt-2">
-              <table class="table table-sm align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Placă</th>
-                    <th>Produs</th>
-                    <th class="text-end" style="width:110px">mp</th>
-                    <th style="width:100px">Mod</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($hplAlloc as $a): ?>
-                    <tr>
-                      <?php $abid = (int)($a['board_id'] ?? 0); ?>
-                      <td class="text-muted">
-                        <?php if ($abid > 0): ?>
-                          <a href="<?= htmlspecialchars(Url::to('/stock/boards/' . $abid)) ?>" class="text-decoration-none">
-                            <?= htmlspecialchars((string)($a['board_code'] ?? '')) ?>
-                          </a>
-                        <?php else: ?>
-                          <?= htmlspecialchars((string)($a['board_code'] ?? '')) ?>
-                        <?php endif; ?>
-                      </td>
-                      <td><?= htmlspecialchars((string)($a['product_name'] ?? '')) ?></td>
-                      <td class="text-end fw-semibold"><?= number_format((float)($a['qty_m2'] ?? 0), 4, '.', '') ?></td>
-                      <td class="text-muted"><?= htmlspecialchars((string)($a['mode'] ?? '')) ?></td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        <?php endif; ?>
       </div>
     </div>
   </div>

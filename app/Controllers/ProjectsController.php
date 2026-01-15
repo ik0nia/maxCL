@@ -19,7 +19,6 @@ use App\Models\Product;
 use App\Models\Project;
 use App\Models\ProjectDelivery;
 use App\Models\ProjectDeliveryItem;
-use App\Models\ProjectHplAllocation;
 use App\Models\ProjectHplConsumption;
 use App\Models\ProjectMagazieConsumption;
 use App\Models\ProjectProduct;
@@ -74,7 +73,7 @@ final class ProjectsController
     }
 
     /**
-     * Greutăți doar după cantitate (buc) — folosit pentru allocation_mode=by_qty.
+     * Greutăți doar după cantitate (buc).
      * @param array<int, array<string,mixed>> $projectProducts
      * @return array{ppIds:array<int,int>,sumQty:float,weightById:array<int,float>}
      */
@@ -101,68 +100,7 @@ final class ProjectsController
         return ['ppIds' => $ppIds, 'sumQty' => $sum, 'weightById' => $weightById];
     }
 
-    /**
-     * Recalculează alocările HPL (mp) pentru TOATE consumurile din proiect,
-     * în funcție de allocation_mode și produsele curente.
-     * - nu rulează dacă allocations_locked=1 sau allocation_mode=manual
-     */
-    private static function recalcHplAllocationsForProject(int $projectId): void
-    {
-        if ($projectId <= 0) return;
-        $project = Project::find($projectId);
-        if (!$project) return;
-
-        $locked = (int)($project['allocations_locked'] ?? 0) === 1;
-        if ($locked) return;
-
-        $allocMode = (string)($project['allocation_mode'] ?? 'by_area');
-        if ($allocMode === 'manual') return;
-
-        $pps = ProjectProduct::forProject($projectId);
-        if (!$pps) return;
-
-        $w = ($allocMode === 'by_qty') ? self::productQtyOnlyWeights($pps) : self::productQtyWeights($pps);
-        /** @var array<int,int> $ppIds */
-        $ppIds = $w['ppIds'];
-        if (!$ppIds) return;
-
-        $cons = ProjectHplConsumption::forProject($projectId);
-        foreach ($cons as $c) {
-            $cid = (int)($c['id'] ?? 0);
-            if ($cid <= 0) continue;
-            $qtyM2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
-            if ($qtyM2 <= 0) {
-                ProjectHplAllocation::replaceForConsumption($cid, []);
-                continue;
-            }
-
-            $rows = [];
-            $sumAlloc = 0.0;
-            $lastId = 0;
-            foreach ($ppIds as $ppId) {
-                $weight = (float)($w['weightById'][$ppId] ?? 0.0);
-                if ($weight <= 0) continue;
-                $m2 = $qtyM2 * $weight;
-                $rows[] = ['project_product_id' => $ppId, 'qty_m2' => $m2];
-                $sumAlloc += $m2;
-                $lastId = $ppId;
-            }
-            // Ajustare reziduală (floating point) pe ultima intrare, ca suma să fie exact qtyM2.
-            if ($rows && $lastId > 0) {
-                $diff = $qtyM2 - $sumAlloc;
-                if (abs($diff) > 0.0000001) {
-                    for ($i = count($rows) - 1; $i >= 0; $i--) {
-                        if ((int)$rows[$i]['project_product_id'] === $lastId) {
-                            $rows[$i]['qty_m2'] = max(0.0, (float)$rows[$i]['qty_m2'] + $diff);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            ProjectHplAllocation::replaceForConsumption($cid, $rows);
-        }
-    }
+    // NOTĂ: alocarea automată HPL pe produse a fost eliminată (cerință).
 
     /**
      * Distribuie manopera estimată (CNC/ATELIER) pe produse:
@@ -302,105 +240,53 @@ final class ProjectsController
     }
 
     /**
+     * HPL cost (fără alocare automată pe produse):
+     * costul unui produs se calculează doar din placa selectată pe produs (hpl_board_id)
+     * și suprafața lui (m2_per_unit × qty), la prețul lei/mp al plăcii.
+     *
      * @param array<int, array<string,mixed>> $projectProducts
-     * @param array<int, array<string,mixed>> $hplAlloc
-     * @param array<int, array<string,mixed>> $hplConsum
      * @return array<int, array{hpl_cost:float}>
      */
-    private static function hplCostByProduct(array $projectProducts, array $hplAlloc, array $hplConsum): array
+    private static function hplCostByProduct(array $projectProducts): array
     {
-        $w = self::productQtyWeights($projectProducts);
-        /** @var array<int,int> $ppIds */
-        $ppIds = $w['ppIds'];
         $out = [];
-        foreach ($ppIds as $ppId) $out[$ppId] = ['hpl_cost' => 0.0];
-
-        $pricePm2 = function (array $row): float {
-            if (isset($row['board_sale_price_per_m2']) && $row['board_sale_price_per_m2'] !== null && $row['board_sale_price_per_m2'] !== '' && is_numeric($row['board_sale_price_per_m2'])) {
-                return (float)$row['board_sale_price_per_m2'];
-            }
-            $sale = (isset($row['board_sale_price']) && $row['board_sale_price'] !== null && $row['board_sale_price'] !== '' && is_numeric($row['board_sale_price']))
-                ? (float)$row['board_sale_price']
-                : null;
-            $wmm = (int)($row['board_std_width_mm'] ?? 0);
-            $hmm = (int)($row['board_std_height_mm'] ?? 0);
-            $area = ($wmm > 0 && $hmm > 0) ? (($wmm * $hmm) / 1000000.0) : 0.0;
-            if ($sale !== null && $sale >= 0 && $area > 0) return $sale / $area;
-            return 0.0;
-        };
-
-        // Cerință: dacă produsul are mp/buc setat, taxăm doar acei mp,
-        // folosind costul mediu lei/mp al plăcilor alocate în proiect.
-        $totM2 = 0.0;
-        $totCost = 0.0;
-        foreach ($hplConsum as $c) {
-            $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
-            if ($m2 <= 0) continue;
-            $ppm = $pricePm2($c);
-            if ($ppm <= 0) continue;
-            $totM2 += $m2;
-            $totCost += ($m2 * $ppm);
-        }
-        $avgPpm = ($totM2 > 0) ? ($totCost / $totM2) : 0.0;
-
-        // Map mp necesari pe produs (mp/buc × qty)
-        $needM2 = [];
         foreach ($projectProducts as $pp) {
             $ppId = (int)($pp['id'] ?? 0);
             if ($ppId <= 0) continue;
+            $out[$ppId] = ['hpl_cost' => 0.0];
+
+            $boardId = isset($pp['hpl_board_id']) && $pp['hpl_board_id'] !== null && $pp['hpl_board_id'] !== '' ? (int)$pp['hpl_board_id'] : 0;
+            if ($boardId <= 0) continue;
             $qty = (float)($pp['qty'] ?? 0);
             $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
-            $need = ($m2u > 0 && $qty > 0) ? ($m2u * $qty) : 0.0;
-            $needM2[$ppId] = $need;
-        }
+            if ($qty <= 0 || $m2u <= 0) continue;
 
-        if ($avgPpm > 0.0) {
-            foreach ($ppIds as $ppId) {
-                $need = (float)($needM2[$ppId] ?? 0.0);
-                if ($need > 0) {
-                    $out[$ppId]['hpl_cost'] = $need * $avgPpm;
+            $ppm = 0.0;
+            try {
+                $b = HplBoard::find($boardId);
+                if ($b) {
+                    $ppm = isset($b['sale_price_per_m2']) && $b['sale_price_per_m2'] !== null && $b['sale_price_per_m2'] !== '' && is_numeric($b['sale_price_per_m2'])
+                        ? (float)$b['sale_price_per_m2']
+                        : 0.0;
+                    if ($ppm <= 0) {
+                        $sale = (isset($b['sale_price']) && $b['sale_price'] !== null && $b['sale_price'] !== '' && is_numeric($b['sale_price']))
+                            ? (float)$b['sale_price']
+                            : null;
+                        $wmm = (int)($b['std_width_mm'] ?? 0);
+                        $hmm = (int)($b['std_height_mm'] ?? 0);
+                        $area = ($wmm > 0 && $hmm > 0) ? (($wmm * $hmm) / 1000000.0) : 0.0;
+                        if ($sale !== null && $sale >= 0 && $area > 0) $ppm = $sale / $area;
+                    }
                 }
+            } catch (\Throwable $e) {
+                $ppm = 0.0;
             }
-            // Pentru produsele fără mp/buc setat, păstrăm fallback-ul vechi (din alocări).
-        }
-
-        if ($hplAlloc) {
-            foreach ($hplAlloc as $a) {
-                $ppId = (int)($a['project_product_id'] ?? 0);
-                if ($ppId <= 0 || !isset($out[$ppId])) continue;
-                // dacă am taxat deja după mp/buc, nu mai suprascriem
-                if ((float)($needM2[$ppId] ?? 0.0) > 0 && $avgPpm > 0.0) continue;
-                $m2 = isset($a['qty_m2']) ? (float)$a['qty_m2'] : 0.0;
-                if ($m2 <= 0) continue;
-                $c = $m2 * $pricePm2($a);
-                if ($c > 0) $out[$ppId]['hpl_cost'] += $c;
-            }
-            return $out;
-        }
-
-        // Fallback: fără alocări -> distribuim consumul pe bucăți
-        foreach ($hplConsum as $c) {
-            $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
-            if ($m2 <= 0) continue;
-            $cost = $m2 * $pricePm2($c);
-            if ($cost <= 0) continue;
-            foreach ($ppIds as $pid) {
-                if ((float)($needM2[$pid] ?? 0.0) > 0 && $avgPpm > 0.0) continue;
-                $weight = (float)($w['weightById'][$pid] ?? 0.0);
-                if ($weight <= 0) continue;
-                $out[$pid]['hpl_cost'] += ($cost * $weight);
-            }
+            if ($ppm <= 0) continue;
+            $out[$ppId]['hpl_cost'] = ($m2u * $qty) * $ppm;
         }
         return $out;
     }
 
-    /**
-     * @param array<int, array<string,mixed>> $workLogs
-     * @param array<int, array<string,mixed>> $magConsum
-     * @param array<int, array<string,mixed>> $hplConsum
-     * @param array<int, array<string,mixed>> $hplAlloc
-     * @return array{labor_cost:float,mag_cost:float,hpl_cost:float,total_cost:float,hpl_reserved_m2:float,hpl_reserved_cost:float,hpl_consumed_m2:float,hpl_consumed_cost:float}
-     */
     /**
      * Sumar proiect derivat din alocările pe produse (pentru tab-ul Produse).
      * Totalurile de cost trebuie să fie suma costurilor afișate pe produse.
@@ -410,7 +296,6 @@ final class ProjectsController
      * @param array<int, array<string,mixed>> $materialsByProduct
      * @param array<int, array<string,mixed>> $magConsum
      * @param array<int, array<string,mixed>> $hplConsum
-     * @param array<int, array<string,mixed>> $hplAlloc
      * @return array<string,mixed>
      */
     private static function projectSummaryFromProducts(
@@ -418,8 +303,7 @@ final class ProjectsController
         array $laborByProduct,
         array $materialsByProduct,
         array $magConsum,
-        array $hplConsum,
-        array $hplAlloc
+        array $hplConsum
     ): array {
         $laborCost = 0.0;
         $laborCncH = 0.0;
@@ -539,7 +423,7 @@ final class ProjectsController
         }
         $hplAvgPpm = ($hplTotM2 > 0) ? ($hplTotCost / $hplTotM2) : 0.0;
 
-        // mp necesari (din mp/buc × qty) și mp alocat pe produse (fallback din allocations dacă mp/buc e 0)
+        // mp necesari (din m2_per_unit × qty)
         $needM2 = 0.0;
         $needByPp = [];
         foreach ($projectProducts as $pp) {
@@ -551,20 +435,12 @@ final class ProjectsController
             $needByPp[$ppId] = $m2t;
             $needM2 += $m2t;
         }
-        $allocByPp = [];
-        foreach ($hplAlloc as $a) {
-            $ppId = (int)($a['project_product_id'] ?? 0);
-            $m2 = isset($a['qty_m2']) ? (float)$a['qty_m2'] : 0.0;
-            if ($ppId <= 0 || $m2 <= 0) continue;
-            $allocByPp[$ppId] = ($allocByPp[$ppId] ?? 0.0) + $m2;
-        }
         $productsHplM2 = 0.0;
         foreach ($projectProducts as $pp) {
             $ppId = (int)($pp['id'] ?? 0);
             if ($ppId <= 0) continue;
             $m2t = (float)($needByPp[$ppId] ?? 0.0);
-            if ($m2t > 0) $productsHplM2 += $m2t;
-            else $productsHplM2 += (float)($allocByPp[$ppId] ?? 0.0);
+            $productsHplM2 += $m2t;
         }
 
         $reservedRemainingM2 = max(0.0, $hplResM2 - $needM2);
@@ -641,15 +517,7 @@ final class ProjectsController
         ];
     }
 
-    /** @return array<int, array{value:string,label:string}> */
-    private static function allocationModes(): array
-    {
-        return [
-            ['value' => 'by_area', 'label' => 'by_area (după suprafață)'],
-            ['value' => 'by_qty', 'label' => 'by_qty (după cantitate)'],
-            ['value' => 'manual', 'label' => 'manual'],
-        ];
-    }
+    // NOTĂ: alocarea automată HPL pe produse a fost eliminată (cerință).
 
     /**
      * Mută plăci întregi (piece_type=FULL) între status-uri în stoc (AVAILABLE/RESERVED/CONSUMED).
@@ -813,12 +681,9 @@ final class ProjectsController
             'row' => [
                 'status' => 'DRAFT',
                 'priority' => 0,
-                'allocation_mode' => 'by_area',
-                'allocations_locked' => 0,
             ],
             'errors' => [],
             'statuses' => self::statuses(),
-            'allocationModes' => self::allocationModes(),
             'clients' => Client::allWithProjects(), // reuse list (name/type)
             'groups' => ClientGroup::forSelect(),
         ]);
@@ -850,11 +715,6 @@ final class ProjectsController
         $allowedStatuses = array_map(fn($s) => (string)$s['value'], self::statuses());
         if ($status !== '' && !in_array($status, $allowedStatuses, true)) $errors['status'] = 'Status invalid.';
 
-        $allocationMode = trim((string)($_POST['allocation_mode'] ?? 'by_area'));
-        $allowedAlloc = array_map(fn($m) => (string)$m['value'], self::allocationModes());
-        if ($allocationMode !== '' && !in_array($allocationMode, $allowedAlloc, true)) $errors['allocation_mode'] = 'Mod invalid.';
-        $allocLocked = isset($_POST['allocations_locked']) ? 1 : 0;
-
         if ($errors) {
             echo View::render('projects/form', [
                 'title' => 'Proiect nou',
@@ -862,7 +722,6 @@ final class ProjectsController
                 'row' => $_POST,
                 'errors' => $errors,
                 'statuses' => self::statuses(),
-                'allocationModes' => self::allocationModes(),
                 'clients' => Client::allWithProjects(),
                 'groups' => ClientGroup::forSelect(),
             ]);
@@ -883,8 +742,6 @@ final class ProjectsController
             'tags' => trim((string)($_POST['tags'] ?? '')) ?: null,
             'client_id' => $clientId,
             'client_group_id' => $groupId,
-            'allocation_mode' => $allocationMode ?: 'by_area',
-            'allocations_locked' => $allocLocked,
             'created_by' => Auth::id(),
         ];
 
@@ -937,9 +794,8 @@ final class ProjectsController
                     $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
                     try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
-                    try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
-                    $hplBy = self::hplCostByProduct($projectProducts, $hplAlloc, $hplConsum);
+        $hplBy = self::hplCostByProduct($projectProducts);
                     foreach ($projectProducts as $pp) {
                         $ppId = (int)($pp['id'] ?? 0);
                         if ($ppId <= 0) continue;
@@ -948,12 +804,11 @@ final class ProjectsController
                             'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
                         ];
                     }
-            $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum, $hplAlloc);
+            $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum);
                 } elseif ($tab === 'consum') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
                     try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
-                    try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
                     try { $hplBoards = HplBoard::allWithTotals(null, null); } catch (\Throwable $e) { $hplBoards = []; }
                     try { $magazieItems = MagazieItem::all(null, 5000); } catch (\Throwable $e) { $magazieItems = []; }
                     $projectHplPieces = [];
@@ -1008,7 +863,7 @@ final class ProjectsController
                     'projectProducts' => $projectProducts,
                     'magazieConsum' => $magazieConsum,
                     'hplConsum' => $hplConsum,
-                    'hplAlloc' => $hplAlloc,
+                    'hplAlloc' => [],
                     'hplBoards' => $hplBoards,
                     'magazieItems' => $magazieItems,
                     'projectHplPieces' => $projectHplPieces,
@@ -1028,7 +883,7 @@ final class ProjectsController
                     'projectLabels' => $projectLabels,
                     'cncFiles' => $cncFiles,
                     'statuses' => self::statuses(),
-                    'allocationModes' => self::allocationModes(),
+                    'allocationModes' => [],
                     'clients' => Client::allWithProjects(),
                     'groups' => ClientGroup::forSelect(),
                 ]);
@@ -1083,11 +938,6 @@ final class ProjectsController
         $allowedStatuses = array_map(fn($s) => (string)$s['value'], self::statuses());
         if ($status !== '' && !in_array($status, $allowedStatuses, true)) $errors['status'] = 'Status invalid.';
 
-        $allocationMode = trim((string)($_POST['allocation_mode'] ?? (string)($before['allocation_mode'] ?? 'by_area')));
-        $allowedAlloc = array_map(fn($m) => (string)$m['value'], self::allocationModes());
-        if ($allocationMode !== '' && !in_array($allocationMode, $allowedAlloc, true)) $errors['allocation_mode'] = 'Mod invalid.';
-        $allocLocked = isset($_POST['allocations_locked']) ? 1 : 0;
-
         if ($errors) {
             Session::flash('toast_error', 'Completează corect câmpurile proiectului.');
             Response::redirect('/projects/' . $id . '?tab=general');
@@ -1109,8 +959,6 @@ final class ProjectsController
             'tags' => trim((string)($_POST['tags'] ?? '')) ?: null,
             'client_id' => $clientId,
             'client_group_id' => $groupId,
-            'allocation_mode' => $allocationMode ?: 'by_area',
-            'allocations_locked' => $allocLocked,
         ];
 
         try {
@@ -1266,7 +1114,6 @@ final class ProjectsController
                 'unit' => $unit,
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
             ]);
-            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             Session::flash('toast_success', 'Produs adăugat în proiect.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot adăuga produsul: ' . $e->getMessage());
@@ -1379,7 +1226,6 @@ final class ProjectsController
                 'surface_value' => $surfaceValue,
                 'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,
             ]);
-            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
 
             Session::flash('toast_success', 'Produs creat și adăugat în proiect.');
         } catch (\Throwable $e) {
@@ -1570,7 +1416,6 @@ final class ProjectsController
                 'message' => 'A actualizat produs în proiect.',
                 'project_id' => $projectId,
             ]);
-            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             Session::flash('toast_success', 'Produs actualizat.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot actualiza produsul: ' . $e->getMessage());
@@ -1732,8 +1577,6 @@ final class ProjectsController
             }
 
             $pdo->commit();
-            // best-effort: alocări/costuri
-            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             return null;
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
@@ -2045,7 +1888,6 @@ final class ProjectsController
                 'project_id' => $projectId,
                 'product_id' => (int)($before['product_id'] ?? 0),
             ]);
-            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
             Session::flash('toast_success', 'Produs scos din proiect.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot scoate produsul: ' . $e->getMessage());
@@ -2212,41 +2054,6 @@ final class ProjectsController
             // Păstrăm mesajul tehnic (proiect/consumption id) în Audit, nu în notes.
             $noteAppend = ($note !== '') ? $note : ('Proiect ' . $projCode . ' · consum HPL #' . $cid);
             self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend, $projectId);
-
-            // Auto-alocare pe produse (dacă nu e blocată distribuția și există produse)
-            $allocLocked = (int)($project['allocations_locked'] ?? 0) === 1;
-            if (!$allocLocked) {
-                $pps = ProjectProduct::forProject($projectId);
-                $weights = [];
-                $sum = 0.0;
-                $allocMode = (string)($project['allocation_mode'] ?? 'by_area');
-                $byArea = ($allocMode === 'by_area');
-                foreach ($pps as $pp) {
-                    $ppid = (int)($pp['id'] ?? 0);
-                    if ($ppid <= 0) continue;
-                    $qq = (float)($pp['qty'] ?? 0);
-                    $weight = 0.0;
-                    $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
-                    if ($byArea && $m2u > 0 && $qq > 0) {
-                        $weight = ($m2u * $qq);
-                    } elseif ($qq > 0) {
-                        $weight = $qq;
-                    }
-                    if ($weight <= 0) continue;
-                    $weights[$ppid] = $weight;
-                    $sum += $weight;
-                }
-                if ($sum > 0.0) {
-                    $alloc = [];
-                    foreach ($weights as $ppid => $wgt) {
-                        $alloc[] = [
-                            'project_product_id' => (int)$ppid,
-                            'qty_m2' => (float)$qtyM2 * ($wgt / $sum),
-                        ];
-                    }
-                    ProjectHplAllocation::replaceForConsumption($cid, $alloc);
-                }
-            }
 
             $pdo->commit();
 
