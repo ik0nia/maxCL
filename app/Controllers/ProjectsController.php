@@ -1273,6 +1273,7 @@ final class ProjectsController
         $check = Validator::required($_POST, [
             'name' => 'Denumire',
             'qty' => 'Cantitate',
+            'surface_mode' => 'Suprafață',
         ]);
         $errors = $check['errors'];
         $name = trim((string)($_POST['name'] ?? ''));
@@ -1291,11 +1292,15 @@ final class ProjectsController
             $m2 = ($surfaceMode === 'HALF_BOARD') ? ($boardArea / 2.0) : $boardArea;
         } elseif ($surfaceMode === 'M2') {
             $m2 = $surfaceM2;
-        } elseif ($surfaceMode === '' || $surfaceMode === '0') {
-            $m2 = null; // opțional
         } else {
             // invalid -> ignorăm
             $m2 = null;
+        }
+        if ($m2 === null || $m2 <= 0) {
+            $errors['surface_mode'] = 'Suprafață invalidă.';
+        }
+        if ($surfaceMode === 'M2' && ($surfaceM2 === null || $surfaceM2 <= 0)) {
+            $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
         }
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';

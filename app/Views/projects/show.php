@@ -276,15 +276,23 @@ ob_start();
               <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">Suprafață (opțional)</label>
-              <select class="form-select" name="surface_mode" id="ppSurfaceMode">
-                <option value="">—</option>
-                <option value="HALF_BOARD">1/2 placă</option>
-                <option value="FULL_BOARD">1 placă</option>
-                <option value="M2">mp (introdu suprafața)</option>
-              </select>
+              <label class="form-label fw-semibold">Suprafață</label>
+              <div class="d-flex flex-wrap gap-3">
+                <label class="form-check form-check-inline m-0">
+                  <input class="form-check-input" type="radio" name="surface_mode" value="HALF_BOARD" required>
+                  <span class="form-check-label">1/2 placă</span>
+                </label>
+                <label class="form-check form-check-inline m-0">
+                  <input class="form-check-input" type="radio" name="surface_mode" value="FULL_BOARD" required checked>
+                  <span class="form-check-label">1 placă</span>
+                </label>
+                <label class="form-check form-check-inline m-0">
+                  <input class="form-check-input" type="radio" name="surface_mode" value="M2" required>
+                  <span class="form-check-label">mp</span>
+                </label>
+              </div>
               <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
-                <input class="form-control" type="number" step="0.0001" min="0" name="surface_m2" placeholder="ex: 0.6000">
+                <input class="form-control" type="number" step="0.0001" min="0.0001" name="surface_m2" placeholder="ex: 0.6000">
                 <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
               </div>
             </div>
@@ -297,15 +305,16 @@ ob_start();
 
           <script>
             document.addEventListener('DOMContentLoaded', function () {
-              const mode = document.getElementById('ppSurfaceMode');
+              const modeRadios = document.querySelectorAll('input[name="surface_mode"]');
               const wrap = document.getElementById('ppSurfaceM2Wrap');
-              if (!mode || !wrap) return;
+              if (!wrap || !modeRadios || !modeRadios.length) return;
               function sync() {
-                const v = String(mode.value || '');
+                let v = '';
+                modeRadios.forEach(function(r){ if (r.checked) v = String(r.value || ''); });
                 if (v === 'M2') wrap.classList.remove('d-none');
                 else wrap.classList.add('d-none');
               }
-              mode.addEventListener('change', sync);
+              modeRadios.forEach(function (r) { r.addEventListener('change', sync); });
               sync();
             });
           </script>
