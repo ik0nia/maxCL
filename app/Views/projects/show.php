@@ -438,6 +438,7 @@ ob_start();
           $prodHplM2 = (float)($sum['products_hpl_m2'] ?? 0);
           $magCon = is_array($sum['mag_consumed_by_unit'] ?? null) ? $sum['mag_consumed_by_unit'] : [];
           $magRes = is_array($sum['mag_reserved_by_unit'] ?? null) ? $sum['mag_reserved_by_unit'] : [];
+          $magItems = is_array($sum['mag_items'] ?? null) ? $sum['mag_items'] : [];
           $fmtUnits = function(array $m): string {
             if (!$m) return '—';
             $parts = [];
@@ -462,6 +463,54 @@ ob_start();
           <div class="text-muted small mt-1">
             Consum: <?= htmlspecialchars($fmtUnits($magCon)) ?> · Rezervat: <?= htmlspecialchars($fmtUnits($magRes)) ?>
           </div>
+          <?php if ($magItems): ?>
+            <div class="mt-2">
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#magItemsSummary">
+                Detaliu accesorii
+              </button>
+              <div class="collapse mt-2" id="magItemsSummary">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Accesoriu</th>
+                        <th class="text-end" style="width:120px">Consum</th>
+                        <th class="text-end" style="width:120px">Rezervat</th>
+                        <th class="text-end" style="width:120px">Preț</th>
+                        <th class="text-end" style="width:140px">Valoare</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($magItems as $it): ?>
+                        <?php
+                          $code = trim((string)($it['winmentor_code'] ?? ''));
+                          $name = trim((string)($it['item_name'] ?? ''));
+                          $unit = (string)($it['unit'] ?? 'buc');
+                          $qc = (float)($it['qty_consumed'] ?? 0.0);
+                          $qr = (float)($it['qty_reserved'] ?? 0.0);
+                          $price = (float)($it['unit_price'] ?? 0.0);
+                          $val = ($qc + $qr) * $price;
+                          if (($qc + $qr) <= 0) continue;
+                        ?>
+                        <tr>
+                          <td>
+                            <div class="fw-semibold">
+                              <?= htmlspecialchars(($code !== '' ? ($code . ' · ') : '') . ($name !== '' ? $name : ('#' . (int)($it['item_id'] ?? 0)))) ?>
+                            </div>
+                            <div class="text-muted small"><?= htmlspecialchars($unit) ?></div>
+                          </td>
+                          <td class="text-end"><?= $qc > 0 ? number_format($qc, 3, '.', '') . ' ' . htmlspecialchars($unit) : '—' ?></td>
+                          <td class="text-end"><?= $qr > 0 ? number_format($qr, 3, '.', '') . ' ' . htmlspecialchars($unit) : '—' ?></td>
+                          <td class="text-end"><?= number_format($price, 2, '.', '') ?></td>
+                          <td class="text-end fw-semibold"><?= number_format($val, 2, '.', '') ?> lei</td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          <?php endif; ?>
           <div class="d-flex justify-content-between mt-1">
             <div class="text-muted">Materiale HPL</div>
             <div class="fw-semibold"><?= number_format($sumHpl, 2, '.', '') ?> lei</div>

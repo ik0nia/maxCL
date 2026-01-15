@@ -448,7 +448,9 @@ final class ProjectsController
         // Magazie cantitativ: agregăm pe unit și pe mod
         $magConsumed = [];
         $magReserved = [];
+        $magItems = [];
         foreach ($magConsum as $c) {
+            $itemId = isset($c['item_id']) ? (int)$c['item_id'] : 0;
             $qty = isset($c['qty']) ? (float)$c['qty'] : 0.0;
             if ($qty <= 0) continue;
             $unit = (string)($c['unit'] ?? 'buc');
@@ -458,7 +460,41 @@ final class ProjectsController
             } elseif ($mode === 'RESERVED') {
                 $magReserved[$unit] = ($magReserved[$unit] ?? 0.0) + $qty;
             }
+
+            // Agregare pe accesorii (cantități + preț + valoare)
+            if ($itemId > 0) {
+                if (!isset($magItems[$itemId])) {
+                    $magItems[$itemId] = [
+                        'item_id' => $itemId,
+                        'winmentor_code' => (string)($c['winmentor_code'] ?? ''),
+                        'item_name' => (string)($c['item_name'] ?? ''),
+                        'unit' => $unit,
+                        'unit_price' => (isset($c['item_unit_price']) && $c['item_unit_price'] !== null && $c['item_unit_price'] !== '' && is_numeric($c['item_unit_price']))
+                            ? (float)$c['item_unit_price']
+                            : 0.0,
+                        'qty_consumed' => 0.0,
+                        'qty_reserved' => 0.0,
+                    ];
+                }
+                if ($mode === 'CONSUMED') {
+                    $magItems[$itemId]['qty_consumed'] += $qty;
+                } elseif ($mode === 'RESERVED') {
+                    $magItems[$itemId]['qty_reserved'] += $qty;
+                }
+            }
         }
+
+        // Sortăm accesorii după valoare desc (consumat + rezervat)
+        $magItemsList = array_values($magItems);
+        usort($magItemsList, function (array $a, array $b): int {
+            $pa = (float)($a['unit_price'] ?? 0.0);
+            $qa = (float)($a['qty_consumed'] ?? 0.0) + (float)($a['qty_reserved'] ?? 0.0);
+            $va = $pa * $qa;
+            $pb = (float)($b['unit_price'] ?? 0.0);
+            $qb = (float)($b['qty_consumed'] ?? 0.0) + (float)($b['qty_reserved'] ?? 0.0);
+            $vb = $pb * $qb;
+            return $vb <=> $va;
+        });
 
         // HPL cantitativ: mp rezervat/consumat din consumuri
         $pricePm2 = function (array $row): float {
@@ -543,6 +579,7 @@ final class ProjectsController
             'labor_atelier_hours' => $laborAtH,
             'mag_consumed_by_unit' => $magConsumed,
             'mag_reserved_by_unit' => $magReserved,
+            'mag_items' => $magItemsList,
             'hpl_reserved_m2' => $hplResM2,
             'hpl_consumed_m2' => $hplConM2,
             'products_need_m2' => $needM2,
