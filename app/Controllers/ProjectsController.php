@@ -36,20 +36,27 @@ final class ProjectsController
     /**
      * Distribuie manopera estimată (CNC/ATELIER) pe produse:
      * - înregistrările legate de produs rămân la produs
-     * - înregistrările la nivel de proiect (fără project_product_id) se împart egal la nr. de produse
+     * - înregistrările la nivel de proiect (fără project_product_id) se împart proporțional cu cantitatea (nr. bucăți)
      *
      * @param array<int, array<string,mixed>> $projectProducts
      * @param array<int, array<string,mixed>> $workLogs
-     * @return array<int, array{cnc_hours:float,cnc_cost:float,atelier_hours:float,atelier_cost:float,total_cost:float,cnc_rate:float,atelier_rate:float}>
+     * @return array<int, array{qty:float,cnc_hours:float,cnc_cost:float,atelier_hours:float,atelier_cost:float,total_cost:float,cnc_rate:float,atelier_rate:float}>
      */
     private static function laborEstimateByProduct(array $projectProducts, array $workLogs): array
     {
         $ppIds = [];
+        $ppQty = [];
         foreach ($projectProducts as $pp) {
             $id = (int)($pp['id'] ?? 0);
-            if ($id > 0) $ppIds[] = $id;
+            if ($id > 0) {
+                $ppIds[] = $id;
+                $q = (float)($pp['qty'] ?? 0);
+                $ppQty[$id] = ($q > 0) ? $q : 0.0;
+            }
         }
         $n = count($ppIds);
+        $sumQty = 0.0;
+        foreach ($ppIds as $ppId) $sumQty += (float)($ppQty[$ppId] ?? 0.0);
 
         // sum direct + project-level
         $direct = [];
@@ -92,13 +99,22 @@ final class ProjectsController
             }
         }
 
-        $shareCncHours = ($n > 0) ? ($projCncHours / $n) : 0.0;
-        $shareCncCost = ($n > 0) ? ($projCncCost / $n) : 0.0;
-        $shareAtHours = ($n > 0) ? ($projAtHours / $n) : 0.0;
-        $shareAtCost = ($n > 0) ? ($projAtCost / $n) : 0.0;
-
         $out = [];
         foreach ($ppIds as $ppId) {
+            $qty = (float)($ppQty[$ppId] ?? 0.0);
+            // Distribuție pe bucăți (dacă nu avem qty, fallback egal pe rânduri).
+            $weight = 0.0;
+            if ($sumQty > 0.0) {
+                $weight = $qty / $sumQty;
+            } elseif ($n > 0) {
+                $weight = 1.0 / $n;
+            }
+
+            $shareCncHours = $projCncHours * $weight;
+            $shareCncCost = $projCncCost * $weight;
+            $shareAtHours = $projAtHours * $weight;
+            $shareAtCost = $projAtCost * $weight;
+
             $cncH = ($direct[$ppId]['cnc_hours'] ?? 0.0) + $shareCncHours;
             $cncC = ($direct[$ppId]['cnc_cost'] ?? 0.0) + $shareCncCost;
             $atH = ($direct[$ppId]['atelier_hours'] ?? 0.0) + $shareAtHours;
@@ -106,6 +122,7 @@ final class ProjectsController
             $cncRate = $cncH > 0 ? ($cncC / $cncH) : 0.0;
             $atRate = $atH > 0 ? ($atC / $atH) : 0.0;
             $out[$ppId] = [
+                'qty' => $qty,
                 'cnc_hours' => $cncH,
                 'cnc_cost' => $cncC,
                 'atelier_hours' => $atH,

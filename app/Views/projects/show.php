@@ -280,16 +280,38 @@ ob_start();
                     $atC = $lab ? (float)($lab['atelier_cost'] ?? 0.0) : 0.0;
                     $atR = $lab ? (float)($lab['atelier_rate'] ?? 0.0) : 0.0;
                     $totC = $lab ? (float)($lab['total_cost'] ?? 0.0) : 0.0;
+                    $qtyUnits = ($qty > 0.0) ? $qty : 0.0;
+                    $showPerUnit = ($qtyUnits > 1.0001);
+                    $cncHUnit = $showPerUnit ? ($cncH / $qtyUnits) : $cncH;
+                    $cncCUnit = $showPerUnit ? ($cncC / $qtyUnits) : $cncC;
+                    $atHUnit = $showPerUnit ? ($atH / $qtyUnits) : $atH;
+                    $atCUnit = $showPerUnit ? ($atC / $qtyUnits) : $atC;
+                    $totCUnit = $showPerUnit ? ($totC / $qtyUnits) : $totC;
                   ?>
                   <tr>
                     <td>
                       <div class="fw-semibold"><?= htmlspecialchars($pname) ?></div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                       <div class="text-muted small mt-1">
-                        Estimare:
-                        CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
-                        Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
-                        <span class="fw-semibold">Total <?= number_format($totC, 2, '.', '') ?> lei</span>
+                        <?php if ($showPerUnit): ?>
+                          <div>
+                            Estimare/buc:
+                            CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncHUnit, 2, '.', '') ?>h = <?= number_format($cncCUnit, 2, '.', '') ?> lei ·
+                            Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atHUnit, 2, '.', '') ?>h = <?= number_format($atCUnit, 2, '.', '') ?> lei ·
+                            <span class="fw-semibold">Total <?= number_format($totCUnit, 2, '.', '') ?> lei</span>
+                          </div>
+                          <div>
+                            Total (<?= number_format($qtyUnits, 2, '.', '') ?> buc):
+                            CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
+                            Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
+                            <span class="fw-semibold">Total <?= number_format($totC, 2, '.', '') ?> lei</span>
+                          </div>
+                        <?php else: ?>
+                          Estimare:
+                          CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
+                          Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
+                          <span class="fw-semibold">Total <?= number_format($totC, 2, '.', '') ?> lei</span>
+                        <?php endif; ?>
                       </div>
                     </td>
                     <td class="text-end"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
