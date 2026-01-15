@@ -328,6 +328,23 @@ ob_start();
             .s2-thumb{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px}
             .s2-thumb2{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px;margin-left:-8px}
             .s2-row{display:flex;align-items:center}
+            /* Make this select2 field taller (scoped) */
+            #ppHplBoardSelect + .select2-container .select2-selection--single{
+              min-height: 54px;
+              padding: 8px 10px;
+            }
+            #ppHplBoardSelect + .select2-container .select2-selection--single .select2-selection__rendered{
+              line-height: 34px;
+              padding-left: 0;
+              padding-right: 22px;
+              font-size: 1.05rem;
+            }
+            #ppHplBoardSelect + .select2-container .select2-selection--single .select2-selection__arrow{
+              height: 52px;
+            }
+            #ppHplBoardSelect + .select2-container .select2-selection--single .select2-selection__clear{
+              margin-top: 6px;
+            }
           </style>
           <script>
             document.addEventListener('DOMContentLoaded', function(){
