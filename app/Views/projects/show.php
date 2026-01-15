@@ -428,21 +428,47 @@ ob_start();
           $sumMag = (float)($sum['mag_cost'] ?? 0);
           $sumHpl = (float)($sum['hpl_cost'] ?? 0);
           $sumTotal = (float)($sum['total_cost'] ?? 0);
-          $resM2 = (float)($sum['hpl_reserved_remaining_m2'] ?? ($sum['hpl_reserved_m2'] ?? 0));
-          $resCost = (float)($sum['hpl_reserved_remaining_cost'] ?? ($sum['hpl_reserved_cost'] ?? 0));
+          $resM2 = (float)($sum['hpl_reserved_remaining_m2'] ?? 0);
+          $resCost = (float)($sum['hpl_reserved_remaining_cost'] ?? 0);
+          $cncH = (float)($sum['labor_cnc_hours'] ?? 0);
+          $atH = (float)($sum['labor_atelier_hours'] ?? 0);
+          $hplRes = (float)($sum['hpl_reserved_m2'] ?? 0);
+          $hplCon = (float)($sum['hpl_consumed_m2'] ?? 0);
+          $needM2 = (float)($sum['products_need_m2'] ?? 0);
+          $prodHplM2 = (float)($sum['products_hpl_m2'] ?? 0);
+          $magCon = is_array($sum['mag_consumed_by_unit'] ?? null) ? $sum['mag_consumed_by_unit'] : [];
+          $magRes = is_array($sum['mag_reserved_by_unit'] ?? null) ? $sum['mag_reserved_by_unit'] : [];
+          $fmtUnits = function(array $m): string {
+            if (!$m) return '—';
+            $parts = [];
+            foreach ($m as $u => $q) {
+              $parts[] = number_format((float)$q, 3, '.', '') . ' ' . (string)$u;
+            }
+            return implode(', ', $parts);
+          };
         ?>
         <div class="mt-2">
           <div class="d-flex justify-content-between">
             <div class="text-muted">Manoperă (estim.)</div>
             <div class="fw-semibold"><?= number_format($sumLabor, 2, '.', '') ?> lei</div>
           </div>
+          <div class="text-muted small mt-1">
+            CNC: <?= number_format($cncH, 2, '.', '') ?> h · Atelier: <?= number_format($atH, 2, '.', '') ?> h
+          </div>
           <div class="d-flex justify-content-between mt-1">
             <div class="text-muted">Materiale Magazie</div>
             <div class="fw-semibold"><?= number_format($sumMag, 2, '.', '') ?> lei</div>
           </div>
+          <div class="text-muted small mt-1">
+            Consum: <?= htmlspecialchars($fmtUnits($magCon)) ?> · Rezervat: <?= htmlspecialchars($fmtUnits($magRes)) ?>
+          </div>
           <div class="d-flex justify-content-between mt-1">
             <div class="text-muted">Materiale HPL</div>
             <div class="fw-semibold"><?= number_format($sumHpl, 2, '.', '') ?> lei</div>
+          </div>
+          <div class="text-muted small mt-1">
+            Rezervat: <?= number_format($hplRes, 2, '.', '') ?> mp · Consumat: <?= number_format($hplCon, 2, '.', '') ?> mp ·
+            Produse (mp): <?= number_format($prodHplM2, 2, '.', '') ?> mp (din mp/buc: <?= number_format($needM2, 2, '.', '') ?> mp)
           </div>
           <hr class="my-2">
           <div class="d-flex justify-content-between">

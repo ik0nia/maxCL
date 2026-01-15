@@ -398,7 +398,163 @@ final class ProjectsController
      * @param array<int, array<string,mixed>> $hplAlloc
      * @return array{labor_cost:float,mag_cost:float,hpl_cost:float,total_cost:float,hpl_reserved_m2:float,hpl_reserved_cost:float,hpl_consumed_m2:float,hpl_consumed_cost:float}
      */
-    private static function projectCostSummary(array $projectProducts, array $workLogs, array $magConsum, array $hplConsum, array $hplAlloc): array
+    /**
+     * Sumar proiect derivat din alocările pe produse (pentru tab-ul Produse).
+     * Totalurile de cost trebuie să fie suma costurilor afișate pe produse.
+     *
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @param array<int, array<string,mixed>> $laborByProduct
+     * @param array<int, array<string,mixed>> $materialsByProduct
+     * @param array<int, array<string,mixed>> $magConsum
+     * @param array<int, array<string,mixed>> $hplConsum
+     * @param array<int, array<string,mixed>> $hplAlloc
+     * @return array<string,mixed>
+     */
+    private static function projectSummaryFromProducts(
+        array $projectProducts,
+        array $laborByProduct,
+        array $materialsByProduct,
+        array $magConsum,
+        array $hplConsum,
+        array $hplAlloc
+    ): array {
+        $laborCost = 0.0;
+        $laborCncH = 0.0;
+        $laborAtH = 0.0;
+        foreach ($projectProducts as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+            $lab = $laborByProduct[$ppId] ?? null;
+            if (is_array($lab)) {
+                $laborCost += (float)($lab['total_cost'] ?? 0.0);
+                $laborCncH += (float)($lab['cnc_hours'] ?? 0.0);
+                $laborAtH += (float)($lab['atelier_hours'] ?? 0.0);
+            }
+        }
+
+        $magCost = 0.0;
+        $hplCost = 0.0;
+        foreach ($projectProducts as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+            $m = $materialsByProduct[$ppId] ?? null;
+            if (!is_array($m)) continue;
+            $magCost += (float)($m['mag_cost'] ?? 0.0);
+            $hplCost += (float)($m['hpl_cost'] ?? 0.0);
+        }
+        $totalCost = $laborCost + $magCost + $hplCost;
+
+        // Magazie cantitativ: agregăm pe unit și pe mod
+        $magConsumed = [];
+        $magReserved = [];
+        foreach ($magConsum as $c) {
+            $qty = isset($c['qty']) ? (float)$c['qty'] : 0.0;
+            if ($qty <= 0) continue;
+            $unit = (string)($c['unit'] ?? 'buc');
+            $mode = (string)($c['mode'] ?? '');
+            if ($mode === 'CONSUMED') {
+                $magConsumed[$unit] = ($magConsumed[$unit] ?? 0.0) + $qty;
+            } elseif ($mode === 'RESERVED') {
+                $magReserved[$unit] = ($magReserved[$unit] ?? 0.0) + $qty;
+            }
+        }
+
+        // HPL cantitativ: mp rezervat/consumat din consumuri
+        $pricePm2 = function (array $row): float {
+            if (isset($row['board_sale_price_per_m2']) && $row['board_sale_price_per_m2'] !== null && $row['board_sale_price_per_m2'] !== '' && is_numeric($row['board_sale_price_per_m2'])) {
+                return (float)$row['board_sale_price_per_m2'];
+            }
+            $sale = (isset($row['board_sale_price']) && $row['board_sale_price'] !== null && $row['board_sale_price'] !== '' && is_numeric($row['board_sale_price']))
+                ? (float)$row['board_sale_price']
+                : null;
+            $wmm = (int)($row['board_std_width_mm'] ?? 0);
+            $hmm = (int)($row['board_std_height_mm'] ?? 0);
+            $area = ($wmm > 0 && $hmm > 0) ? (($wmm * $hmm) / 1000000.0) : 0.0;
+            if ($sale !== null && $sale >= 0 && $area > 0) return $sale / $area;
+            return 0.0;
+        };
+
+        $hplResM2 = 0.0;
+        $hplResCost = 0.0;
+        $hplConM2 = 0.0;
+        $hplConCost = 0.0;
+        $hplTotM2 = 0.0;
+        $hplTotCost = 0.0;
+        foreach ($hplConsum as $c) {
+            $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
+            if ($m2 <= 0) continue;
+            $ppm = $pricePm2($c);
+            $cost = ($ppm > 0) ? ($m2 * $ppm) : 0.0;
+            if ($ppm > 0) {
+                $hplTotM2 += $m2;
+                $hplTotCost += $cost;
+            }
+            $mode = (string)($c['mode'] ?? '');
+            if ($mode === 'RESERVED') {
+                $hplResM2 += $m2;
+                $hplResCost += $cost;
+            } elseif ($mode === 'CONSUMED') {
+                $hplConM2 += $m2;
+                $hplConCost += $cost;
+            }
+        }
+        $hplAvgPpm = ($hplTotM2 > 0) ? ($hplTotCost / $hplTotM2) : 0.0;
+
+        // mp necesari (din mp/buc × qty) și mp alocat pe produse (fallback din allocations dacă mp/buc e 0)
+        $needM2 = 0.0;
+        $needByPp = [];
+        foreach ($projectProducts as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+            $qty = (float)($pp['qty'] ?? 0);
+            $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+            $m2t = ($qty > 0 && $m2u > 0) ? ($qty * $m2u) : 0.0;
+            $needByPp[$ppId] = $m2t;
+            $needM2 += $m2t;
+        }
+        $allocByPp = [];
+        foreach ($hplAlloc as $a) {
+            $ppId = (int)($a['project_product_id'] ?? 0);
+            $m2 = isset($a['qty_m2']) ? (float)$a['qty_m2'] : 0.0;
+            if ($ppId <= 0 || $m2 <= 0) continue;
+            $allocByPp[$ppId] = ($allocByPp[$ppId] ?? 0.0) + $m2;
+        }
+        $productsHplM2 = 0.0;
+        foreach ($projectProducts as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+            $m2t = (float)($needByPp[$ppId] ?? 0.0);
+            if ($m2t > 0) $productsHplM2 += $m2t;
+            else $productsHplM2 += (float)($allocByPp[$ppId] ?? 0.0);
+        }
+
+        $reservedRemainingM2 = max(0.0, $hplResM2 - $needM2);
+        $reservedRemainingCost = ($hplAvgPpm > 0) ? ($reservedRemainingM2 * $hplAvgPpm) : 0.0;
+
+        return [
+            // costuri din produse (cerință)
+            'labor_cost' => $laborCost,
+            'mag_cost' => $magCost,
+            'hpl_cost' => $hplCost,
+            'total_cost' => $totalCost,
+            // cantitativ
+            'labor_cnc_hours' => $laborCncH,
+            'labor_atelier_hours' => $laborAtH,
+            'mag_consumed_by_unit' => $magConsumed,
+            'mag_reserved_by_unit' => $magReserved,
+            'hpl_reserved_m2' => $hplResM2,
+            'hpl_consumed_m2' => $hplConM2,
+            'products_need_m2' => $needM2,
+            'products_hpl_m2' => $productsHplM2,
+            // valori suplimentare
+            'hpl_avg_ppm' => $hplAvgPpm,
+            'hpl_reserved_remaining_m2' => $reservedRemainingM2,
+            'hpl_reserved_remaining_cost' => $reservedRemainingCost,
+            'hpl_reserved_cost' => $hplResCost,
+            'hpl_consumed_cost' => $hplConCost,
+        ];
+    }
+
     {
         $labor = 0.0;
         foreach ($workLogs as $w) {
@@ -851,7 +1007,7 @@ final class ProjectsController
                             'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
                         ];
                     }
-            $projectCostSummary = self::projectCostSummary($projectProducts, $workLogs, $magazieConsum, $hplConsum, $hplAlloc);
+            $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum, $hplAlloc);
                 } elseif ($tab === 'consum') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
