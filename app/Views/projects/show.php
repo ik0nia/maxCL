@@ -264,21 +264,29 @@ ob_start();
               <input class="form-control" name="name" required>
             </div>
             <div class="col-12">
+              <label class="form-label fw-semibold">Descriere</label>
+              <textarea class="form-control" name="description" rows="2" maxlength="4000" placeholder="Opțional…"></textarea>
+            </div>
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Cod (opțional)</label>
               <input class="form-control" name="code">
             </div>
-            <div class="col-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Cantitate</label>
               <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Unit</label>
-              <input class="form-control" name="unit" value="buc">
-            </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">mp / buc (opțional)</label>
-              <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
-              <div class="text-muted small mt-1">Nu mai folosim lungime/lățime; setăm suprafața (mp) per piesă.</div>
+              <label class="form-label fw-semibold">Suprafață (opțional)</label>
+              <select class="form-select" name="surface_mode" id="ppSurfaceMode">
+                <option value="">—</option>
+                <option value="HALF_BOARD">1/2 placă</option>
+                <option value="FULL_BOARD">1 placă</option>
+                <option value="M2">mp (introdu suprafața)</option>
+              </select>
+              <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
+                <input class="form-control" type="number" step="0.0001" min="0" name="surface_m2" placeholder="ex: 0.6000">
+                <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
+              </div>
             </div>
             <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-primary" type="submit">
@@ -286,6 +294,21 @@ ob_start();
               </button>
             </div>
           </form>
+
+          <script>
+            document.addEventListener('DOMContentLoaded', function () {
+              const mode = document.getElementById('ppSurfaceMode');
+              const wrap = document.getElementById('ppSurfaceM2Wrap');
+              if (!mode || !wrap) return;
+              function sync() {
+                const v = String(mode.value || '');
+                if (v === 'M2') wrap.classList.remove('d-none');
+                else wrap.classList.add('d-none');
+              }
+              mode.addEventListener('change', sync);
+              sync();
+            });
+          </script>
         <?php endif; ?>
       </div>
 

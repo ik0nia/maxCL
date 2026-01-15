@@ -1276,11 +1276,27 @@ final class ProjectsController
         ]);
         $errors = $check['errors'];
         $name = trim((string)($_POST['name'] ?? ''));
+        $desc = trim((string)($_POST['description'] ?? ''));
         $code = trim((string)($_POST['code'] ?? ''));
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
-        $unit = trim((string)($_POST['unit'] ?? 'buc'));
-        $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
-        if ($m2 !== null && $m2 < 0) $m2 = null;
+        $surfaceMode = trim((string)($_POST['surface_mode'] ?? ''));
+        $surfaceM2 = Validator::dec(trim((string)($_POST['surface_m2'] ?? ''))) ?? null;
+        if ($surfaceM2 !== null && $surfaceM2 < 0) $surfaceM2 = null;
+
+        // Calculăm m2/buc din select-ul "Suprafață"
+        $m2 = null;
+        if ($surfaceMode === 'HALF_BOARD' || $surfaceMode === 'FULL_BOARD') {
+            $boardArea = self::defaultBoardAreaM2ForProject($projectId);
+            if ($boardArea <= 0) $boardArea = 5.796; // fallback 2800×2070
+            $m2 = ($surfaceMode === 'HALF_BOARD') ? ($boardArea / 2.0) : $boardArea;
+        } elseif ($surfaceMode === 'M2') {
+            $m2 = $surfaceM2;
+        } elseif ($surfaceMode === '' || $surfaceMode === '0') {
+            $m2 = null; // opțional
+        } else {
+            // invalid -> ignorăm
+            $m2 = null;
+        }
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($errors) {
@@ -1294,7 +1310,7 @@ final class ProjectsController
                 'name' => $name,
                 'width_mm' => null,
                 'height_mm' => null,
-                'notes' => null,
+                'notes' => $desc !== '' ? $desc : null,
                 'cnc_settings_json' => null,
             ]);
             Audit::log('PRODUCT_CREATE', 'products', $pid, null, null, [
@@ -1306,7 +1322,7 @@ final class ProjectsController
                 'project_id' => $projectId,
                 'product_id' => $pid,
                 'qty' => $qty,
-                'unit' => $unit !== '' ? $unit : 'buc',
+                'unit' => 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
                 'production_status' => 'CREAT',
                 'delivered_qty' => 0,
@@ -1321,7 +1337,7 @@ final class ProjectsController
                 'project_id' => $projectId,
                 'product_id' => $pid,
                 'qty' => $qty,
-                'unit' => $unit,
+                'unit' => 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
             ]);
             try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
@@ -1331,6 +1347,32 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot crea produsul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    private static function defaultBoardAreaM2ForProject(int $projectId): float
+    {
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        try {
+            $st = $pdo->prepare("
+                SELECT b.std_width_mm, b.std_height_mm, COALESCE(SUM(c.qty_boards),0) AS q
+                FROM project_hpl_consumptions c
+                INNER JOIN hpl_boards b ON b.id = c.board_id
+                WHERE c.project_id = ?
+                GROUP BY c.board_id, b.std_width_mm, b.std_height_mm
+                ORDER BY q DESC, c.board_id DESC
+                LIMIT 1
+            ");
+            $st->execute([(int)$projectId]);
+            $r = $st->fetch();
+            if (!$r) return 0.0;
+            $w = (int)($r['std_width_mm'] ?? 0);
+            $h = (int)($r['std_height_mm'] ?? 0);
+            if ($w <= 0 || $h <= 0) return 0.0;
+            return ($w * $h) / 1000000.0;
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
     }
 
     public static function updateProjectProduct(array $params): void
