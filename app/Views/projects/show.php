@@ -381,7 +381,7 @@ ob_start();
                 let base = '';
                 if (th) base += esc(th) + 'mm';
                 if (name) base += (base ? ' · ' : '') + '<strong>' + esc(name) + '</strong>';
-                if (dim) base += (base ? ' · ' : '') + esc(dim);
+                if (dim) base += (base ? ' · ' : '') + 'Dimensiune standard: ' + esc(dim);
                 if (tex) base += (base ? ' · ' : '') + esc(tex);
 
                 if (colors) $txt.html('<strong>' + esc(colors) + '</strong> · ' + base);
