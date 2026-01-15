@@ -1399,50 +1399,64 @@ ob_start();
           <?php if (!$projectHplPieces): ?>
             <div class="text-muted mt-2">Nu există piese HPL asociate proiectului încă.</div>
           <?php else: ?>
-            <div class="table-responsive mt-2">
-              <table class="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Placă</th>
-                    <th>Tip</th>
-                    <th>Status</th>
-                    <th>Dimensiuni</th>
-                    <th class="text-end">Buc</th>
-                    <th>Locație</th>
-                    <th class="text-end">mp</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($projectHplPieces as $p): ?>
-                    <?php
-                      $bid = (int)($p['board_id'] ?? 0);
-                      $bLabel = trim((string)($p['board_code'] ?? '') . ' · ' . (string)($p['board_name'] ?? ''));
-                      $wmm = (int)($p['width_mm'] ?? 0);
-                      $hmm = (int)($p['height_mm'] ?? 0);
-                      $qty = (int)($p['qty'] ?? 0);
-                      $mp = isset($p['area_total_m2']) ? (float)$p['area_total_m2'] : 0.0;
-                    ?>
+            <?php
+              // Grupăm pe placă, ca în Stoc → Placă (unde placa este implicită).
+              $piecesByBoard = [];
+              foreach ($projectHplPieces as $p) {
+                $bid = (int)($p['board_id'] ?? 0);
+                if (!isset($piecesByBoard[$bid])) $piecesByBoard[$bid] = [];
+                $piecesByBoard[$bid][] = $p;
+              }
+            ?>
+            <?php foreach ($piecesByBoard as $bid => $rows): ?>
+              <?php
+                $first = $rows[0] ?? [];
+                $bLabel = trim((string)($first['board_code'] ?? '') . ' · ' . (string)($first['board_name'] ?? ''));
+                if ($bLabel === '') $bLabel = $bid > 0 ? ('Placă #' . (int)$bid) : 'Placă';
+              ?>
+              <div class="mt-2 fw-semibold">
+                <?php if ((int)$bid > 0): ?>
+                  <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$bid)) ?>">
+                    <?= htmlspecialchars($bLabel) ?>
+                  </a>
+                <?php else: ?>
+                  <?= htmlspecialchars($bLabel) ?>
+                <?php endif; ?>
+              </div>
+
+              <div class="table-responsive mt-2">
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
                     <tr>
-                      <td class="fw-semibold">
-                        <?php if ($bid > 0): ?>
-                          <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid)) ?>">
-                            <?= htmlspecialchars($bLabel) ?>
-                          </a>
-                        <?php else: ?>
-                          <?= htmlspecialchars($bLabel) ?>
-                        <?php endif; ?>
-                      </td>
-                      <td class="fw-semibold"><?= htmlspecialchars((string)($p['piece_type'] ?? '')) ?></td>
-                      <td class="fw-semibold"><?= htmlspecialchars((string)($p['status'] ?? '')) ?></td>
-                      <td class="text-muted"><?= $hmm > 0 && $wmm > 0 ? (htmlspecialchars($hmm . ' × ' . $wmm . ' mm')) : '—' ?></td>
-                      <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
-                      <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
-                      <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
+                      <th>Tip</th>
+                      <th>Status</th>
+                      <th>Dimensiuni</th>
+                      <th class="text-end">Buc</th>
+                      <th>Locație</th>
+                      <th class="text-end">mp</th>
                     </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($rows as $p): ?>
+                      <?php
+                        $wmm = (int)($p['width_mm'] ?? 0);
+                        $hmm = (int)($p['height_mm'] ?? 0);
+                        $qty = (int)($p['qty'] ?? 0);
+                        $mp = isset($p['area_total_m2']) ? (float)$p['area_total_m2'] : 0.0;
+                      ?>
+                      <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars((string)($p['piece_type'] ?? '')) ?></td>
+                        <td class="fw-semibold"><?= htmlspecialchars((string)($p['status'] ?? '')) ?></td>
+                        <td class="text-muted"><?= $hmm > 0 && $wmm > 0 ? (htmlspecialchars($hmm . ' × ' . $wmm . ' mm')) : '—' ?></td>
+                        <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
+                        <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
+                        <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endforeach; ?>
           <?php endif; ?>
         </div>
 
