@@ -1332,131 +1332,55 @@ ob_start();
         <?php endif; ?>
 
         <div class="mt-3">
-          <?php if (!$hplConsum): ?>
-            <div class="text-muted">Nu există consumuri HPL încă.</div>
-          <?php else: ?>
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Placă</th>
-                    <th style="width:140px" class="text-end">Plăci</th>
-                    <th style="width:110px">Mod</th>
-                    <th>Notă</th>
-                    <th class="text-end" style="width:130px">Acțiuni</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($hplConsum as $c): ?>
-                    <?php
-                      $note = (string)($c['note'] ?? '');
-                      // Nu afișăm resturile interne (jumătăți) aici; ele se văd în stoc (OFFCUT).
-                      if ($note !== '' && strpos($note, 'REST_JUMATATE') === 0) continue;
-                    ?>
-                    <?php $cid = (int)($c['id'] ?? 0); ?>
-                    <tr>
-                      <?php $bid = (int)($c['board_id'] ?? 0); ?>
-                      <td class="fw-semibold">
-                        <?php if ($bid > 0): ?>
-                          <a href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid)) ?>" class="text-decoration-none">
-                            <?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?>
-                          </a>
-                        <?php else: ?>
-                          <?= htmlspecialchars((string)($c['board_code'] ?? '')) ?> · <?= htmlspecialchars((string)($c['board_name'] ?? '')) ?>
-                        <?php endif; ?>
-                      </td>
-                      <?php $qb = (int)($c['qty_boards'] ?? 0); ?>
-                      <td class="text-end fw-semibold">
-                        <?= $qb > 0 ? ($qb . ' buc') : '—' ?>
-                        <div class="text-muted small"><?= number_format((float)($c['qty_m2'] ?? 0), 4, '.', '') ?> mp</div>
-                      </td>
-                      <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
-                      <td class="text-muted"><?= htmlspecialchars($note) ?></td>
-                      <td class="text-end">
-                        <?php if ($canWrite): ?>
-                          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/' . $cid . '/delete')) ?>" class="m-0 d-inline"
-                                onsubmit="return confirm('Ștergi consumul HPL?');">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                            <button class="btn btn-outline-secondary btn-sm" type="submit">
-                              <i class="bi bi-trash me-1"></i> Șterge
-                            </button>
-                          </form>
-                        <?php else: ?>
-                          <span class="text-muted">—</span>
-                        <?php endif; ?>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          <?php endif; ?>
-        </div>
-
-        <div class="mt-3">
           <div class="fw-semibold">Piese HPL (stoc proiect)</div>
           <div class="text-muted small">FULL/OFFCUT cu dimensiuni, la fel ca în Stoc → Placă.</div>
           <?php if (!$projectHplPieces): ?>
             <div class="text-muted mt-2">Nu există piese HPL asociate proiectului încă.</div>
           <?php else: ?>
-            <?php
-              // Grupăm pe placă, ca în Stoc → Placă (unde placa este implicită).
-              $piecesByBoard = [];
-              foreach ($projectHplPieces as $p) {
-                $bid = (int)($p['board_id'] ?? 0);
-                if (!isset($piecesByBoard[$bid])) $piecesByBoard[$bid] = [];
-                $piecesByBoard[$bid][] = $p;
-              }
-            ?>
-            <?php foreach ($piecesByBoard as $bid => $rows): ?>
-              <?php
-                $first = $rows[0] ?? [];
-                $bLabel = trim((string)($first['board_code'] ?? '') . ' · ' . (string)($first['board_name'] ?? ''));
-                if ($bLabel === '') $bLabel = $bid > 0 ? ('Placă #' . (int)$bid) : 'Placă';
-              ?>
-              <div class="mt-2 fw-semibold">
-                <?php if ((int)$bid > 0): ?>
-                  <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . (int)$bid)) ?>">
-                    <?= htmlspecialchars($bLabel) ?>
-                  </a>
-                <?php else: ?>
-                  <?= htmlspecialchars($bLabel) ?>
-                <?php endif; ?>
-              </div>
-
-              <div class="table-responsive mt-2">
-                <table class="table table-hover align-middle mb-0">
-                  <thead>
+            <div class="table-responsive mt-2">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Placă</th>
+                    <th>Tip</th>
+                    <th>Status</th>
+                    <th>Dimensiuni</th>
+                    <th class="text-end">Buc</th>
+                    <th>Locație</th>
+                    <th class="text-end">mp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($projectHplPieces as $p): ?>
+                    <?php
+                      $bid = (int)($p['board_id'] ?? 0);
+                      $bLabel = trim((string)($p['board_code'] ?? '') . ' · ' . (string)($p['board_name'] ?? ''));
+                      $wmm = (int)($p['width_mm'] ?? 0);
+                      $hmm = (int)($p['height_mm'] ?? 0);
+                      $qty = (int)($p['qty'] ?? 0);
+                      $mp = isset($p['area_total_m2']) ? (float)$p['area_total_m2'] : 0.0;
+                    ?>
                     <tr>
-                      <th>Tip</th>
-                      <th>Status</th>
-                      <th>Dimensiuni</th>
-                      <th class="text-end">Buc</th>
-                      <th>Locație</th>
-                      <th class="text-end">mp</th>
+                      <td class="fw-semibold">
+                        <?php if ($bid > 0): ?>
+                          <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid)) ?>">
+                            <?= htmlspecialchars($bLabel) ?>
+                          </a>
+                        <?php else: ?>
+                          <?= htmlspecialchars($bLabel) ?>
+                        <?php endif; ?>
+                      </td>
+                      <td class="fw-semibold"><?= htmlspecialchars((string)($p['piece_type'] ?? '')) ?></td>
+                      <td class="fw-semibold"><?= htmlspecialchars((string)($p['status'] ?? '')) ?></td>
+                      <td class="text-muted"><?= $hmm > 0 && $wmm > 0 ? (htmlspecialchars($hmm . ' × ' . $wmm . ' mm')) : '—' ?></td>
+                      <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
+                      <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
+                      <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($rows as $p): ?>
-                      <?php
-                        $wmm = (int)($p['width_mm'] ?? 0);
-                        $hmm = (int)($p['height_mm'] ?? 0);
-                        $qty = (int)($p['qty'] ?? 0);
-                        $mp = isset($p['area_total_m2']) ? (float)$p['area_total_m2'] : 0.0;
-                      ?>
-                      <tr>
-                        <td class="fw-semibold"><?= htmlspecialchars((string)($p['piece_type'] ?? '')) ?></td>
-                        <td class="fw-semibold"><?= htmlspecialchars((string)($p['status'] ?? '')) ?></td>
-                        <td class="text-muted"><?= $hmm > 0 && $wmm > 0 ? (htmlspecialchars($hmm . ' × ' . $wmm . ' mm')) : '—' ?></td>
-                        <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
-                        <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
-                        <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
-            <?php endforeach; ?>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
           <?php endif; ?>
         </div>
 
