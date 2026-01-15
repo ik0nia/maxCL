@@ -1236,7 +1236,7 @@ ob_start();
     <div class="col-12 col-lg-5">
       <div class="card app-card p-3">
         <div class="h5 m-0">Adaugă ore</div>
-        <div class="text-muted">CNC / Atelier (estimate + reale)</div>
+        <div class="text-muted">CNC / Atelier (doar estimări)</div>
         <div class="text-muted small mt-1">
           Costuri din Setări: CNC <strong><?= $cncRate !== null ? number_format($cncRate, 2, '.', '') : '—' ?></strong> lei/h ·
           Manoperă <strong><?= $laborRate !== null ? number_format($laborRate, 2, '.', '') : '—' ?></strong> lei/h
@@ -1263,15 +1263,11 @@ ob_start();
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-4">
+            <div class="col-12">
               <label class="form-label fw-semibold">Ore estimate</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="hours_estimated">
+              <input class="form-control" type="number" step="0.01" min="0.01" name="hours_estimated" required placeholder="ex: 2.50">
+              <div class="text-muted small mt-1">Câmp obligatoriu. Ore reale nu se mai introduc aici.</div>
             </div>
-            <div class="col-4">
-              <label class="form-label fw-semibold">Ore reale</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="hours_actual">
-            </div>
-            <div class="col-4"></div>
             <div class="col-12">
               <label class="form-label fw-semibold">Notă</label>
               <input class="form-control" name="note" maxlength="255">
@@ -1324,8 +1320,8 @@ ob_start();
                   <th>Tip</th>
                   <th>Produs</th>
                   <th class="text-end">Est.</th>
-                  <th class="text-end">Real</th>
                   <th class="text-end">Cost/oră</th>
+                  <th class="text-end">Cost (estim.)</th>
                   <th>Notă</th>
                   <th class="text-end">Acțiuni</th>
                 </tr>
@@ -1335,16 +1331,16 @@ ob_start();
                   <?php
                     $wid = (int)($w['id'] ?? 0);
                     $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : null;
-                    $ha = isset($w['hours_actual']) && $w['hours_actual'] !== null && $w['hours_actual'] !== '' ? (float)$w['hours_actual'] : null;
                     $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
+                    $costEst = ($he !== null && $cph !== null) ? ($he * $cph) : null;
                   ?>
                   <tr>
                     <td class="text-muted"><?= htmlspecialchars((string)($w['created_at'] ?? '')) ?></td>
                     <td class="fw-semibold"><?= htmlspecialchars((string)($w['work_type'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string)($w['product_name'] ?? '')) ?></td>
                     <td class="text-end"><?= $he !== null ? number_format($he, 2, '.', '') : '—' ?></td>
-                    <td class="text-end"><?= $ha !== null ? number_format($ha, 2, '.', '') : '—' ?></td>
                     <td class="text-end"><?= $cph !== null ? number_format($cph, 2, '.', '') : '—' ?></td>
+                    <td class="text-end fw-semibold"><?= $costEst !== null ? number_format((float)$costEst, 2, '.', '') : '—' ?></td>
                     <td class="text-muted"><?= htmlspecialchars((string)($w['note'] ?? '')) ?></td>
                     <td class="text-end">
                       <?php if ($canWrite): ?>

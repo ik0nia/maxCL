@@ -1481,11 +1481,15 @@ final class ProjectsController
         }
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
         $he = Validator::dec(trim((string)($_POST['hours_estimated'] ?? '')));
-        $ha = Validator::dec(trim((string)($_POST['hours_actual'] ?? '')));
         $note = trim((string)($_POST['note'] ?? ''));
 
-        if ($he !== null && $he < 0) $he = null;
-        if ($ha !== null && $ha < 0) $ha = null;
+        if ($he !== null && $he <= 0) $he = null;
+        $ha = null; // nu mai folosim ore reale în formular
+
+        if ($he === null) {
+            Session::flash('toast_error', 'Completează orele estimate (valoare > 0).');
+            Response::redirect('/projects/' . $projectId . '?tab=hours');
+        }
 
         // Cost/oră din Setări costuri (admin-only)
         $cph = null;
