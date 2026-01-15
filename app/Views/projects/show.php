@@ -1152,7 +1152,7 @@ ob_start();
     <div class="col-12 col-lg-6">
       <div class="card app-card p-3">
         <div class="h5 m-0">Consum HPL</div>
-        <div class="text-muted">Rezervat/Consumat (plăci întregi) + alocare automată (mp) pe produse</div>
+        <div class="text-muted">Rezervat/Consumat (plăci întregi)</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
@@ -1404,13 +1404,12 @@ ob_start();
                 <thead>
                   <tr>
                     <th>Placă</th>
-                    <th style="width:90px">Tip</th>
-                    <th style="width:130px">Status</th>
+                    <th>Tip</th>
+                    <th>Status</th>
                     <th>Dimensiuni</th>
-                    <th class="text-end" style="width:90px">Buc</th>
-                    <th style="width:140px">Locație</th>
-                    <th class="text-end" style="width:120px">mp</th>
-                    <th>Notă</th>
+                    <th class="text-end">Buc</th>
+                    <th>Locație</th>
+                    <th class="text-end">mp</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1439,7 +1438,6 @@ ob_start();
                       <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
                       <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
-                      <td class="text-muted"><?= nl2br(htmlspecialchars((string)($p['notes'] ?? ''))) ?></td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
