@@ -253,6 +253,100 @@ final class ProjectsController
         return $out;
     }
 
+    /**
+     * @param array<int, array<string,mixed>> $workLogs
+     * @param array<int, array<string,mixed>> $magConsum
+     * @param array<int, array<string,mixed>> $hplConsum
+     * @param array<int, array<string,mixed>> $hplAlloc
+     * @return array{labor_cost:float,mag_cost:float,hpl_cost:float,total_cost:float,hpl_reserved_m2:float,hpl_reserved_cost:float,hpl_consumed_m2:float,hpl_consumed_cost:float}
+     */
+    private static function projectCostSummary(array $workLogs, array $magConsum, array $hplConsum, array $hplAlloc): array
+    {
+        $labor = 0.0;
+        foreach ($workLogs as $w) {
+            $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
+            if ($he <= 0) continue;
+            $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
+            if ($cph === null || $cph < 0 || !is_finite($cph)) continue;
+            $labor += ($he * $cph);
+        }
+
+        $mag = 0.0;
+        foreach ($magConsum as $c) {
+            $qty = isset($c['qty']) ? (float)$c['qty'] : 0.0;
+            if ($qty <= 0) continue;
+            $unitPrice = isset($c['item_unit_price']) && $c['item_unit_price'] !== null && $c['item_unit_price'] !== '' && is_numeric($c['item_unit_price'])
+                ? (float)$c['item_unit_price']
+                : 0.0;
+            if ($unitPrice <= 0) continue;
+            $mag += ($qty * $unitPrice);
+        }
+
+        $pricePm2 = function (array $row): float {
+            if (isset($row['board_sale_price_per_m2']) && $row['board_sale_price_per_m2'] !== null && $row['board_sale_price_per_m2'] !== '' && is_numeric($row['board_sale_price_per_m2'])) {
+                return (float)$row['board_sale_price_per_m2'];
+            }
+            $sale = (isset($row['board_sale_price']) && $row['board_sale_price'] !== null && $row['board_sale_price'] !== '' && is_numeric($row['board_sale_price']))
+                ? (float)$row['board_sale_price']
+                : null;
+            $wmm = (int)($row['board_std_width_mm'] ?? 0);
+            $hmm = (int)($row['board_std_height_mm'] ?? 0);
+            $area = ($wmm > 0 && $hmm > 0) ? (($wmm * $hmm) / 1000000.0) : 0.0;
+            if ($sale !== null && $sale >= 0 && $area > 0) return $sale / $area;
+            return 0.0;
+        };
+
+        $hpl = 0.0;
+        if ($hplAlloc) {
+            foreach ($hplAlloc as $a) {
+                $m2 = isset($a['qty_m2']) ? (float)$a['qty_m2'] : 0.0;
+                if ($m2 <= 0) continue;
+                $ppm = $pricePm2($a);
+                if ($ppm <= 0) continue;
+                $hpl += ($m2 * $ppm);
+            }
+        } else {
+            foreach ($hplConsum as $c) {
+                $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
+                if ($m2 <= 0) continue;
+                $ppm = $pricePm2($c);
+                if ($ppm <= 0) continue;
+                $hpl += ($m2 * $ppm);
+            }
+        }
+
+        $hplResM2 = 0.0;
+        $hplResCost = 0.0;
+        $hplConM2 = 0.0;
+        $hplConCost = 0.0;
+        foreach ($hplConsum as $c) {
+            $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
+            if ($m2 <= 0) continue;
+            $ppm = $pricePm2($c);
+            $cost = ($ppm > 0) ? ($m2 * $ppm) : 0.0;
+            $mode = (string)($c['mode'] ?? '');
+            if ($mode === 'RESERVED') {
+                $hplResM2 += $m2;
+                $hplResCost += $cost;
+            } elseif ($mode === 'CONSUMED') {
+                $hplConM2 += $m2;
+                $hplConCost += $cost;
+            }
+        }
+
+        $total = $labor + $mag + $hpl;
+        return [
+            'labor_cost' => $labor,
+            'mag_cost' => $mag,
+            'hpl_cost' => $hpl,
+            'total_cost' => $total,
+            'hpl_reserved_m2' => $hplResM2,
+            'hpl_reserved_cost' => $hplResCost,
+            'hpl_consumed_m2' => $hplConM2,
+            'hpl_consumed_cost' => $hplConCost,
+        ];
+    }
+
     private static function countFullBoardsAvailable(int $boardId): int
     {
         /** @var \PDO $pdo */
@@ -576,6 +670,7 @@ final class ProjectsController
         $cncFiles = [];
         $laborByProduct = [];
         $materialsByProduct = [];
+        $projectCostSummary = [];
         if ($tab === 'products') {
             try {
                 $projectProducts = ProjectProduct::forProject($id);
@@ -597,6 +692,7 @@ final class ProjectsController
                     'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
                 ];
             }
+            $projectCostSummary = self::projectCostSummary($workLogs, $magazieConsum, $hplConsum, $hplAlloc);
         } elseif ($tab === 'consum') {
             try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
             try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
@@ -672,6 +768,7 @@ final class ProjectsController
             'workLogs' => $workLogs,
             'laborByProduct' => $laborByProduct,
             'materialsByProduct' => $materialsByProduct,
+            'projectCostSummary' => $projectCostSummary,
             'costSettings' => [
                 'labor' => (function () {
                     try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; }

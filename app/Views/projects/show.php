@@ -253,165 +253,161 @@ ob_start();
         <?php if (!$projectProducts): ?>
           <div class="text-muted mt-2">Nu există produse încă.</div>
         <?php else: ?>
-          <div class="table-responsive mt-2">
-            <table class="table table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>Produs</th>
-                  <th style="width:120px" class="text-end">Cant.</th>
-                  <th style="width:150px">Status</th>
-                  <th style="width:140px" class="text-end">Livrat</th>
-                  <th class="text-end" style="width:210px">Acțiuni</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($projectProducts as $pp): ?>
-                  <?php
-                    $ppId = (int)($pp['id'] ?? 0);
-                    $qty = (float)($pp['qty'] ?? 0);
-                    $del = (float)($pp['delivered_qty'] ?? 0);
-                    $pname = (string)($pp['product_name'] ?? '');
-                    $pcode = (string)($pp['product_code'] ?? '');
-                    $lab = (isset($laborByProduct[$ppId]) && is_array($laborByProduct[$ppId])) ? $laborByProduct[$ppId] : null;
-                    $cncH = $lab ? (float)($lab['cnc_hours'] ?? 0.0) : 0.0;
-                    $cncC = $lab ? (float)($lab['cnc_cost'] ?? 0.0) : 0.0;
-                    $cncR = $lab ? (float)($lab['cnc_rate'] ?? 0.0) : 0.0;
-                    $atH = $lab ? (float)($lab['atelier_hours'] ?? 0.0) : 0.0;
-                    $atC = $lab ? (float)($lab['atelier_cost'] ?? 0.0) : 0.0;
-                    $atR = $lab ? (float)($lab['atelier_rate'] ?? 0.0) : 0.0;
-                    $totC = $lab ? (float)($lab['total_cost'] ?? 0.0) : 0.0;
-                    $qtyUnits = ($qty > 0.0) ? $qty : 0.0;
-                    $showPerUnit = ($qtyUnits > 1.0001);
-                    $cncHUnit = $showPerUnit ? ($cncH / $qtyUnits) : $cncH;
-                    $cncCUnit = $showPerUnit ? ($cncC / $qtyUnits) : $cncC;
-                    $atHUnit = $showPerUnit ? ($atH / $qtyUnits) : $atH;
-                    $atCUnit = $showPerUnit ? ($atC / $qtyUnits) : $atC;
-                    $totCUnit = $showPerUnit ? ($totC / $qtyUnits) : $totC;
+          <div class="row g-3 mt-2">
+            <?php foreach ($projectProducts as $pp): ?>
+              <?php
+                $ppId = (int)($pp['id'] ?? 0);
+                $qty = (float)($pp['qty'] ?? 0);
+                $del = (float)($pp['delivered_qty'] ?? 0);
+                $pname = (string)($pp['product_name'] ?? '');
+                $pcode = (string)($pp['product_code'] ?? '');
+                $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+                $m2t = ($m2u > 0 && $qty > 0) ? ($m2u * $qty) : 0.0;
 
-                    $mat = (isset($materialsByProduct[$ppId]) && is_array($materialsByProduct[$ppId])) ? $materialsByProduct[$ppId] : null;
-                    $magCost = $mat ? (float)($mat['mag_cost'] ?? 0.0) : 0.0;
-                    $hplCost = $mat ? (float)($mat['hpl_cost'] ?? 0.0) : 0.0;
-                    $matCost = $magCost + $hplCost;
-                    $magCostUnit = $showPerUnit ? ($magCost / $qtyUnits) : $magCost;
-                    $hplCostUnit = $showPerUnit ? ($hplCost / $qtyUnits) : $hplCost;
-                    $matCostUnit = $showPerUnit ? ($matCost / $qtyUnits) : $matCost;
-                    $totalEst = $totC + $matCost;
-                    $totalEstUnit = $showPerUnit ? ($totalEst / $qtyUnits) : $totalEst;
-                  ?>
-                  <tr>
-                    <td>
-                      <div class="fw-semibold"><?= htmlspecialchars($pname) ?></div>
+                $lab = (isset($laborByProduct[$ppId]) && is_array($laborByProduct[$ppId])) ? $laborByProduct[$ppId] : null;
+                $cncH = $lab ? (float)($lab['cnc_hours'] ?? 0.0) : 0.0;
+                $cncC = $lab ? (float)($lab['cnc_cost'] ?? 0.0) : 0.0;
+                $cncR = $lab ? (float)($lab['cnc_rate'] ?? 0.0) : 0.0;
+                $atH = $lab ? (float)($lab['atelier_hours'] ?? 0.0) : 0.0;
+                $atC = $lab ? (float)($lab['atelier_cost'] ?? 0.0) : 0.0;
+                $atR = $lab ? (float)($lab['atelier_rate'] ?? 0.0) : 0.0;
+                $manCost = $lab ? (float)($lab['total_cost'] ?? 0.0) : 0.0;
+
+                $mat = (isset($materialsByProduct[$ppId]) && is_array($materialsByProduct[$ppId])) ? $materialsByProduct[$ppId] : null;
+                $magCost = $mat ? (float)($mat['mag_cost'] ?? 0.0) : 0.0;
+                $hplCost = $mat ? (float)($mat['hpl_cost'] ?? 0.0) : 0.0;
+                $matCost = $magCost + $hplCost;
+                $totalEst = $manCost + $matCost;
+
+                $qtyUnits = ($qty > 0.0) ? $qty : 0.0;
+                $showPerUnit = ($qtyUnits > 1.0001);
+                $cncHUnit = $showPerUnit ? ($cncH / $qtyUnits) : $cncH;
+                $cncCUnit = $showPerUnit ? ($cncC / $qtyUnits) : $cncC;
+                $atHUnit = $showPerUnit ? ($atH / $qtyUnits) : $atH;
+                $atCUnit = $showPerUnit ? ($atC / $qtyUnits) : $atC;
+                $manUnit = $showPerUnit ? ($manCost / $qtyUnits) : $manCost;
+                $magUnit = $showPerUnit ? ($magCost / $qtyUnits) : $magCost;
+                $hplUnit = $showPerUnit ? ($hplCost / $qtyUnits) : $hplCost;
+                $matUnit = $showPerUnit ? ($matCost / $qtyUnits) : $matCost;
+                $totUnit = $showPerUnit ? ($totalEst / $qtyUnits) : $totalEst;
+              ?>
+              <div class="col-12">
+                <div class="card app-card p-3">
+                  <div class="d-flex align-items-start justify-content-between gap-2">
+                    <div>
+                      <div class="h5 m-0"><?= htmlspecialchars($pname) ?></div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
-                      <div class="text-muted small mt-1">
-                        <?php if ($showPerUnit): ?>
-                          <div>
-                            Estimare/buc:
-                            CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncHUnit, 2, '.', '') ?>h = <?= number_format($cncCUnit, 2, '.', '') ?> lei ·
-                            Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atHUnit, 2, '.', '') ?>h = <?= number_format($atCUnit, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Manoperă <?= number_format($totCUnit, 2, '.', '') ?> lei</span>
-                          </div>
-                          <div>
-                            Materiale/buc:
-                            Magazie <?= number_format($magCostUnit, 2, '.', '') ?> lei ·
-                            HPL <?= number_format($hplCostUnit, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Total <?= number_format($matCostUnit, 2, '.', '') ?> lei</span>
-                          </div>
-                          <div class="fw-semibold">
-                            Total estimat/buc: <?= number_format($totalEstUnit, 2, '.', '') ?> lei
-                          </div>
-                          <div>
-                            Total (<?= number_format($qtyUnits, 2, '.', '') ?> buc):
-                            CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
-                            Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Manoperă <?= number_format($totC, 2, '.', '') ?> lei</span>
-                          </div>
-                          <div>
-                            Materiale total:
-                            Magazie <?= number_format($magCost, 2, '.', '') ?> lei ·
-                            HPL <?= number_format($hplCost, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Total <?= number_format($matCost, 2, '.', '') ?> lei</span>
-                          </div>
-                          <div class="fw-semibold">
-                            Total estimat: <?= number_format($totalEst, 2, '.', '') ?> lei
-                          </div>
-                        <?php else: ?>
-                          Estimare:
-                          CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
-                          Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
-                          <span class="fw-semibold">Manoperă <?= number_format($totC, 2, '.', '') ?> lei</span>
-                          <div>
-                            Materiale: Magazie <?= number_format($magCost, 2, '.', '') ?> lei · HPL <?= number_format($hplCost, 2, '.', '') ?> lei ·
-                            <span class="fw-semibold">Total <?= number_format($matCost, 2, '.', '') ?> lei</span>
-                          </div>
-                          <div class="fw-semibold">Total estimat: <?= number_format($totalEst, 2, '.', '') ?> lei</div>
-                        <?php endif; ?>
+                    </div>
+                    <div class="text-end">
+                      <div class="text-muted small">Status</div>
+                      <div class="fw-semibold"><?= htmlspecialchars((string)($pp['production_status'] ?? '')) ?></div>
+                    </div>
+                  </div>
+
+                  <div class="row g-2 mt-2">
+                    <div class="col-6 col-md-3">
+                      <div class="text-muted small">Cantitate</div>
+                      <div class="fw-semibold"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                      <div class="text-muted small">Livrat</div>
+                      <div class="fw-semibold"><?= number_format($del, 2, '.', '') ?></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                      <div class="text-muted small">mp/buc</div>
+                      <div class="fw-semibold"><?= number_format($m2u, 4, '.', '') ?></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                      <div class="text-muted small">mp total</div>
+                      <div class="fw-semibold"><?= number_format($m2t, 4, '.', '') ?></div>
+                    </div>
+                  </div>
+
+                  <div class="mt-3 text-muted small">
+                    <?php if ($showPerUnit): ?>
+                      <div><strong>Estimare/buc</strong></div>
+                      <div>
+                        CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncHUnit, 2, '.', '') ?>h = <?= number_format($cncCUnit, 2, '.', '') ?> lei ·
+                        Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atHUnit, 2, '.', '') ?>h = <?= number_format($atCUnit, 2, '.', '') ?> lei ·
+                        <span class="fw-semibold">Manoperă <?= number_format($manUnit, 2, '.', '') ?> lei</span>
                       </div>
-                    </td>
-                    <td class="text-end"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
-                    <td class="fw-semibold"><?= htmlspecialchars((string)($pp['production_status'] ?? '')) ?></td>
-                    <td class="text-end"><?= number_format($del, 2, '.', '') ?></td>
-                    <td class="text-end">
-                      <?php if ($canWrite): ?>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
-                          <i class="bi bi-pencil me-1"></i> Editează
-                        </button>
-                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/unlink')) ?>" class="d-inline"
-                              onsubmit="return confirm('Scoți produsul din proiect?');">
-                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                          <button class="btn btn-outline-secondary btn-sm" type="submit">
-                            <i class="bi bi-link-45deg me-1"></i> Scoate
-                          </button>
-                        </form>
-                      <?php else: ?>
-                        <span class="text-muted">—</span>
-                      <?php endif; ?>
-                    </td>
-                  </tr>
+                      <div>
+                        Materiale: Magazie <?= number_format($magUnit, 2, '.', '') ?> lei · HPL <?= number_format($hplUnit, 2, '.', '') ?> lei ·
+                        <span class="fw-semibold">Total <?= number_format($matUnit, 2, '.', '') ?> lei</span>
+                      </div>
+                      <div class="fw-semibold">Total estimat/buc: <?= number_format($totUnit, 2, '.', '') ?> lei</div>
+                      <hr class="my-2">
+                      <div><strong>Total (<?= number_format($qtyUnits, 2, '.', '') ?> buc)</strong></div>
+                    <?php else: ?>
+                      <div><strong>Estimare</strong></div>
+                    <?php endif; ?>
+                    <div>
+                      CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
+                      Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
+                      <span class="fw-semibold">Manoperă <?= number_format($manCost, 2, '.', '') ?> lei</span>
+                    </div>
+                    <div>
+                      Materiale: Magazie <?= number_format($magCost, 2, '.', '') ?> lei · HPL <?= number_format($hplCost, 2, '.', '') ?> lei ·
+                      <span class="fw-semibold">Total <?= number_format($matCost, 2, '.', '') ?> lei</span>
+                    </div>
+                    <div class="fw-semibold">Total estimat: <?= number_format($totalEst, 2, '.', '') ?> lei</div>
+                  </div>
+
                   <?php if ($canWrite): ?>
-                    <tr class="collapse" id="ppEdit<?= $ppId ?>">
-                      <td colspan="5">
-                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/update')) ?>" class="row g-2 align-items-end">
-                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                          <div class="col-6 col-md-2">
-                            <label class="form-label fw-semibold mb-1">Cant.</label>
-                            <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>">
-                          </div>
-                          <div class="col-6 col-md-2">
-                            <label class="form-label fw-semibold mb-1">Unit</label>
-                            <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($pp['unit'] ?? 'buc')) ?>">
-                          </div>
-                          <div class="col-6 col-md-2">
-                            <label class="form-label fw-semibold mb-1">mp/buc</label>
-                            <input class="form-control form-control-sm" type="number" step="0.0001" min="0" name="m2_per_unit" value="<?= htmlspecialchars((string)($pp['m2_per_unit'] ?? '0')) ?>">
-                          </div>
-                          <div class="col-12 col-md-3">
-                            <label class="form-label fw-semibold mb-1">Status</label>
-                            <select class="form-select form-select-sm" name="production_status">
-                              <?php foreach (['DE_PREGATIT'=>'De pregătit','CNC'=>'CNC','ATELIER'=>'Atelier','FINISARE'=>'Finisare','GATA'=>'Gata','LIVRAT_PARTIAL'=>'Livrat parțial','LIVRAT_COMPLET'=>'Livrat complet','REBUT'=>'Rebut/Refăcut'] as $val => $lbl): ?>
-                                <option value="<?= htmlspecialchars($val) ?>" <?= ((string)($pp['production_status'] ?? '') === $val) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
-                              <?php endforeach; ?>
-                            </select>
-                          </div>
-                          <div class="col-6 col-md-2">
-                            <label class="form-label fw-semibold mb-1">Livrat</label>
-                            <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="delivered_qty" value="<?= htmlspecialchars((string)$del) ?>">
-                          </div>
-                          <div class="col-12 col-md-3">
-                            <label class="form-label fw-semibold mb-1">Notă</label>
-                            <input class="form-control form-control-sm" name="notes" value="<?= htmlspecialchars((string)($pp['notes'] ?? '')) ?>">
-                          </div>
-                          <div class="col-12 d-flex justify-content-end">
-                            <button class="btn btn-primary btn-sm" type="submit">
-                              <i class="bi bi-save me-1"></i> Salvează
-                            </button>
-                          </div>
-                        </form>
-                      </td>
-                    </tr>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
+                        <i class="bi bi-pencil me-1"></i> Editează
+                      </button>
+                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/unlink')) ?>" class="m-0"
+                            onsubmit="return confirm('Scoți produsul din proiect?');">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                        <button class="btn btn-outline-secondary btn-sm" type="submit">
+                          <i class="bi bi-link-45deg me-1"></i> Scoate
+                        </button>
+                      </form>
+                    </div>
+                    <div class="collapse mt-3" id="ppEdit<?= $ppId ?>">
+                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/update')) ?>" class="row g-2 align-items-end">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                        <div class="col-6 col-md-2">
+                          <label class="form-label fw-semibold mb-1">Cant.</label>
+                          <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>">
+                        </div>
+                        <div class="col-6 col-md-2">
+                          <label class="form-label fw-semibold mb-1">Unit</label>
+                          <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($pp['unit'] ?? 'buc')) ?>">
+                        </div>
+                        <div class="col-6 col-md-2">
+                          <label class="form-label fw-semibold mb-1">mp/buc</label>
+                          <input class="form-control form-control-sm" type="number" step="0.0001" min="0" name="m2_per_unit" value="<?= htmlspecialchars((string)($pp['m2_per_unit'] ?? '0')) ?>">
+                        </div>
+                        <div class="col-12 col-md-3">
+                          <label class="form-label fw-semibold mb-1">Status</label>
+                          <select class="form-select form-select-sm" name="production_status">
+                            <?php foreach (['DE_PREGATIT'=>'De pregătit','CNC'=>'CNC','ATELIER'=>'Atelier','FINISARE'=>'Finisare','GATA'=>'Gata','LIVRAT_PARTIAL'=>'Livrat parțial','LIVRAT_COMPLET'=>'Livrat complet','REBUT'=>'Rebut/Refăcut'] as $val => $lbl): ?>
+                              <option value="<?= htmlspecialchars($val) ?>" <?= ((string)($pp['production_status'] ?? '') === $val) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                          <label class="form-label fw-semibold mb-1">Livrat</label>
+                          <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="delivered_qty" value="<?= htmlspecialchars((string)$del) ?>">
+                        </div>
+                        <div class="col-12 col-md-3">
+                          <label class="form-label fw-semibold mb-1">Notă</label>
+                          <input class="form-control form-control-sm" name="notes" value="<?= htmlspecialchars((string)($pp['notes'] ?? '')) ?>">
+                        </div>
+                        <div class="col-12 d-flex justify-content-end">
+                          <button class="btn btn-primary btn-sm" type="submit">
+                            <i class="bi bi-save me-1"></i> Salvează
+                          </button>
+                        </div>
+                      </form>
+                    </div>
                   <?php endif; ?>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
         <?php endif; ?>
       </div>
@@ -419,75 +415,126 @@ ob_start();
 
     <div class="col-12 col-lg-5">
       <div class="card app-card p-3 mb-3">
-        <div class="h5 m-0">Adaugă produs existent</div>
-        <div class="text-muted">Selectează un produs din modulul Produse</div>
-        <?php if (!$canWrite): ?>
-          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
-        <?php else: ?>
-          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/add-existing')) ?>" class="row g-2 mt-1">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-            <div class="col-12">
-              <label class="form-label fw-semibold">ID produs</label>
-              <input class="form-control" name="product_id" placeholder="ex: 123">
-              <div class="text-muted small mt-1">Momentan: introdu ID-ul produsului (următorul pas: search).</div>
+        <div class="h5 m-0">Sumar costuri proiect</div>
+        <div class="text-muted">Manoperă + materiale + HPL rezervat (neconsumat)</div>
+        <?php
+          $sum = is_array($projectCostSummary ?? null) ? $projectCostSummary : [];
+          $sumLabor = (float)($sum['labor_cost'] ?? 0);
+          $sumMag = (float)($sum['mag_cost'] ?? 0);
+          $sumHpl = (float)($sum['hpl_cost'] ?? 0);
+          $sumTotal = (float)($sum['total_cost'] ?? 0);
+          $resM2 = (float)($sum['hpl_reserved_m2'] ?? 0);
+          $resCost = (float)($sum['hpl_reserved_cost'] ?? 0);
+        ?>
+        <div class="mt-2">
+          <div class="d-flex justify-content-between">
+            <div class="text-muted">Manoperă (estim.)</div>
+            <div class="fw-semibold"><?= number_format($sumLabor, 2, '.', '') ?> lei</div>
+          </div>
+          <div class="d-flex justify-content-between mt-1">
+            <div class="text-muted">Materiale Magazie</div>
+            <div class="fw-semibold"><?= number_format($sumMag, 2, '.', '') ?> lei</div>
+          </div>
+          <div class="d-flex justify-content-between mt-1">
+            <div class="text-muted">Materiale HPL</div>
+            <div class="fw-semibold"><?= number_format($sumHpl, 2, '.', '') ?> lei</div>
+          </div>
+          <hr class="my-2">
+          <div class="d-flex justify-content-between">
+            <div class="text-muted fw-semibold">Total estimat</div>
+            <div class="fw-semibold" style="font-size:1.15rem"><?= number_format($sumTotal, 2, '.', '') ?> lei</div>
+          </div>
+          <div class="mt-3 p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+            <div class="fw-semibold">HPL rezervat rămas (neconsumat)</div>
+            <div class="text-muted small">Evidențiere financiară pentru plăcile rezervate în stoc, dar încă neconsumate.</div>
+            <div class="d-flex justify-content-between mt-1">
+              <div class="text-muted">Suprafață</div>
+              <div class="fw-semibold"><?= number_format($resM2, 2, '.', '') ?> mp</div>
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Cantitate</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+            <div class="d-flex justify-content-between mt-1">
+              <div class="text-muted">Valoare</div>
+              <div class="fw-semibold"><?= number_format($resCost, 2, '.', '') ?> lei</div>
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Unit</label>
-              <input class="form-control" name="unit" value="buc">
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">mp / buc (opțional)</label>
-              <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
-              <div class="text-muted small mt-1">Folosit pentru distribuția costurilor pe produse.</div>
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-outline-secondary" type="submit">
-                <i class="bi bi-plus-lg me-1"></i> Adaugă
-              </button>
-            </div>
-          </form>
-        <?php endif; ?>
+          </div>
+        </div>
       </div>
 
       <div class="card app-card p-3">
-        <div class="h5 m-0">Creează produs nou în proiect</div>
-        <div class="text-muted">Se creează produs + se atașează automat</div>
+        <div class="h5 m-0">Adaugă produs</div>
+        <div class="text-muted">Poți adăuga un produs existent sau crea unul nou</div>
         <?php if (!$canWrite): ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
         <?php else: ?>
-          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2 mt-1">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-            <div class="col-12">
-              <label class="form-label fw-semibold">Denumire</label>
-              <input class="form-control" name="name" required>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">Cod (opțional)</label>
-              <input class="form-control" name="code">
-            </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Cantitate</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
-            </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Unit</label>
-              <input class="form-control" name="unit" value="buc">
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">mp / buc (opțional)</label>
-              <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
-              <div class="text-muted small mt-1">Nu mai folosim lungime/lățime; setăm suprafața (mp) per piesă.</div>
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-primary" type="submit">
-                <i class="bi bi-plus-lg me-1"></i> Creează
-              </button>
-            </div>
-          </form>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddExisting">
+              <i class="bi bi-link-45deg me-1"></i> Existent
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNew">
+              <i class="bi bi-plus-lg me-1"></i> Nou
+            </button>
+          </div>
+
+          <div class="collapse show mt-3" id="ppAddExisting">
+            <div class="fw-semibold mb-1">Adaugă produs existent</div>
+            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/add-existing')) ?>" class="row g-2">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+              <div class="col-12">
+                <label class="form-label fw-semibold">ID produs</label>
+                <input class="form-control" name="product_id" placeholder="ex: 123">
+                <div class="text-muted small mt-1">Momentan: introdu ID-ul produsului (următorul pas: search).</div>
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">Cantitate</label>
+                <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">Unit</label>
+                <input class="form-control" name="unit" value="buc">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">mp / buc (opțional)</label>
+                <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-outline-secondary" type="submit">
+                  <i class="bi bi-plus-lg me-1"></i> Adaugă
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="collapse mt-3" id="ppAddNew">
+            <div class="fw-semibold mb-1">Creează produs nou în proiect</div>
+            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+              <div class="col-12">
+                <label class="form-label fw-semibold">Denumire</label>
+                <input class="form-control" name="name" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Cod (opțional)</label>
+                <input class="form-control" name="code">
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">Cantitate</label>
+                <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">Unit</label>
+                <input class="form-control" name="unit" value="buc">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">mp / buc (opțional)</label>
+                <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
+                <div class="text-muted small mt-1">Nu mai folosim lungime/lățime; setăm suprafața (mp) per piesă.</div>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit">
+                  <i class="bi bi-plus-lg me-1"></i> Creează
+                </button>
+              </div>
+            </form>
+          </div>
         <?php endif; ?>
       </div>
     </div>
