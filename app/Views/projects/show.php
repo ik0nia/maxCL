@@ -314,13 +314,11 @@ ob_start();
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                     </div>
                     <div class="text-end">
-                      <div class="text-muted small">Status</div>
                       <?php
                         $stVal = (string)($pp['production_status'] ?? '');
                         $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
                         $idx = array_search($stVal, $ppAllowedValues, true);
                       ?>
-                      <div class="fw-semibold"><?= htmlspecialchars($stLbl) ?></div>
                       <?php if ($canSetPPStatus): ?>
                         <?php
                           $flowAll = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
@@ -350,7 +348,7 @@ ob_start();
                               <?php if ($isNext && $canAdvance): ?>
                                 <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
                                   <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                  <button class="btn btn-sm btn-outline-primary px-2 py-1" type="submit" title="Treci la următorul status">
+                                  <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
                                     <?= htmlspecialchars($lbl) ?>
                                   </button>
                                 </form>
@@ -358,7 +356,7 @@ ob_start();
                                 <?php
                                   $cls = 'bg-secondary-subtle text-secondary-emphasis';
                                   if ($isDone) $cls = 'bg-success-subtle text-success-emphasis';
-                                  if ($isCur) $cls = 'bg-primary text-white';
+                                  if ($isCur) $cls = 'bg-success text-white';
                                 ?>
                                 <span class="badge rounded-pill <?= $cls ?> px-2 py-1"><?= htmlspecialchars($lbl) ?></span>
                               <?php endif; ?>
