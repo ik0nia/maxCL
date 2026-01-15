@@ -17,9 +17,12 @@ final class ProjectProduct
             SELECT
               pp.*,
               p.code AS product_code,
-              p.name AS product_name
+              p.name AS product_name,
+              hb.code AS hpl_board_code,
+              hb.name AS hpl_board_name
             FROM project_products pp
             INNER JOIN products p ON p.id = pp.product_id
+            LEFT JOIN hpl_boards hb ON hb.id = pp.hpl_board_id
             WHERE pp.project_id = ?
             ORDER BY pp.id DESC
         ');
@@ -43,8 +46,8 @@ final class ProjectProduct
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         $st = $pdo->prepare('
-            INSERT INTO project_products (project_id, product_id, qty, unit, m2_per_unit, production_status, delivered_qty, notes, cnc_override_json)
-            VALUES (:project_id, :product_id, :qty, :unit, :m2, :st, :del, :notes, :cnc)
+            INSERT INTO project_products (project_id, product_id, qty, unit, m2_per_unit, production_status, hpl_board_id, delivered_qty, notes, cnc_override_json)
+            VALUES (:project_id, :product_id, :qty, :unit, :m2, :st, :hpl_board_id, :del, :notes, :cnc)
         ');
         $st->execute([
             ':project_id' => (int)$data['project_id'],
@@ -53,6 +56,7 @@ final class ProjectProduct
             ':unit' => (string)($data['unit'] ?? 'buc'),
             ':m2' => (float)($data['m2_per_unit'] ?? 0),
             ':st' => (string)($data['production_status'] ?? 'CREAT'),
+            ':hpl_board_id' => $data['hpl_board_id'] ?? null,
             ':del' => (float)($data['delivered_qty'] ?? 0),
             ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
             ':cnc' => $data['cnc_override_json'] ?? null,
@@ -67,7 +71,7 @@ final class ProjectProduct
         $pdo = DB::pdo();
         $st = $pdo->prepare('
             UPDATE project_products
-            SET qty=:qty, unit=:unit, m2_per_unit=:m2, production_status=:st, delivered_qty=:del, notes=:notes
+            SET qty=:qty, unit=:unit, m2_per_unit=:m2, production_status=:st, hpl_board_id=:hpl_board_id, delivered_qty=:del, notes=:notes
             WHERE id=:id
         ');
         $st->execute([
@@ -76,6 +80,7 @@ final class ProjectProduct
             ':unit' => (string)($data['unit'] ?? 'buc'),
             ':m2' => (float)($data['m2_per_unit'] ?? 0),
             ':st' => (string)($data['production_status'] ?? 'CREAT'),
+            ':hpl_board_id' => $data['hpl_board_id'] ?? null,
             ':del' => (float)($data['delivered_qty'] ?? 0),
             ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
         ]);

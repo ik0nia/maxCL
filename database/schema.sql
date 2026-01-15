@@ -307,6 +307,7 @@ CREATE TABLE IF NOT EXISTS project_products (
   unit VARCHAR(32) NOT NULL DEFAULT 'buc',
   m2_per_unit DECIMAL(12,4) NOT NULL DEFAULT 0,
   production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
+  hpl_board_id INT UNSIGNED NULL,
   delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
   notes TEXT NULL,
   cnc_override_json JSON NULL,
@@ -316,8 +317,10 @@ CREATE TABLE IF NOT EXISTS project_products (
   UNIQUE KEY uq_proj_prod (project_id, product_id),
   KEY idx_proj_prod_project (project_id),
   KEY idx_proj_prod_status (production_status),
+  KEY idx_proj_prod_hpl_board (hpl_board_id),
   CONSTRAINT fk_proj_prod_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-  CONSTRAINT fk_proj_prod_product FOREIGN KEY (product_id) REFERENCES products(id)
+  CONSTRAINT fk_proj_prod_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_proj_prod_hpl_board FOREIGN KEY (hpl_board_id) REFERENCES hpl_boards(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Etichete (labels)

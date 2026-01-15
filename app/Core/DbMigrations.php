@@ -471,6 +471,7 @@ final class DbMigrations
                           qty DECIMAL(12,2) NOT NULL DEFAULT 1,
                           unit VARCHAR(32) NOT NULL DEFAULT 'buc',
                           production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
+                          hpl_board_id INT UNSIGNED NULL,
                           delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
                           notes TEXT NULL,
                           cnc_override_json JSON NULL,
@@ -480,8 +481,10 @@ final class DbMigrations
                           UNIQUE KEY uq_proj_prod (project_id, product_id),
                           KEY idx_proj_prod_project (project_id),
                           KEY idx_proj_prod_status (production_status),
+                          KEY idx_proj_prod_hpl_board (hpl_board_id),
                           CONSTRAINT fk_proj_prod_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-                          CONSTRAINT fk_proj_prod_product FOREIGN KEY (product_id) REFERENCES products(id)
+                          CONSTRAINT fk_proj_prod_product FOREIGN KEY (product_id) REFERENCES products(id),
+                          CONSTRAINT fk_proj_prod_hpl_board FOREIGN KEY (hpl_board_id) REFERENCES hpl_boards(id)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     ");
                 },
@@ -856,6 +859,30 @@ final class DbMigrations
                         ");
                     } catch (\Throwable $e) {
                         // ignore
+                    }
+                },
+            ],
+            [
+                'id' => '2026-01-15_05_project_products_hpl_board',
+                'label' => 'ALTER project_products ADD hpl_board_id',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (self::columnExists($pdo, 'project_products', 'hpl_board_id')) return;
+                    if (!self::tableExists($pdo, 'hpl_boards')) return;
+                    try {
+                        $pdo->exec("ALTER TABLE project_products ADD COLUMN hpl_board_id INT UNSIGNED NULL AFTER production_status");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try {
+                        $pdo->exec("ALTER TABLE project_products ADD KEY idx_proj_prod_hpl_board (hpl_board_id)");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try {
+                        $pdo->exec("ALTER TABLE project_products ADD CONSTRAINT fk_proj_prod_hpl_board FOREIGN KEY (hpl_board_id) REFERENCES hpl_boards(id)");
+                    } catch (\Throwable $e) {
+                        // ignore (poate nu avem drepturi / deja există)
                     }
                 },
             ],

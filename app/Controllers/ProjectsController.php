@@ -1280,6 +1280,7 @@ final class ProjectsController
         $desc = trim((string)($_POST['description'] ?? ''));
         $code = trim((string)($_POST['code'] ?? ''));
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
+        $hplBoardId = Validator::int(trim((string)($_POST['hpl_board_id'] ?? '')), 1);
         $surfaceMode = trim((string)($_POST['surface_mode'] ?? ''));
         $surfaceM2 = Validator::dec(trim((string)($_POST['surface_m2'] ?? ''))) ?? null;
         if ($surfaceM2 !== null && $surfaceM2 < 0) $surfaceM2 = null;
@@ -1301,6 +1302,11 @@ final class ProjectsController
         }
         if ($surfaceMode === 'M2' && ($surfaceM2 === null || $surfaceM2 <= 0)) {
             $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
+        }
+        if ($hplBoardId !== null) {
+            if (!self::isHplBoardReservedForProject($projectId, (int)$hplBoardId)) {
+                $errors['hpl_board_id'] = 'Placa HPL selectată nu este rezervată pe acest proiect.';
+            }
         }
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
@@ -1330,6 +1336,7 @@ final class ProjectsController
                 'unit' => 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
                 'production_status' => 'CREAT',
+                'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,
                 'delivered_qty' => 0,
                 'notes' => null,
             ]);
@@ -1344,6 +1351,7 @@ final class ProjectsController
                 'qty' => $qty,
                 'unit' => 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
+                'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,
             ]);
             try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
 
@@ -1377,6 +1385,42 @@ final class ProjectsController
             return ($w * $h) / 1000000.0;
         } catch (\Throwable $e) {
             return 0.0;
+        }
+    }
+
+    private static function isHplBoardReservedForProject(int $projectId, int $boardId): bool
+    {
+        if ($projectId <= 0 || $boardId <= 0) return false;
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        try {
+            $st = $pdo->prepare("
+                SELECT COUNT(*) AS c
+                FROM project_hpl_consumptions
+                WHERE project_id = ?
+                  AND board_id = ?
+                  AND mode = 'RESERVED'
+                  AND COALESCE(qty_boards,0) > 0
+            ");
+            $st->execute([(int)$projectId, (int)$boardId]);
+            $r = $st->fetch();
+            return ((int)($r['c'] ?? 0)) > 0;
+        } catch (\Throwable $e) {
+            // Compat: fără qty_boards
+            try {
+                $st = $pdo->prepare("
+                    SELECT COUNT(*) AS c
+                    FROM project_hpl_consumptions
+                    WHERE project_id = ?
+                      AND board_id = ?
+                      AND mode = 'RESERVED'
+                ");
+                $st->execute([(int)$projectId, (int)$boardId]);
+                $r = $st->fetch();
+                return ((int)($r['c'] ?? 0)) > 0;
+            } catch (\Throwable $e2) {
+                return false;
+            }
         }
     }
 

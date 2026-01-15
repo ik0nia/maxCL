@@ -296,6 +296,11 @@ ob_start();
                 <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
               </div>
             </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">HPL pentru piesă (din rezervările proiectului)</label>
+              <select class="form-select" name="hpl_board_id" id="ppHplBoardSelect" style="width:100%"></select>
+              <div class="text-muted small mt-1">Alegi din plăcile HPL rezervate pe proiect. (Cu thumbnail)</div>
+            </div>
             <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-primary" type="submit">
                 <i class="bi bi-plus-lg me-1"></i> Creează
@@ -316,6 +321,115 @@ ob_start();
               }
               modeRadios.forEach(function (r) { r.addEventListener('change', sync); });
               sync();
+            });
+          </script>
+
+          <style>
+            .s2-thumb{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px}
+            .s2-thumb2{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px;margin-left:-8px}
+            .s2-row{display:flex;align-items:center}
+          </style>
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              const el = document.getElementById('ppHplBoardSelect');
+              if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              const $ = window.jQuery;
+              const $el = $(el);
+              function fmtBoard(opt){
+                if (!opt.id) return opt.text;
+                const thumb = opt.thumb || null;
+                const thumbBack = opt.thumb_back || null;
+                const fc = opt.face_color_code || '';
+                const bc = opt.back_color_code || '';
+                let colors = fc ? String(fc) : '';
+                if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
+
+                const th = (opt.thickness_mm !== undefined && opt.thickness_mm !== null) ? String(opt.thickness_mm) : '';
+                const name = String(opt.name || '');
+                const h = (opt.std_height_mm !== undefined && opt.std_height_mm !== null) ? String(opt.std_height_mm) : '';
+                const w = (opt.std_width_mm !== undefined && opt.std_width_mm !== null) ? String(opt.std_width_mm) : '';
+                const dim = (h && w) ? (h + '×' + w) : String(opt.text || '');
+                const ft = String(opt.face_texture_name || '');
+                const bt = String(opt.back_texture_name || '');
+                let tex = ft ? ft : '';
+                if (bt && bt !== ft) tex = tex ? (tex + '/' + bt) : bt;
+                const stock = (opt.stock_qty_full_available !== undefined && opt.stock_qty_full_available !== null)
+                  ? parseInt(String(opt.stock_qty_full_available), 10)
+                  : NaN;
+                const stockTxt = Number.isFinite(stock) ? stock : null;
+
+                if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex && stockTxt === null) return opt.text;
+                const $row = $('<span class="s2-row"></span>');
+                if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
+                if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
+                const $txt = $('<span></span>');
+                const esc = (s) => String(s || '').replace(/</g,'&lt;');
+                let base = '';
+                if (th) base += esc(th) + 'mm';
+                if (name) base += (base ? ' · ' : '') + '<strong>' + esc(name) + '</strong>';
+                if (dim) base += (base ? ' · ' : '') + esc(dim);
+                if (tex) base += (base ? ' · ' : '') + esc(tex);
+                if (stockTxt !== null) base += ' · <span class="text-muted">stoc: <strong>' + esc(String(stockTxt)) + '</strong> buc</span>';
+
+                if (colors) $txt.html('<strong>' + esc(colors) + '</strong> · ' + base);
+                else $txt.html(base);
+                $row.append($txt);
+                return $row;
+              }
+              $el.select2({
+                width: '100%',
+                placeholder: 'Alege HPL rezervat…',
+                allowClear: true,
+                minimumInputLength: 0,
+                templateResult: fmtBoard,
+                templateSelection: fmtBoard,
+                escapeMarkup: m => m,
+                ajax: {
+                  url: "<?= htmlspecialchars(Url::to('/api/hpl/boards/search')) ?>",
+                  dataType: 'json',
+                  delay: 250,
+                  headers: { 'Accept': 'application/json' },
+                  data: function(params){
+                    return { q: params.term || '', project_id: <?= (int)$project['id'] ?>, reserved_only: 1 };
+                  },
+                  transport: function (params, success, failure) {
+                    const $ = window.jQuery;
+                    if (!$ || !$.ajax) return $.ajax(params).then(success).catch(failure);
+                    const req = $.ajax(params);
+                    req.done(function (resp) {
+                      if (resp && resp.ok === false) {
+                        let msg = String(resp.error || 'Nu pot încărca plăcile HPL rezervate.');
+                        if (resp.debug) msg += ' — ' + String(resp.debug);
+                        if (window.toastr) window.toastr.error(msg);
+                        success({ ok: true, items: [] });
+                        return;
+                      }
+                      success(resp);
+                    });
+                    req.fail(function (xhr) {
+                      let msg = 'Nu pot încărca plăcile HPL rezervate. (API)';
+                      try {
+                        const ct = String((xhr && xhr.getResponseHeader) ? (xhr.getResponseHeader('content-type') || '') : '');
+                        if (ct.toLowerCase().includes('application/json') && xhr.responseJSON) {
+                          msg = String(xhr.responseJSON.error || msg);
+                          if (xhr.responseJSON.debug) msg += ' — ' + String(xhr.responseJSON.debug);
+                        } else if (xhr && typeof xhr.status === 'number' && xhr.status) {
+                          msg += ' HTTP ' + String(xhr.status);
+                        }
+                      } catch (e) {}
+                      if (window.toastr) window.toastr.error(msg);
+                      success({ ok: true, items: [] });
+                      if (typeof failure === 'function') failure();
+                    });
+                    return req;
+                  },
+                  processResults: function(resp){
+                    const items = (resp && resp.items) ? resp.items : [];
+                    return { results: items };
+                  },
+                  cache: true
+                }
+              });
             });
           </script>
         <?php endif; ?>
@@ -459,6 +573,15 @@ ob_start();
                       <div class="fw-semibold"><?= number_format($m2t, 4, '.', '') ?></div>
                     </div>
                   </div>
+                  <?php
+                    $hbCode = trim((string)($pp['hpl_board_code'] ?? ''));
+                    $hbName = trim((string)($pp['hpl_board_name'] ?? ''));
+                  ?>
+                  <?php if ($hbCode !== '' || $hbName !== ''): ?>
+                    <div class="text-muted small mt-2">
+                      <strong>HPL:</strong> <?= htmlspecialchars(trim($hbCode . ($hbName !== '' ? (' · ' . $hbName) : ''))) ?>
+                    </div>
+                  <?php endif; ?>
 
                   <div class="mt-3 text-muted small">
                     <?php if ($showPerUnit): ?>
