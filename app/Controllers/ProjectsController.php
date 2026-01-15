@@ -1295,9 +1295,11 @@ final class ProjectsController
         if ($surfaceMode === '1' || $surfaceMode === '0.5') {
             $surfaceType = 'BOARD';
             $surfaceValue = (float)$surfaceMode; // 1 sau 0.5
-            $boardArea = self::defaultBoardAreaM2ForProject($projectId);
-            if ($boardArea <= 0) $boardArea = 5.796; // fallback 2800×2070
-            $m2 = $boardArea * $surfaceValue;
+            [$hmm, $wmm] = self::defaultBoardDimsMmForProject($projectId);
+            if ($hmm <= 0 || $wmm <= 0) { $hmm = 2800; $wmm = 2070; } // fallback
+            // Regulă: 1/2 placă = jumătate din lungime (h/2), lățime constantă (w).
+            $effH = ($surfaceValue < 0.999) ? ($hmm / 2.0) : (float)$hmm;
+            $m2 = ($effH * (float)$wmm) / 1000000.0;
         } elseif ($surfaceMode === 'M2') {
             $surfaceType = 'M2';
             $surfaceValue = $surfaceM2 !== null ? round((float)$surfaceM2, 2) : null;
@@ -1398,6 +1400,32 @@ final class ProjectsController
         }
     }
 
+    /** @return array{0:int,1:int} height_mm,width_mm */
+    private static function defaultBoardDimsMmForProject(int $projectId): array
+    {
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        try {
+            $st = $pdo->prepare("
+                SELECT b.std_width_mm, b.std_height_mm, COALESCE(SUM(c.qty_boards),0) AS q
+                FROM project_hpl_consumptions c
+                INNER JOIN hpl_boards b ON b.id = c.board_id
+                WHERE c.project_id = ?
+                GROUP BY c.board_id, b.std_width_mm, b.std_height_mm
+                ORDER BY q DESC, c.board_id DESC
+                LIMIT 1
+            ");
+            $st->execute([(int)$projectId]);
+            $r = $st->fetch();
+            if (!$r) return [0, 0];
+            $w = (int)($r['std_width_mm'] ?? 0);
+            $h = (int)($r['std_height_mm'] ?? 0);
+            return [$h, $w];
+        } catch (\Throwable $e) {
+            return [0, 0];
+        }
+    }
+
     private static function isHplBoardReservedForProject(int $projectId, int $boardId): bool
     {
         if ($projectId <= 0 || $boardId <= 0) return false;
@@ -1466,9 +1494,10 @@ final class ProjectsController
         if ($surfaceMode === '1' || $surfaceMode === '0.5') {
             $surfaceType = 'BOARD';
             $surfaceValue = (float)$surfaceMode;
-            $boardArea = self::defaultBoardAreaM2ForProject($projectId);
-            if ($boardArea <= 0) $boardArea = 5.796;
-            $m2 = $boardArea * $surfaceValue;
+            [$hmm, $wmm] = self::defaultBoardDimsMmForProject($projectId);
+            if ($hmm <= 0 || $wmm <= 0) { $hmm = 2800; $wmm = 2070; }
+            $effH = ($surfaceValue < 0.999) ? ($hmm / 2.0) : (float)$hmm;
+            $m2 = ($effH * (float)$wmm) / 1000000.0;
         } elseif ($surfaceMode === 'M2') {
             $surfaceType = 'M2';
             $surfaceValue = $surfaceM2 !== null ? round((float)$surfaceM2, 2) : null;
