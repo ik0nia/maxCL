@@ -17,9 +17,7 @@ final class ProjectProduct
             SELECT
               pp.*,
               p.code AS product_code,
-              p.name AS product_name,
-              p.width_mm AS product_width_mm,
-              p.height_mm AS product_height_mm
+              p.name AS product_name
             FROM project_products pp
             INNER JOIN products p ON p.id = pp.product_id
             WHERE pp.project_id = ?
@@ -45,14 +43,15 @@ final class ProjectProduct
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         $st = $pdo->prepare('
-            INSERT INTO project_products (project_id, product_id, qty, unit, production_status, delivered_qty, notes, cnc_override_json)
-            VALUES (:project_id, :product_id, :qty, :unit, :st, :del, :notes, :cnc)
+            INSERT INTO project_products (project_id, product_id, qty, unit, m2_per_unit, production_status, delivered_qty, notes, cnc_override_json)
+            VALUES (:project_id, :product_id, :qty, :unit, :m2, :st, :del, :notes, :cnc)
         ');
         $st->execute([
             ':project_id' => (int)$data['project_id'],
             ':product_id' => (int)$data['product_id'],
             ':qty' => (float)($data['qty'] ?? 1),
             ':unit' => (string)($data['unit'] ?? 'buc'),
+            ':m2' => (float)($data['m2_per_unit'] ?? 0),
             ':st' => (string)($data['production_status'] ?? 'DE_PREGATIT'),
             ':del' => (float)($data['delivered_qty'] ?? 0),
             ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
@@ -68,13 +67,14 @@ final class ProjectProduct
         $pdo = DB::pdo();
         $st = $pdo->prepare('
             UPDATE project_products
-            SET qty=:qty, unit=:unit, production_status=:st, delivered_qty=:del, notes=:notes
+            SET qty=:qty, unit=:unit, m2_per_unit=:m2, production_status=:st, delivered_qty=:del, notes=:notes
             WHERE id=:id
         ');
         $st->execute([
             ':id' => $id,
             ':qty' => (float)($data['qty'] ?? 1),
             ':unit' => (string)($data['unit'] ?? 'buc'),
+            ':m2' => (float)($data['m2_per_unit'] ?? 0),
             ':st' => (string)($data['production_status'] ?? 'DE_PREGATIT'),
             ':del' => (float)($data['delivered_qty'] ?? 0),
             ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,

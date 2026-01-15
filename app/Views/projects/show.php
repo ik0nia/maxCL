@@ -380,6 +380,10 @@ ob_start();
                             <label class="form-label fw-semibold mb-1">Unit</label>
                             <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($pp['unit'] ?? 'buc')) ?>">
                           </div>
+                          <div class="col-6 col-md-2">
+                            <label class="form-label fw-semibold mb-1">mp/buc</label>
+                            <input class="form-control form-control-sm" type="number" step="0.0001" min="0" name="m2_per_unit" value="<?= htmlspecialchars((string)($pp['m2_per_unit'] ?? '0')) ?>">
+                          </div>
                           <div class="col-12 col-md-3">
                             <label class="form-label fw-semibold mb-1">Status</label>
                             <select class="form-select form-select-sm" name="production_status">
@@ -435,6 +439,11 @@ ob_start();
               <label class="form-label fw-semibold">Unit</label>
               <input class="form-control" name="unit" value="buc">
             </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">mp / buc (opțional)</label>
+              <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
+              <div class="text-muted small mt-1">Folosit pentru distribuția costurilor pe produse.</div>
+            </div>
             <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-outline-secondary" type="submit">
                 <i class="bi bi-plus-lg me-1"></i> Adaugă
@@ -468,13 +477,10 @@ ob_start();
               <label class="form-label fw-semibold">Unit</label>
               <input class="form-control" name="unit" value="buc">
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Lungime (mm)</label>
-              <input class="form-control" type="number" name="height_mm" min="1">
-            </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Lățime (mm)</label>
-              <input class="form-control" type="number" name="width_mm" min="1">
+            <div class="col-12">
+              <label class="form-label fw-semibold">mp / buc (opțional)</label>
+              <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
+              <div class="text-muted small mt-1">Nu mai folosim lungime/lățime; setăm suprafața (mp) per piesă.</div>
             </div>
             <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-primary" type="submit">

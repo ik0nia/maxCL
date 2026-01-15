@@ -46,7 +46,15 @@ final class ProjectsController
             if ($id <= 0) continue;
             $ppIds[] = $id;
             $q = (float)($pp['qty'] ?? 0);
-            $qtyById[$id] = ($q > 0) ? $q : 0.0;
+            $m2 = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+            // Weight base: mp_total dacă există, altfel cantitate (buc).
+            $base = 0.0;
+            if ($m2 > 0 && $q > 0) {
+                $base = $m2 * $q;
+            } elseif ($q > 0) {
+                $base = $q;
+            }
+            $qtyById[$id] = $base;
         }
         $sumQty = 0.0;
         foreach ($ppIds as $id) $sumQty += (float)($qtyById[$id] ?? 0.0);
@@ -824,11 +832,13 @@ final class ProjectsController
         $productId = Validator::int(trim((string)($_POST['product_id'] ?? '')), 1);
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         $unit = trim((string)($_POST['unit'] ?? 'buc'));
+        $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
         if ($productId === null) {
             Session::flash('toast_error', 'Produs invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
         if ($qty <= 0) $qty = 1.0;
+        if ($m2 !== null && $m2 < 0) $m2 = null;
 
         $prod = Product::find((int)$productId);
         if (!$prod) {
@@ -842,6 +852,7 @@ final class ProjectsController
                 'product_id' => (int)$productId,
                 'qty' => $qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
+                'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
                 'production_status' => 'DE_PREGATIT',
                 'delivered_qty' => 0,
                 'notes' => null,
@@ -857,6 +868,7 @@ final class ProjectsController
                 'product_id' => (int)$productId,
                 'qty' => $qty,
                 'unit' => $unit,
+                'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
             ]);
             Session::flash('toast_success', 'Produs adăugat în proiect.');
         } catch (\Throwable $e) {
@@ -884,8 +896,8 @@ final class ProjectsController
         $code = trim((string)($_POST['code'] ?? ''));
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         $unit = trim((string)($_POST['unit'] ?? 'buc'));
-        $width = Validator::int(trim((string)($_POST['width_mm'] ?? '')), 1, 100000);
-        $height = Validator::int(trim((string)($_POST['height_mm'] ?? '')), 1, 100000);
+        $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
+        if ($m2 !== null && $m2 < 0) $m2 = null;
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($errors) {
@@ -897,8 +909,8 @@ final class ProjectsController
             $pid = Product::create([
                 'code' => $code !== '' ? $code : null,
                 'name' => $name,
-                'width_mm' => $width,
-                'height_mm' => $height,
+                'width_mm' => null,
+                'height_mm' => null,
                 'notes' => null,
                 'cnc_settings_json' => null,
             ]);
@@ -912,6 +924,7 @@ final class ProjectsController
                 'product_id' => $pid,
                 'qty' => $qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
+                'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
                 'production_status' => 'DE_PREGATIT',
                 'delivered_qty' => 0,
                 'notes' => null,
@@ -926,6 +939,7 @@ final class ProjectsController
                 'product_id' => $pid,
                 'qty' => $qty,
                 'unit' => $unit,
+                'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
             ]);
 
             Session::flash('toast_success', 'Produs creat și adăugat în proiect.');
@@ -950,6 +964,7 @@ final class ProjectsController
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         $del = Validator::dec(trim((string)($_POST['delivered_qty'] ?? '0'))) ?? 0.0;
         $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
+        $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
         $st = trim((string)($_POST['production_status'] ?? (string)($before['production_status'] ?? 'DE_PREGATIT')));
         $note = trim((string)($_POST['notes'] ?? ''));
 
@@ -958,10 +973,12 @@ final class ProjectsController
         if ($qty <= 0) $qty = 1.0;
         if ($del < 0) $del = 0.0;
         if ($del > $qty) $del = $qty;
+        if ($m2 !== null && $m2 < 0) $m2 = null;
 
         $after = [
             'qty' => $qty,
             'unit' => $unit !== '' ? $unit : 'buc',
+            'm2_per_unit' => $m2 !== null ? (float)$m2 : (float)($before['m2_per_unit'] ?? 0),
             'production_status' => $st,
             'delivered_qty' => $del,
             'notes' => $note !== '' ? $note : null,

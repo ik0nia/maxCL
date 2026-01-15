@@ -772,6 +772,20 @@ final class DbMigrations
                     ");
                 },
             ],
+            [
+                'id' => '2026-01-15_02_project_products_m2',
+                'label' => 'ALTER project_products ADD m2_per_unit',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::columnExists($pdo, 'project_products', 'm2_per_unit')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN m2_per_unit DECIMAL(12,4) NOT NULL DEFAULT 0 AFTER unit");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                },
+            ],
         ];
     }
 
