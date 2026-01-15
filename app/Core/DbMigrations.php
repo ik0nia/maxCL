@@ -199,6 +199,30 @@ final class DbMigrations
                 },
             ],
             [
+                'id' => '2026-01-15_07_hpl_stock_pieces_project',
+                'label' => 'ALTER hpl_stock_pieces ADD project_id',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'hpl_stock_pieces')) return;
+                    if (self::columnExists($pdo, 'hpl_stock_pieces', 'project_id')) return;
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    try {
+                        $pdo->exec("ALTER TABLE hpl_stock_pieces ADD COLUMN project_id INT UNSIGNED NULL AFTER board_id");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try {
+                        $pdo->exec("ALTER TABLE hpl_stock_pieces ADD INDEX idx_hpl_stock_project (project_id)");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try {
+                        $pdo->exec("ALTER TABLE hpl_stock_pieces ADD CONSTRAINT fk_hpl_stock_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL");
+                    } catch (\Throwable $e) {
+                        // ignore (poate nu avem drepturi / deja există)
+                    }
+                },
+            ],
+            [
                 'id' => '2026-01-13_04_add_sale_price',
                 'label' => 'ALTER TABLE hpl_boards ADD sale_price',
                 'fn' => function (PDO $pdo): void {

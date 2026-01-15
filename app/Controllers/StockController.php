@@ -662,6 +662,7 @@ final class StockController
                 (int)$from['height_mm'],
                 $toLocation,
                 1,
+                ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                 (int)$from['id']
             );
 
@@ -674,9 +675,15 @@ final class StockController
                     $destId = (int)$destExisting['id'];
                     HplStockPiece::incrementQty($destId, $qty);
                     HplStockPiece::appendNote($destId, $note);
+                    try {
+                        HplStockPiece::updateFields($destId, [
+                            'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
+                        ]);
+                    } catch (\Throwable $e) {}
                 } else {
                     $destData = [
                         'board_id' => $boardId,
+                        'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                         'piece_type' => (string)$from['piece_type'],
                         'status' => $toStatus,
                         'width_mm' => (int)$from['width_mm'],
@@ -693,6 +700,11 @@ final class StockController
                     $destId = (int)$destExisting['id'];
                     HplStockPiece::incrementQty($destId, $qty);
                     HplStockPiece::appendNote($destId, $note);
+                    try {
+                        HplStockPiece::updateFields($destId, [
+                            'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
+                        ]);
+                    } catch (\Throwable $e) {}
                     HplStockPiece::delete((int)$from['id']);
                 } else {
                     // Update pe aceeași piesă
@@ -702,6 +714,7 @@ final class StockController
                     HplStockPiece::updateFields((int)$from['id'], [
                         'status' => $toStatus,
                         'location' => $toLocation,
+                        'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                         'notes' => $newNotes,
                     ]);
                     $destId = (int)$from['id'];

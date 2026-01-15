@@ -655,7 +655,7 @@ final class ProjectsController
      * Mută plăci întregi (piece_type=FULL) între status-uri în stoc (AVAILABLE/RESERVED/CONSUMED).
      * Se face split/merge pe rânduri cu qty.
      */
-    private static function moveFullBoards(int $boardId, int $qty, string $fromStatus, string $toStatus, ?string $noteAppend = null): void
+    private static function moveFullBoards(int $boardId, int $qty, string $fromStatus, string $toStatus, ?string $noteAppend = null, ?int $projectId = null): void
     {
         $qty = (int)$qty;
         if ($qty <= 0) return;
@@ -713,7 +713,7 @@ final class ProjectsController
                 // ca să evităm duplicatele (ex: la anulare rezervare/consum).
                 $ident = null;
                 try {
-                    $ident = HplStockPiece::findIdentical($boardId, 'FULL', $toStatus, $width, $height, $location, $isAcc, $id);
+                    $ident = HplStockPiece::findIdentical($boardId, 'FULL', $toStatus, $width, $height, $location, $isAcc, $toStatus === 'AVAILABLE' ? null : $projectId, $id);
                 } catch (\Throwable $e) {
                     $ident = null;
                 }
@@ -724,15 +724,23 @@ final class ProjectsController
                         if ($noteAppend) {
                             HplStockPiece::appendNote($destId, $noteAppend);
                         }
+                        // sincronizare project_id pe destinație
+                        try {
+                            if ($toStatus === 'AVAILABLE') {
+                                HplStockPiece::updateFields($destId, ['project_id' => null]);
+                            } elseif ($projectId !== null && $projectId > 0) {
+                                HplStockPiece::updateFields($destId, ['project_id' => $projectId]);
+                            }
+                        } catch (\Throwable $e) {}
                         // sursa a fost cumulată
                         HplStockPiece::delete($id);
                     } else {
                         // fallback: dacă nu avem id valid, mutăm în loc
-                        HplStockPiece::updateFields($id, ['status' => $toStatus]);
+                        HplStockPiece::updateFields($id, ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId)]);
                         if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
                     }
                 } else {
-                    HplStockPiece::updateFields($id, ['status' => $toStatus]);
+                    HplStockPiece::updateFields($id, ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId)]);
                     if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
                 }
             } else {
@@ -742,7 +750,7 @@ final class ProjectsController
                 // adaugă/îmbină în rândul destinație
                 $ident = null;
                 try {
-                    $ident = HplStockPiece::findIdentical($boardId, 'FULL', $toStatus, $width, $height, $location, $isAcc);
+                    $ident = HplStockPiece::findIdentical($boardId, 'FULL', $toStatus, $width, $height, $location, $isAcc, $toStatus === 'AVAILABLE' ? null : $projectId);
                 } catch (\Throwable $e) {
                     $ident = null;
                 }
@@ -754,6 +762,7 @@ final class ProjectsController
                     if ($noteAppend) $newNotes = trim($newNotes . ($newNotes !== '' ? "\n" : '') . $noteAppend);
                     HplStockPiece::create([
                         'board_id' => $boardId,
+                        'project_id' => ($toStatus === 'AVAILABLE') ? null : $projectId,
                         'is_accounting' => $isAcc,
                         'piece_type' => 'FULL',
                         'status' => $toStatus,
@@ -947,6 +956,8 @@ final class ProjectsController
                     try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
                     try { $hplBoards = HplBoard::allWithTotals(null, null); } catch (\Throwable $e) { $hplBoards = []; }
                     try { $magazieItems = MagazieItem::all(null, 5000); } catch (\Throwable $e) { $magazieItems = []; }
+                    $projectHplPieces = [];
+                    try { $projectHplPieces = HplStockPiece::forProject($id); } catch (\Throwable $e) { $projectHplPieces = []; }
                 } elseif ($tab === 'deliveries') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $deliveries = ProjectDelivery::forProject($id); } catch (\Throwable $e) { $deliveries = []; }
@@ -1000,6 +1011,7 @@ final class ProjectsController
                     'hplAlloc' => $hplAlloc,
                     'hplBoards' => $hplBoards,
                     'magazieItems' => $magazieItems,
+                    'projectHplPieces' => $projectHplPieces,
                     'deliveries' => $deliveries,
                     'deliveryItems' => $deliveryItems,
                     'projectFiles' => $projectFiles,
@@ -1678,14 +1690,14 @@ final class ProjectsController
                 }
                 // și în stoc: RESERVED -> CONSUMED (plăci întregi)
                 self::moveFullBoards($boardId, 1, 'RESERVED', 'CONSUMED',
-                    self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''));
+                    self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), $projectId);
                 self::insertProjectHplConsumption($pdo, $projectId, $boardId, 1, $fullM2, 'CONSUMED',
                     self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
             } else {
                 // 1/2 placă
                 if (self::takeReservedHalfRemainder($pdo, $projectId, $boardId, $halfM2)) {
                     // consumăm 1 buc dintr-un offcut rezervat (jumătate), dacă există
-                    self::consumeReservedHalfOffcut($pdo, $boardId, $halfHmm, (int)$wmm,
+                    self::consumeReservedHalfOffcut($pdo, $projectId, $boardId, $halfHmm, (int)$wmm,
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''));
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
@@ -1706,13 +1718,13 @@ final class ProjectsController
                     $remStatus = ($ra === 'KEEP') ? 'RESERVED' : 'AVAILABLE';
                     $remNote = self::HPL_NOTE_HALF_REMAINDER . ' · 1 buc · ' . $halfHmm . '×' . (int)$wmm . ' mm · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '');
                     $consNote = self::HPL_NOTE_AUTO_CONSUME . ' · 1 buc · ' . $halfHmm . '×' . (int)$wmm . ' mm · piesă #' . $ppId . ' · rest=' . $ra . ($pname !== '' ? (' · ' . $pname) : '');
-                    if (!self::cutOneReservedFullIntoHalves($pdo, $boardId, $halfHmm, (int)$wmm, $remStatus, $remNote, $consNote)) {
+                    if (!self::cutOneReservedFullIntoHalves($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, $remStatus, $remNote, $consNote)) {
                         $pdo->rollBack();
                         return 'Nu pot găsi o placă FULL rezervată în stoc pentru tăiere (1/2).';
                     }
                     if ($ra === 'KEEP') {
                         // păstrăm și evidența în consumurile proiectului (pentru totaluri/rapoarte)
-                        self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'RESERVED', $remNote, Auth::id());
+                    self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'RESERVED', $remNote, Auth::id());
                     }
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         $consNote, Auth::id());
@@ -1840,7 +1852,7 @@ final class ProjectsController
         return true;
     }
 
-    private static function consumeReservedHalfOffcut(\PDO $pdo, int $boardId, int $halfHeightMm, int $widthMm, string $noteAppend): void
+    private static function consumeReservedHalfOffcut(\PDO $pdo, int $projectId, int $boardId, int $halfHeightMm, int $widthMm, string $noteAppend): void
     {
         $noteAppend = trim($noteAppend);
         if ($halfHeightMm <= 0 || $widthMm <= 0) return;
@@ -1851,6 +1863,7 @@ final class ProjectsController
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
+                  AND project_id = ?
                   AND piece_type = 'OFFCUT'
                   AND status = 'RESERVED'
                   AND width_mm = ?
@@ -1859,13 +1872,14 @@ final class ProjectsController
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$widthMm, (int)$halfHeightMm]);
+            $st->execute([(int)$boardId, (int)$projectId, (int)$widthMm, (int)$halfHeightMm]);
             $rows = $st->fetchAll();
         } catch (\Throwable $e) {
             $st = $pdo->prepare("
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
+                  AND project_id = ?
                   AND piece_type = 'OFFCUT'
                   AND status = 'RESERVED'
                   AND width_mm = ?
@@ -1873,7 +1887,7 @@ final class ProjectsController
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$widthMm, (int)$halfHeightMm]);
+            $st->execute([(int)$boardId, (int)$projectId, (int)$widthMm, (int)$halfHeightMm]);
             $rows = $st->fetchAll();
         }
         if (!$rows) return;
@@ -1885,18 +1899,19 @@ final class ProjectsController
         $isAcc = (int)($r['is_accounting'] ?? 1);
         // mutăm 1 buc în CONSUMED
         if ($rowQty === 1) {
-            HplStockPiece::updateFields($id, ['status' => 'CONSUMED']);
+            HplStockPiece::updateFields($id, ['status' => 'CONSUMED', 'project_id' => $projectId]);
             if ($noteAppend !== '') HplStockPiece::appendNote($id, $noteAppend);
         } else {
             HplStockPiece::updateQty($id, $rowQty - 1);
             $ident = null;
-            try { $ident = HplStockPiece::findIdentical($boardId, 'OFFCUT', 'CONSUMED', $widthMm, $halfHeightMm, $location, $isAcc); } catch (\Throwable $e) {}
+            try { $ident = HplStockPiece::findIdentical($boardId, 'OFFCUT', 'CONSUMED', $widthMm, $halfHeightMm, $location, $isAcc, $projectId); } catch (\Throwable $e) {}
             if ($ident) {
                 HplStockPiece::incrementQty((int)$ident['id'], 1);
                 if ($noteAppend !== '') HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
             } else {
                 HplStockPiece::create([
                     'board_id' => $boardId,
+                    'project_id' => $projectId,
                     'is_accounting' => $isAcc,
                     'piece_type' => 'OFFCUT',
                     'status' => 'CONSUMED',
@@ -1912,6 +1927,7 @@ final class ProjectsController
 
     private static function cutOneReservedFullIntoHalves(
         \PDO $pdo,
+        int $projectId,
         int $boardId,
         int $halfHeightMm,
         int $widthMm,
@@ -1930,25 +1946,27 @@ final class ProjectsController
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
+                  AND project_id = ?
                   AND piece_type = 'FULL'
                   AND status = 'RESERVED'
                   AND (is_accounting = 1 OR is_accounting IS NULL)
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId]);
+            $st->execute([(int)$boardId, (int)$projectId]);
             $rows = $st->fetchAll();
         } catch (\Throwable $e) {
             $st = $pdo->prepare("
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
+                  AND project_id = ?
                   AND piece_type = 'FULL'
                   AND status = 'RESERVED'
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId]);
+            $st->execute([(int)$boardId, (int)$projectId]);
             $rows = $st->fetchAll();
         }
         if (!$rows) return false;
@@ -1965,13 +1983,14 @@ final class ProjectsController
 
         // 1) Consumăm jumătatea (OFFCUT CONSUMED)
         $identC = null;
-        try { $identC = HplStockPiece::findIdentical($boardId, 'OFFCUT', 'CONSUMED', $widthMm, $halfHeightMm, $location, $isAcc); } catch (\Throwable $e) {}
+        try { $identC = HplStockPiece::findIdentical($boardId, 'OFFCUT', 'CONSUMED', $widthMm, $halfHeightMm, $location, $isAcc, $projectId); } catch (\Throwable $e) {}
         if ($identC) {
             HplStockPiece::incrementQty((int)$identC['id'], 1);
             if (trim($consumedNote) !== '') HplStockPiece::appendNote((int)$identC['id'], $consumedNote);
         } else {
             HplStockPiece::create([
                 'board_id' => $boardId,
+                'project_id' => $projectId,
                 'is_accounting' => $isAcc,
                 'piece_type' => 'OFFCUT',
                 'status' => 'CONSUMED',
@@ -1984,14 +2003,17 @@ final class ProjectsController
         }
 
         // 2) Restul jumătății (OFFCUT AVAILABLE/RESERVED)
+        $remProjectId = ($remainderStatus === 'AVAILABLE') ? null : $projectId;
         $identR = null;
-        try { $identR = HplStockPiece::findIdentical($boardId, 'OFFCUT', $remainderStatus, $widthMm, $halfHeightMm, $location, $isAcc); } catch (\Throwable $e) {}
+        try { $identR = HplStockPiece::findIdentical($boardId, 'OFFCUT', $remainderStatus, $widthMm, $halfHeightMm, $location, $isAcc, $remProjectId); } catch (\Throwable $e) {}
         if ($identR) {
             HplStockPiece::incrementQty((int)$identR['id'], 1);
             if (trim($remainderNote) !== '') HplStockPiece::appendNote((int)$identR['id'], $remainderNote);
+            try { HplStockPiece::updateFields((int)$identR['id'], ['project_id' => $remProjectId]); } catch (\Throwable $e) {}
         } else {
             HplStockPiece::create([
                 'board_id' => $boardId,
+                'project_id' => $remProjectId,
                 'is_accounting' => $isAcc,
                 'piece_type' => 'OFFCUT',
                 'status' => $remainderStatus,
@@ -2189,7 +2211,7 @@ final class ProjectsController
             // IMPORTANT (cerință): nota afișată pe piesa din stoc trebuie să coincidă cu nota din proiect.
             // Păstrăm mesajul tehnic (proiect/consumption id) în Audit, nu în notes.
             $noteAppend = ($note !== '') ? $note : ('Proiect ' . $projCode . ' · consum HPL #' . $cid);
-            self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend);
+            self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend, $projectId);
 
             // Auto-alocare pe produse (dacă nu e blocată distribuția și există produse)
             $allocLocked = (int)($project['allocations_locked'] ?? 0) === 1;
@@ -2429,7 +2451,7 @@ final class ProjectsController
             $qtyBoards = (int)($before['qty_boards'] ?? 0);
             if ($qtyBoards > 0) {
                 try {
-                    self::moveFullBoards((int)($before['board_id'] ?? 0), $qtyBoards, $from, 'AVAILABLE', 'Anulare consum HPL #' . $cid);
+                    self::moveFullBoards((int)($before['board_id'] ?? 0), $qtyBoards, $from, 'AVAILABLE', 'Anulare consum HPL #' . $cid, $projectId);
                 } catch (\Throwable $e) {
                     // ignore
                 }

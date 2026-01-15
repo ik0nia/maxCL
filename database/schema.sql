@@ -101,6 +101,7 @@ ALTER TABLE hpl_boards
 CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   board_id INT UNSIGNED NOT NULL,
+  project_id INT UNSIGNED NULL,
   -- 1 = intră în contabilitate / totaluri stoc; 0 = piese interne (nestocabile), nu intră în totaluri
   is_accounting TINYINT(1) NOT NULL DEFAULT 1,
   piece_type ENUM('FULL','OFFCUT') NOT NULL,
@@ -116,11 +117,13 @@ CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   area_total_m2 DECIMAL(12,4) AS (((width_mm * height_mm) / 1000000.0) * qty) STORED,
   PRIMARY KEY (id),
   KEY idx_hpl_stock_board (board_id),
+  KEY idx_hpl_stock_project (project_id),
   KEY idx_hpl_stock_accounting (is_accounting),
   KEY idx_hpl_stock_status (status),
   KEY idx_hpl_stock_piece_type (piece_type),
   KEY idx_hpl_stock_location (location),
-  CONSTRAINT fk_hpl_stock_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id)
+  CONSTRAINT fk_hpl_stock_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+  CONSTRAINT fk_hpl_stock_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Best-effort: adaugă coloana dacă lipsește (MySQL 8+).
