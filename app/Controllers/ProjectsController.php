@@ -173,13 +173,10 @@ final class ProjectsController
      */
     private static function laborEstimateByProduct(array $projectProducts, array $workLogs): array
     {
-        $w = self::productQtyWeights($projectProducts);
+        // IMPORTANT: manopera se distribuie pe bucăți (qty), nu pe mp.
+        $w2 = self::productQtyOnlyWeights($projectProducts);
         /** @var array<int,int> $ppIds */
-        $ppIds = $w['ppIds'];
-        /** @var array<int,float> $ppQty */
-        $ppQty = $w['qtyById'];
-        $n = count($ppIds);
-        $sumQty = (float)$w['sumQty'];
+        $ppIds = $w2['ppIds'];
         $validPp = array_fill_keys($ppIds, true);
 
         // sum direct + project-level
@@ -226,8 +223,16 @@ final class ProjectsController
 
         $out = [];
         foreach ($ppIds as $ppId) {
-            $qty = (float)($ppQty[$ppId] ?? 0.0);
-            $weight = (float)($w['weightById'][$ppId] ?? 0.0);
+            $qty = 0.0;
+            // qty real (buc) pentru afișare
+            foreach ($projectProducts as $pp) {
+                if ((int)($pp['id'] ?? 0) === $ppId) {
+                    $qq = (float)($pp['qty'] ?? 0);
+                    $qty = $qq > 0 ? $qq : 0.0;
+                    break;
+                }
+            }
+            $weight = (float)($w2['weightById'][$ppId] ?? 0.0);
 
             $shareCncHours = $projCncHours * $weight;
             $shareCncCost = $projCncCost * $weight;
