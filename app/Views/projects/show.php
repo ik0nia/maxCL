@@ -251,6 +251,44 @@ ob_start();
 <?php elseif ($tab === 'products'): ?>
   <div class="row g-3">
     <div class="col-12 col-lg-7">
+      <div class="card app-card p-3 mb-3">
+        <div class="h5 m-0">Adaugă produs (nou)</div>
+        <div class="text-muted">Fiecare piesă se creează direct în proiect</div>
+        <?php if (!$canWrite): ?>
+          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
+        <?php else: ?>
+          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2 mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Denumire</label>
+              <input class="form-control" name="name" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Cod (opțional)</label>
+              <input class="form-control" name="code">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Cantitate</label>
+              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Unit</label>
+              <input class="form-control" name="unit" value="buc">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">mp / buc (opțional)</label>
+              <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
+              <div class="text-muted small mt-1">Nu mai folosim lungime/lățime; setăm suprafața (mp) per piesă.</div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i> Creează
+              </button>
+            </div>
+          </form>
+        <?php endif; ?>
+      </div>
+
       <div class="card app-card p-3">
         <div class="h5 m-0">Produse (piese) în proiect</div>
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
@@ -595,85 +633,6 @@ ob_start();
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="card app-card p-3">
-        <div class="h5 m-0">Adaugă produs</div>
-        <div class="text-muted">Poți adăuga un produs existent sau crea unul nou</div>
-        <?php if (!$canWrite): ?>
-          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
-        <?php else: ?>
-          <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddExisting">
-              <i class="bi bi-link-45deg me-1"></i> Existent
-            </button>
-            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNew">
-              <i class="bi bi-plus-lg me-1"></i> Nou
-            </button>
-          </div>
-
-          <div class="collapse show mt-3" id="ppAddExisting">
-            <div class="fw-semibold mb-1">Adaugă produs existent</div>
-            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/add-existing')) ?>" class="row g-2">
-              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-              <div class="col-12">
-                <label class="form-label fw-semibold">ID produs</label>
-                <input class="form-control" name="product_id" placeholder="ex: 123">
-                <div class="text-muted small mt-1">Momentan: introdu ID-ul produsului (următorul pas: search).</div>
-              </div>
-              <div class="col-6">
-                <label class="form-label fw-semibold">Cantitate</label>
-                <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
-              </div>
-              <div class="col-6">
-                <label class="form-label fw-semibold">Unit</label>
-                <input class="form-control" name="unit" value="buc">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">mp / buc (opțional)</label>
-                <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
-              </div>
-              <div class="col-12 d-flex justify-content-end">
-                <button class="btn btn-outline-secondary" type="submit">
-                  <i class="bi bi-plus-lg me-1"></i> Adaugă
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div class="collapse mt-3" id="ppAddNew">
-            <div class="fw-semibold mb-1">Creează produs nou în proiect</div>
-            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2">
-              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-              <div class="col-12">
-                <label class="form-label fw-semibold">Denumire</label>
-                <input class="form-control" name="name" required>
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">Cod (opțional)</label>
-                <input class="form-control" name="code">
-              </div>
-              <div class="col-6">
-                <label class="form-label fw-semibold">Cantitate</label>
-                <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
-              </div>
-              <div class="col-6">
-                <label class="form-label fw-semibold">Unit</label>
-                <input class="form-control" name="unit" value="buc">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">mp / buc (opțional)</label>
-                <input class="form-control" type="number" step="0.0001" min="0" name="m2_per_unit" placeholder="ex: 0.60">
-                <div class="text-muted small mt-1">Nu mai folosim lungime/lățime; setăm suprafața (mp) per piesă.</div>
-              </div>
-              <div class="col-12 d-flex justify-content-end">
-                <button class="btn btn-primary" type="submit">
-                  <i class="bi bi-plus-lg me-1"></i> Creează
-                </button>
-              </div>
-            </form>
-          </div>
-        <?php endif; ?>
       </div>
     </div>
   </div>
