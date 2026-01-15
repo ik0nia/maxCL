@@ -318,32 +318,70 @@ ob_start();
                       <?php
                         $stVal = (string)($pp['production_status'] ?? '');
                         $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
+                        $idx = array_search($stVal, $ppAllowedValues, true);
                       ?>
                       <div class="fw-semibold"><?= htmlspecialchars($stLbl) ?></div>
                       <?php if ($canSetPPStatus): ?>
-                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="mt-2">
-                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                          <div class="input-group input-group-sm">
-                            <select class="form-select form-select-sm" name="production_status">
-                              <?php if (!in_array($stVal, $ppAllowedValues, true) && $stVal !== ''): ?>
-                                <option value="<?= htmlspecialchars($stVal) ?>" selected disabled><?= htmlspecialchars($stLbl) ?></option>
-                              <?php endif; ?>
-                              <?php foreach ($ppStatusesAll as $s): ?>
+                        <?php
+                          $flowAll = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
+                          $idxAll = array_search($stVal, $flowAll, true);
+                          if ($idxAll === false) $idxAll = 0;
+                          $nextVal = $flowAll[$idxAll + 1] ?? null;
+                          $nextLbl = $nextVal !== null ? ($ppStatusLabel[$nextVal] ?? $nextVal) : null;
+                          $canAdvance = ($nextVal !== null) && in_array($nextVal, $ppAllowedValues, true);
+                        ?>
+                        <div class="mt-2">
+                          <div class="d-flex flex-wrap align-items-center gap-1">
+                            <?php foreach ($ppStatusesAll as $i => $s): ?>
+                              <?php
+                                $v = (string)$s['value'];
+                                $lbl = (string)$s['label'];
+                                $isDone = ($i < $idxAll);
+                                $isCur = ($i === $idxAll);
+                                $isNext = ($i === $idxAll + 1);
+                                $isVisible = true;
+                                if (!$canSetPPFinal && in_array($v, ['AVIZAT','LIVRAT'], true) && !in_array($stVal, ['AVIZAT','LIVRAT'], true)) {
+                                  // Operator: arătăm statusurile finale ca "locked", dar nu le facem clickabile.
+                                  $isVisible = true;
+                                }
+                              ?>
+                              <?php if (!$isVisible) continue; ?>
+
+                              <?php if ($isNext && $canAdvance): ?>
+                                <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                  <button class="btn btn-sm btn-outline-primary px-2 py-1" type="submit" title="Treci la următorul status">
+                                    <?= htmlspecialchars($lbl) ?>
+                                  </button>
+                                </form>
+                              <?php else: ?>
                                 <?php
-                                  $v = (string)$s['value'];
-                                  if (!in_array($v, $ppAllowedValues, true)) continue;
+                                  $cls = 'bg-secondary-subtle text-secondary-emphasis';
+                                  if ($isDone) $cls = 'bg-success-subtle text-success-emphasis';
+                                  if ($isCur) $cls = 'bg-primary text-white';
                                 ?>
-                                <option value="<?= htmlspecialchars($v) ?>" <?= ($stVal === $v) ? 'selected' : '' ?>>
-                                  <?= htmlspecialchars((string)$s['label']) ?>
-                                </option>
-                              <?php endforeach; ?>
-                            </select>
-                            <button class="btn btn-outline-primary" type="submit">Setează</button>
+                                <span class="badge rounded-pill <?= $cls ?> px-2 py-1"><?= htmlspecialchars($lbl) ?></span>
+                              <?php endif; ?>
+
+                              <?php if ($i < count($ppStatusesAll) - 1): ?>
+                                <span class="text-muted">—</span>
+                              <?php endif; ?>
+                            <?php endforeach; ?>
                           </div>
-                          <?php if (!$canSetPPFinal): ?>
-                            <div class="text-muted small mt-1">Avizat/Livrat: doar Admin/Gestionar.</div>
+
+                          <?php if ($nextLbl !== null): ?>
+                            <div class="text-muted small mt-1">
+                              Următorul: <strong><?= htmlspecialchars($nextLbl) ?></strong>
+                              <?php if (!$canAdvance): ?>
+                                · <span>nu ai drepturi / nu se poate avansa</span>
+                              <?php endif; ?>
+                            </div>
                           <?php endif; ?>
-                        </form>
+
+                          <?php if (!$canSetPPFinal): ?>
+                            <div class="text-muted small">Avizat/Livrat: doar Admin/Gestionar.</div>
+                          <?php endif; ?>
+                        </div>
                       <?php endif; ?>
                     </div>
                   </div>
@@ -427,14 +465,7 @@ ob_start();
                         </div>
                         <div class="col-12 col-md-3">
                           <label class="form-label fw-semibold mb-1">Status</label>
-                          <select class="form-select form-select-sm" name="production_status">
-                            <?php foreach ($ppStatusesAll as $s): ?>
-                              <?php $val = (string)$s['value']; ?>
-                              <option value="<?= htmlspecialchars($val) ?>" <?= ((string)($pp['production_status'] ?? '') === $val) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars((string)$s['label']) ?>
-                              </option>
-                            <?php endforeach; ?>
-                          </select>
+                          <input class="form-control form-control-sm" value="<?= htmlspecialchars($stLbl) ?>" disabled>
                         </div>
                         <div class="col-6 col-md-2">
                           <label class="form-label fw-semibold mb-1">Livrat</label>

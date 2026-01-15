@@ -1349,11 +1349,8 @@ final class ProjectsController
         $del = Validator::dec(trim((string)($_POST['delivered_qty'] ?? '0'))) ?? 0.0;
         $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
         $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
-        $st = trim((string)($_POST['production_status'] ?? (string)($before['production_status'] ?? 'CREAT')));
         $note = trim((string)($_POST['notes'] ?? ''));
 
-        $allowed = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
-        if (!in_array($st, $allowed, true)) $st = (string)($before['production_status'] ?? 'CREAT');
         if ($qty <= 0) $qty = 1.0;
         if ($del < 0) $del = 0.0;
         if ($del > $qty) $del = $qty;
@@ -1363,7 +1360,8 @@ final class ProjectsController
             'qty' => $qty,
             'unit' => $unit !== '' ? $unit : 'buc',
             'm2_per_unit' => $m2 !== null ? (float)$m2 : (float)($before['m2_per_unit'] ?? 0),
-            'production_status' => $st,
+            // Statusul se schimbă doar pe flow (pas cu pas), nu din edit.
+            'production_status' => (string)($before['production_status'] ?? 'CREAT'),
             'delivered_qty' => $del,
             'notes' => $note !== '' ? $note : null,
         ];
@@ -1387,7 +1385,6 @@ final class ProjectsController
         Csrf::verify($_POST['_csrf'] ?? null);
         $projectId = (int)($params['id'] ?? 0);
         $ppId = (int)($params['ppId'] ?? 0);
-        $newStatus = trim((string)($_POST['production_status'] ?? ''));
 
         if (!self::canSetProjectProductStatus()) {
             Session::flash('toast_error', 'Nu ai drepturi pentru a schimba statusul.');
@@ -1400,27 +1397,31 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
-        $allowed = self::allowedProjectProductStatusesForCurrentUser();
-        if ($newStatus === '' || !in_array($newStatus, $allowed, true)) {
-            Session::flash('toast_error', 'Status invalid sau fără drepturi (Avizat/Livrat sunt doar pentru Admin/Gestionar).');
+        $flow = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
+        $old = (string)($before['production_status'] ?? 'CREAT');
+        $idx = array_search($old, $flow, true);
+        if ($idx === false) $idx = 0;
+        $next = $flow[$idx + 1] ?? null;
+        if ($next === null) {
+            Session::flash('toast_success', 'Piesa este deja la ultimul status.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
-        $old = (string)($before['production_status'] ?? '');
-        if ($old === $newStatus) {
-            Session::flash('toast_error', 'Statusul este deja setat.');
+        $allowed = self::allowedProjectProductStatusesForCurrentUser();
+        if (!in_array($next, $allowed, true)) {
+            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Avizat/Livrat sunt doar pentru Admin/Gestionar).');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
         try {
-            ProjectProduct::updateStatus($ppId, $newStatus);
+            ProjectProduct::updateStatus($ppId, $next);
             $after = $before;
-            $after['production_status'] = $newStatus;
+            $after['production_status'] = $next;
             Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [
-                'message' => 'Schimbare status piesă: ' . $old . ' → ' . $newStatus,
+                'message' => 'Schimbare status piesă: ' . $old . ' → ' . $next,
                 'project_id' => $projectId,
                 'old_status' => $old,
-                'new_status' => $newStatus,
+                'new_status' => $next,
             ]);
             Session::flash('toast_success', 'Status piesă actualizat.');
         } catch (\Throwable $e) {
