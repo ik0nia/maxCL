@@ -178,6 +178,7 @@ final class ProjectsController
         $ppQty = $w['qtyById'];
         $n = count($ppIds);
         $sumQty = (float)$w['sumQty'];
+        $validPp = array_fill_keys($ppIds, true);
 
         // sum direct + project-level
         $direct = [];
@@ -198,7 +199,8 @@ final class ProjectsController
                 ? (int)$w['project_product_id']
                 : 0;
 
-            if ($ppId > 0) {
+            // dacă worklog-ul e legat de un produs care nu mai există în proiect, îl tratăm ca "la nivel de proiect"
+            if ($ppId > 0 && isset($validPp[$ppId])) {
                 if (!isset($direct[$ppId])) {
                     $direct[$ppId] = ['cnc_hours' => 0.0, 'cnc_cost' => 0.0, 'atelier_hours' => 0.0, 'atelier_cost' => 0.0];
                 }
