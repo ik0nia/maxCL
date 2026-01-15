@@ -46,18 +46,39 @@ final class Product
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            INSERT INTO products (code, name, width_mm, height_mm, notes, cnc_settings_json)
-            VALUES (:code, :name, :w, :h, :notes, :cnc)
-        ');
-        $st->execute([
-            ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
-            ':name' => trim((string)($data['name'] ?? '')),
-            ':w' => isset($data['width_mm']) ? (int)$data['width_mm'] : null,
-            ':h' => isset($data['height_mm']) ? (int)$data['height_mm'] : null,
-            ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
-            ':cnc' => $data['cnc_settings_json'] ?? null,
-        ]);
+        try {
+            $st = $pdo->prepare('
+                INSERT INTO products (code, name, sale_price, width_mm, height_mm, notes, cnc_settings_json)
+                VALUES (:code, :name, :sale_price, :w, :h, :notes, :cnc)
+            ');
+            $st->execute([
+                ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
+                ':name' => trim((string)($data['name'] ?? '')),
+                ':sale_price' => array_key_exists('sale_price', $data) ? ($data['sale_price'] !== null ? (float)$data['sale_price'] : null) : null,
+                ':w' => isset($data['width_mm']) ? (int)$data['width_mm'] : null,
+                ':h' => isset($data['height_mm']) ? (int)$data['height_mm'] : null,
+                ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
+                ':cnc' => $data['cnc_settings_json'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            // Compat: schema veche fără sale_price
+            $m = strtolower($e->getMessage());
+            if (!(str_contains($m, 'unknown column') && str_contains($m, 'sale_price'))) {
+                throw $e;
+            }
+            $st = $pdo->prepare('
+                INSERT INTO products (code, name, width_mm, height_mm, notes, cnc_settings_json)
+                VALUES (:code, :name, :w, :h, :notes, :cnc)
+            ');
+            $st->execute([
+                ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
+                ':name' => trim((string)($data['name'] ?? '')),
+                ':w' => isset($data['width_mm']) ? (int)$data['width_mm'] : null,
+                ':h' => isset($data['height_mm']) ? (int)$data['height_mm'] : null,
+                ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
+                ':cnc' => $data['cnc_settings_json'] ?? null,
+            ]);
+        }
         return (int)$pdo->lastInsertId();
     }
 
@@ -66,19 +87,42 @@ final class Product
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            UPDATE products
-            SET code = :code,
-                name = :name,
-                notes = :notes
-            WHERE id = :id
-        ');
-        $st->execute([
-            ':id' => (int)$id,
-            ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
-            ':name' => trim((string)($data['name'] ?? '')),
-            ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
-        ]);
+        try {
+            $st = $pdo->prepare('
+                UPDATE products
+                SET code = :code,
+                    name = :name,
+                    sale_price = :sale_price,
+                    notes = :notes
+                WHERE id = :id
+            ');
+            $st->execute([
+                ':id' => (int)$id,
+                ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
+                ':name' => trim((string)($data['name'] ?? '')),
+                ':sale_price' => array_key_exists('sale_price', $data) ? ($data['sale_price'] !== null ? (float)$data['sale_price'] : null) : null,
+                ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
+            ]);
+        } catch (\Throwable $e) {
+            // Compat: schema veche fără sale_price
+            $m = strtolower($e->getMessage());
+            if (!(str_contains($m, 'unknown column') && str_contains($m, 'sale_price'))) {
+                throw $e;
+            }
+            $st = $pdo->prepare('
+                UPDATE products
+                SET code = :code,
+                    name = :name,
+                    notes = :notes
+                WHERE id = :id
+            ');
+            $st->execute([
+                ':id' => (int)$id,
+                ':code' => (isset($data['code']) && trim((string)$data['code']) !== '') ? trim((string)$data['code']) : null,
+                ':name' => trim((string)($data['name'] ?? '')),
+                ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
+            ]);
+        }
     }
 }
 

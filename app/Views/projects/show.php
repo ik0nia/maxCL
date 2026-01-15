@@ -236,61 +236,76 @@ ob_start();
   <div class="row g-3">
     <div class="col-12 col-lg-7">
       <div class="card app-card p-3 mb-3">
-        <div class="h5 m-0">Adaugă produs (nou)</div>
-        <div class="text-muted">Fiecare piesă se creează direct în proiect</div>
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div class="h5 m-0">Adaugă produs (nou)</div>
+            <div class="text-muted">Fiecare piesă se creează direct în proiect</div>
+          </div>
+          <?php if ($canWrite): ?>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNewCollapse" aria-expanded="false" aria-controls="ppAddNewCollapse">
+              <i class="bi bi-plus-lg me-1"></i> Creează piesă
+            </button>
+          <?php endif; ?>
+        </div>
         <?php if (!$canWrite): ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
         <?php else: ?>
-          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2 mt-2">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-            <div class="col-12">
-              <label class="form-label fw-semibold">Denumire</label>
-              <input class="form-control" name="name" required>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">Descriere</label>
-              <textarea class="form-control" name="description" rows="2" maxlength="4000" placeholder="Opțional…"></textarea>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Cod (opțional)</label>
-              <input class="form-control" name="code">
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Cantitate</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">Suprafață</label>
-              <div class="d-flex flex-wrap gap-3">
-                <label class="form-check form-check-inline m-0">
-                  <input class="form-check-input" type="radio" name="surface_mode" value="0.5" required>
-                  <span class="form-check-label">1/2 placă</span>
-                </label>
-                <label class="form-check form-check-inline m-0">
-                  <input class="form-check-input" type="radio" name="surface_mode" value="1" required checked>
-                  <span class="form-check-label">1 placă</span>
-                </label>
-                <label class="form-check form-check-inline m-0">
-                  <input class="form-check-input" type="radio" name="surface_mode" value="M2" required>
-                  <span class="form-check-label">mp</span>
-                </label>
+          <div class="collapse mt-3" id="ppAddNewCollapse">
+            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/create')) ?>" class="row g-2">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+              <div class="col-12">
+                <label class="form-label fw-semibold">Denumire</label>
+                <input class="form-control" name="name" required>
               </div>
-              <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
-                <input class="form-control" type="number" step="0.01" min="0.01" name="surface_m2" placeholder="ex: 0.60">
-                <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Descriere</label>
+                <textarea class="form-control" name="description" rows="2" maxlength="4000" placeholder="Opțional…"></textarea>
               </div>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">HPL pentru piesă (din rezervările proiectului)</label>
-              <select class="form-select js-pp-hpl-reserved-select" name="hpl_board_id" id="ppHplBoardSelect" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
-              <div class="text-muted small mt-1">Alegi din plăcile HPL rezervate pe proiect. (Cu thumbnail)</div>
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-primary" type="submit">
-                <i class="bi bi-plus-lg me-1"></i> Creează
-              </button>
-            </div>
-          </form>
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Cod (opțional)</label>
+                <input class="form-control" name="code">
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Cantitate</label>
+                <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Preț vânzare (lei)</label>
+                <input class="form-control" type="number" step="0.01" min="0" name="sale_price" placeholder="opțional">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Suprafață</label>
+                <div class="d-flex flex-wrap gap-3">
+                  <label class="form-check form-check-inline m-0">
+                    <input class="form-check-input" type="radio" name="surface_mode" value="0.5" required>
+                    <span class="form-check-label">1/2 placă</span>
+                  </label>
+                  <label class="form-check form-check-inline m-0">
+                    <input class="form-check-input" type="radio" name="surface_mode" value="1" required checked>
+                    <span class="form-check-label">1 placă</span>
+                  </label>
+                  <label class="form-check form-check-inline m-0">
+                    <input class="form-check-input" type="radio" name="surface_mode" value="M2" required>
+                    <span class="form-check-label">mp</span>
+                  </label>
+                </div>
+                <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="surface_m2" placeholder="ex: 0.60">
+                  <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">HPL pentru piesă (din rezervările proiectului)</label>
+                <select class="form-select js-pp-hpl-reserved-select" name="hpl_board_id" id="ppHplBoardSelect" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
+                <div class="text-muted small mt-1">Alegi din plăcile HPL rezervate pe proiect. (Cu thumbnail)</div>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit">
+                  <i class="bi bi-plus-lg me-1"></i> Creează
+                </button>
+              </div>
+            </form>
+          </div>
 
           <script>
             document.addEventListener('DOMContentLoaded', function () {
@@ -715,6 +730,7 @@ ob_start();
                     <div class="collapse mt-3" id="ppEdit<?= $ppId ?>">
                       <?php
                         $pDesc = (string)($pp['product_notes'] ?? '');
+                        $pSale = isset($pp['product_sale_price']) && $pp['product_sale_price'] !== null && $pp['product_sale_price'] !== '' ? (float)$pp['product_sale_price'] : null;
                         $curM2 = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
                         $curSurfaceType = (string)($pp['surface_type'] ?? '');
                         $curSurfaceVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
@@ -747,6 +763,12 @@ ob_start();
                         <div class="col-12 col-md-6">
                           <label class="form-label fw-semibold mb-1">Cantitate</label>
                           <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                          <label class="form-label fw-semibold mb-1">Preț vânzare (lei)</label>
+                          <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="sale_price"
+                                 value="<?= $pSale !== null ? htmlspecialchars(number_format((float)$pSale, 2, '.', '')) : '' ?>"
+                                 placeholder="opțional">
                         </div>
                         <div class="col-12">
                           <label class="form-label fw-semibold mb-1">Suprafață</label>

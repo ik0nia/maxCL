@@ -291,6 +291,7 @@ CREATE TABLE IF NOT EXISTS products (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   code VARCHAR(64) NULL,
   name VARCHAR(190) NOT NULL,
+  sale_price DECIMAL(12,2) NULL,
   width_mm INT NULL,
   height_mm INT NULL,
   notes TEXT NULL,

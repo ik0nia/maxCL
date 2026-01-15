@@ -13,22 +13,47 @@ final class ProjectProduct
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            SELECT
-              pp.*,
-              p.code AS product_code,
-              p.name AS product_name,
-              p.notes AS product_notes,
-              hb.code AS hpl_board_code,
-              hb.name AS hpl_board_name
-            FROM project_products pp
-            INNER JOIN products p ON p.id = pp.product_id
-            LEFT JOIN hpl_boards hb ON hb.id = pp.hpl_board_id
-            WHERE pp.project_id = ?
-            ORDER BY pp.id DESC
-        ');
-        $st->execute([(int)$projectId]);
-        return $st->fetchAll();
+        try {
+            $st = $pdo->prepare('
+                SELECT
+                  pp.*,
+                  p.code AS product_code,
+                  p.name AS product_name,
+                  p.notes AS product_notes,
+                  p.sale_price AS product_sale_price,
+                  hb.code AS hpl_board_code,
+                  hb.name AS hpl_board_name
+                FROM project_products pp
+                INNER JOIN products p ON p.id = pp.product_id
+                LEFT JOIN hpl_boards hb ON hb.id = pp.hpl_board_id
+                WHERE pp.project_id = ?
+                ORDER BY pp.id DESC
+            ');
+            $st->execute([(int)$projectId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            // Compat: schema veche fără products.sale_price
+            $m = strtolower($e->getMessage());
+            if (!(str_contains($m, 'unknown column') && str_contains($m, 'sale_price'))) {
+                throw $e;
+            }
+            $st = $pdo->prepare('
+                SELECT
+                  pp.*,
+                  p.code AS product_code,
+                  p.name AS product_name,
+                  p.notes AS product_notes,
+                  hb.code AS hpl_board_code,
+                  hb.name AS hpl_board_name
+                FROM project_products pp
+                INNER JOIN products p ON p.id = pp.product_id
+                LEFT JOIN hpl_boards hb ON hb.id = pp.hpl_board_id
+                WHERE pp.project_id = ?
+                ORDER BY pp.id DESC
+            ');
+            $st->execute([(int)$projectId]);
+            return $st->fetchAll();
+        }
     }
 
     public static function find(int $id): ?array

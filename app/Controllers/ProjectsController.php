@@ -1140,6 +1140,8 @@ final class ProjectsController
         $name = trim((string)($_POST['name'] ?? ''));
         $desc = trim((string)($_POST['description'] ?? ''));
         $code = trim((string)($_POST['code'] ?? ''));
+        $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
+        $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         $hplBoardId = Validator::int(trim((string)($_POST['hpl_board_id'] ?? '')), 1);
         $surfaceMode = trim((string)($_POST['surface_mode'] ?? ''));
@@ -1179,6 +1181,9 @@ final class ProjectsController
         }
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
+        if ($salePriceRaw !== '' && ($salePrice === null || $salePrice < 0)) {
+            $errors['sale_price'] = 'Preț vânzare invalid.';
+        }
         if ($errors) {
             Session::flash('toast_error', 'Completează corect produsul.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
@@ -1188,6 +1193,7 @@ final class ProjectsController
             $pid = Product::create([
                 'code' => $code !== '' ? $code : null,
                 'name' => $name,
+                'sale_price' => ($salePrice !== null && $salePrice >= 0) ? round((float)$salePrice, 2) : null,
                 'width_mm' => null,
                 'height_mm' => null,
                 'notes' => $desc !== '' ? $desc : null,
@@ -1337,6 +1343,8 @@ final class ProjectsController
         $name = trim((string)($_POST['name'] ?? ''));
         $desc = trim((string)($_POST['description'] ?? ''));
         $code = trim((string)($_POST['code'] ?? ''));
+        $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
+        $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         $hplBoardId = Validator::int(trim((string)($_POST['hpl_board_id'] ?? '')), 1);
         $surfaceMode = trim((string)($_POST['surface_mode'] ?? ''));
@@ -1375,6 +1383,9 @@ final class ProjectsController
                 $errors['hpl_board_id'] = 'Placa HPL selectată nu este rezervată pe acest proiect.';
             }
         }
+        if ($salePriceRaw !== '' && ($salePrice === null || $salePrice < 0)) {
+            $errors['sale_price'] = 'Preț vânzare invalid.';
+        }
 
         if ($errors) {
             Session::flash('toast_error', 'Completează corect produsul.');
@@ -1402,6 +1413,7 @@ final class ProjectsController
                 Product::updateFields($prodId, [
                     'code' => $code !== '' ? $code : null,
                     'name' => $name,
+                    'sale_price' => ($salePrice !== null && $salePrice >= 0) ? round((float)$salePrice, 2) : null,
                     'notes' => $desc !== '' ? $desc : null,
                 ]);
                 $prodAfter = Product::find($prodId);

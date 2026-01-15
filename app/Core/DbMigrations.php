@@ -945,6 +945,19 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-16_01_products_sale_price',
+                'label' => 'ALTER products ADD sale_price',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'products')) return;
+                    if (self::columnExists($pdo, 'products', 'sale_price')) return;
+                    try {
+                        $pdo->exec("ALTER TABLE products ADD COLUMN sale_price DECIMAL(12,2) NULL AFTER name");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
         ];
     }
 
