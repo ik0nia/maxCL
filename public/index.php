@@ -236,6 +236,7 @@ $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersM
 
 $projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$projectsProductStatusMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 
 $router->get('/projects', fn() => ProjectsController::index(), $projectsReadMW);
 $router->get('/projects/create', fn() => ProjectsController::createForm(), $projectsWriteMW);
@@ -246,6 +247,7 @@ $router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatu
 $router->post('/projects/{id}/products/add-existing', fn($p) => ProjectsController::addExistingProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/create', fn($p) => ProjectsController::createProductInProject($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsController::updateProjectProduct($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/{ppId}/status', fn($p) => ProjectsController::updateProjectProductStatus($p), $projectsProductStatusMW);
 $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);

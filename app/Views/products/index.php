@@ -5,6 +5,15 @@ use App\Core\View;
 $rows = $rows ?? [];
 $q = trim((string)($q ?? ''));
 $label = trim((string)($label ?? ''));
+$stLbl = [
+  'CREAT' => 'Creat',
+  'PROIECTARE' => 'Proiectare',
+  'CNC' => 'CNC',
+  'MONTAJ' => 'Montaj',
+  'GATA_DE_LIVRARE' => 'Gata de livrare',
+  'AVIZAT' => 'Avizat',
+  'LIVRAT' => 'Livrat',
+];
 
 ob_start();
 ?>
@@ -61,7 +70,8 @@ ob_start();
             <div class="fw-semibold"><?= htmlspecialchars((string)($r['product_name'] ?? '')) ?></div>
             <div class="text-muted small"><?= htmlspecialchars((string)($r['product_code'] ?? '')) ?></div>
           </td>
-          <td class="fw-semibold"><?= htmlspecialchars((string)($r['production_status'] ?? '')) ?></td>
+          <?php $sv = (string)($r['production_status'] ?? ''); ?>
+          <td class="fw-semibold"><?= htmlspecialchars($stLbl[$sv] ?? $sv) ?></td>
           <td class="text-end"><?= number_format((float)($r['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($r['unit'] ?? '')) ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)($r['delivered_qty'] ?? 0), 2, '.', '') ?></td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['labels'] ?? '')) ?></td>

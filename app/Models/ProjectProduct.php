@@ -52,7 +52,7 @@ final class ProjectProduct
             ':qty' => (float)($data['qty'] ?? 1),
             ':unit' => (string)($data['unit'] ?? 'buc'),
             ':m2' => (float)($data['m2_per_unit'] ?? 0),
-            ':st' => (string)($data['production_status'] ?? 'DE_PREGATIT'),
+            ':st' => (string)($data['production_status'] ?? 'CREAT'),
             ':del' => (float)($data['delivered_qty'] ?? 0),
             ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
             ':cnc' => $data['cnc_override_json'] ?? null,
@@ -75,9 +75,20 @@ final class ProjectProduct
             ':qty' => (float)($data['qty'] ?? 1),
             ':unit' => (string)($data['unit'] ?? 'buc'),
             ':m2' => (float)($data['m2_per_unit'] ?? 0),
-            ':st' => (string)($data['production_status'] ?? 'DE_PREGATIT'),
+            ':st' => (string)($data['production_status'] ?? 'CREAT'),
             ':del' => (float)($data['delivered_qty'] ?? 0),
             ':notes' => (isset($data['notes']) && trim((string)$data['notes']) !== '') ? trim((string)$data['notes']) : null,
+        ]);
+    }
+
+    public static function updateStatus(int $id, string $status): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('UPDATE project_products SET production_status = :st WHERE id = :id');
+        $st->execute([
+            ':id' => $id,
+            ':st' => $status,
         ]);
     }
 

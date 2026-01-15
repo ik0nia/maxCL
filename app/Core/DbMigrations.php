@@ -470,7 +470,7 @@ final class DbMigrations
                           product_id INT UNSIGNED NOT NULL,
                           qty DECIMAL(12,2) NOT NULL DEFAULT 1,
                           unit VARCHAR(32) NOT NULL DEFAULT 'buc',
-                          production_status ENUM('DE_PREGATIT','CNC','ATELIER','FINISARE','GATA','LIVRAT_PARTIAL','LIVRAT_COMPLET','REBUT') NOT NULL DEFAULT 'DE_PREGATIT',
+                          production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
                           delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
                           notes TEXT NULL,
                           cnc_override_json JSON NULL,
@@ -806,6 +806,57 @@ final class DbMigrations
                           CONSTRAINT fk_comments_user FOREIGN KEY (user_id) REFERENCES users(id)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     ");
+                },
+            ],
+            [
+                'id' => '2026-01-15_04_project_products_statuses_v2',
+                'label' => 'ALTER project_products.production_status (v2) + data migrate',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::columnExists($pdo, 'project_products', 'production_status')) return;
+
+                    // 1) Extinde enum-ul (include vechile valori) ca să putem migra datele.
+                    try {
+                        $pdo->exec("
+                            ALTER TABLE project_products
+                            MODIFY production_status ENUM(
+                              'DE_PREGATIT','CNC','ATELIER','FINISARE','GATA','LIVRAT_PARTIAL','LIVRAT_COMPLET','REBUT',
+                              'CREAT','PROIECTARE','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT'
+                            ) NOT NULL DEFAULT 'CREAT'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore (poate e deja extins)
+                    }
+
+                    // 2) Migrare best-effort a valorilor vechi către noile statusuri.
+                    try {
+                        $pdo->exec("
+                            UPDATE project_products
+                            SET production_status = CASE production_status
+                              WHEN 'DE_PREGATIT' THEN 'CREAT'
+                              WHEN 'ATELIER' THEN 'MONTAJ'
+                              WHEN 'FINISARE' THEN 'MONTAJ'
+                              WHEN 'GATA' THEN 'GATA_DE_LIVRARE'
+                              WHEN 'LIVRAT_PARTIAL' THEN 'LIVRAT'
+                              WHEN 'LIVRAT_COMPLET' THEN 'LIVRAT'
+                              WHEN 'REBUT' THEN 'CREAT'
+                              ELSE production_status
+                            END
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+
+                    // 3) Strânge enum-ul la lista finală.
+                    try {
+                        $pdo->exec("
+                            ALTER TABLE project_products
+                            MODIFY production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT')
+                            NOT NULL DEFAULT 'CREAT'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
                 },
             ],
         ];

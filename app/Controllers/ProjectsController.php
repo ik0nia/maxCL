@@ -1166,6 +1166,41 @@ final class ProjectsController
         return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
     }
 
+    public static function canSetProjectProductStatus(): bool
+    {
+        $u = Auth::user();
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+    }
+
+    public static function canSetProjectProductFinalStatus(): bool
+    {
+        $u = Auth::user();
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+    }
+
+    /** @return array<int, array{value:string,label:string}> */
+    public static function projectProductStatuses(): array
+    {
+        return [
+            ['value' => 'CREAT', 'label' => 'Creat'],
+            ['value' => 'PROIECTARE', 'label' => 'Proiectare'],
+            ['value' => 'CNC', 'label' => 'CNC'],
+            ['value' => 'MONTAJ', 'label' => 'Montaj'],
+            ['value' => 'GATA_DE_LIVRARE', 'label' => 'Gata de livrare'],
+            ['value' => 'AVIZAT', 'label' => 'Avizat'],
+            ['value' => 'LIVRAT', 'label' => 'Livrat'],
+        ];
+    }
+
+    /** @return array<int,string> */
+    private static function allowedProjectProductStatusesForCurrentUser(): array
+    {
+        $all = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
+        if (self::canSetProjectProductFinalStatus()) return $all;
+        // Operatorii nu pot seta statusurile finale.
+        return array_values(array_filter($all, fn($v) => !in_array($v, ['AVIZAT', 'LIVRAT'], true)));
+    }
+
     public static function addExistingProduct(array $params): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);
@@ -1200,7 +1235,7 @@ final class ProjectsController
                 'qty' => $qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
-                'production_status' => 'DE_PREGATIT',
+                'production_status' => 'CREAT',
                 'delivered_qty' => 0,
                 'notes' => null,
             ]);
@@ -1273,7 +1308,7 @@ final class ProjectsController
                 'qty' => $qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
-                'production_status' => 'DE_PREGATIT',
+                'production_status' => 'CREAT',
                 'delivered_qty' => 0,
                 'notes' => null,
             ]);
@@ -1314,11 +1349,11 @@ final class ProjectsController
         $del = Validator::dec(trim((string)($_POST['delivered_qty'] ?? '0'))) ?? 0.0;
         $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
         $m2 = Validator::dec(trim((string)($_POST['m2_per_unit'] ?? ''))) ?? null;
-        $st = trim((string)($_POST['production_status'] ?? (string)($before['production_status'] ?? 'DE_PREGATIT')));
+        $st = trim((string)($_POST['production_status'] ?? (string)($before['production_status'] ?? 'CREAT')));
         $note = trim((string)($_POST['notes'] ?? ''));
 
-        $allowed = ['DE_PREGATIT','CNC','ATELIER','FINISARE','GATA','LIVRAT_PARTIAL','LIVRAT_COMPLET','REBUT'];
-        if (!in_array($st, $allowed, true)) $st = (string)($before['production_status'] ?? 'DE_PREGATIT');
+        $allowed = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
+        if (!in_array($st, $allowed, true)) $st = (string)($before['production_status'] ?? 'CREAT');
         if ($qty <= 0) $qty = 1.0;
         if ($del < 0) $del = 0.0;
         if ($del > $qty) $del = $qty;
@@ -1343,6 +1378,53 @@ final class ProjectsController
             Session::flash('toast_success', 'Produs actualizat.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot actualiza produsul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    public static function updateProjectProductStatus(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $newStatus = trim((string)($_POST['production_status'] ?? ''));
+
+        if (!self::canSetProjectProductStatus()) {
+            Session::flash('toast_error', 'Nu ai drepturi pentru a schimba statusul.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $before = ProjectProduct::find($ppId);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $allowed = self::allowedProjectProductStatusesForCurrentUser();
+        if ($newStatus === '' || !in_array($newStatus, $allowed, true)) {
+            Session::flash('toast_error', 'Status invalid sau fără drepturi (Avizat/Livrat sunt doar pentru Admin/Gestionar).');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $old = (string)($before['production_status'] ?? '');
+        if ($old === $newStatus) {
+            Session::flash('toast_error', 'Statusul este deja setat.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        try {
+            ProjectProduct::updateStatus($ppId, $newStatus);
+            $after = $before;
+            $after['production_status'] = $newStatus;
+            Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [
+                'message' => 'Schimbare status piesă: ' . $old . ' → ' . $newStatus,
+                'project_id' => $projectId,
+                'old_status' => $old,
+                'new_status' => $newStatus,
+            ]);
+            Session::flash('toast_success', 'Status piesă actualizat.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot schimba statusul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
     }
@@ -1882,10 +1964,9 @@ final class ProjectsController
                 $totalQty = (float)($pp['qty'] ?? 0);
                 if ($newDelivered > $totalQty) $newDelivered = $totalQty;
 
-                // update status based on delivered
-                $newStatus = (string)($pp['production_status'] ?? 'DE_PREGATIT');
-                if ($newDelivered >= $totalQty - 1e-9) $newStatus = 'LIVRAT_COMPLET';
-                elseif ($newDelivered > 0) $newStatus = 'LIVRAT_PARTIAL';
+                // update status based on delivered (doar livrat complet)
+                $newStatus = (string)($pp['production_status'] ?? 'CREAT');
+                if ($newDelivered >= $totalQty - 1e-9) $newStatus = 'LIVRAT';
 
                 ProjectProduct::updateFields($ppId, [
                     'qty' => $totalQty,

@@ -255,6 +255,16 @@ ob_start();
         <div class="h5 m-0">Produse (piese) în proiect</div>
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
 
+        <?php
+          $ppStatusesAll = ProjectsController::projectProductStatuses();
+          $ppStatusLabel = [];
+          foreach ($ppStatusesAll as $s) $ppStatusLabel[(string)$s['value']] = (string)$s['label'];
+          $canSetPPStatus = ProjectsController::canSetProjectProductStatus();
+          $canSetPPFinal = ProjectsController::canSetProjectProductFinalStatus();
+          $ppAllowedValues = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
+          if (!$canSetPPFinal) $ppAllowedValues = array_values(array_filter($ppAllowedValues, fn($v) => !in_array($v, ['AVIZAT','LIVRAT'], true)));
+        ?>
+
         <?php if (!$projectProducts): ?>
           <div class="text-muted mt-2">Nu există produse încă.</div>
         <?php else: ?>
@@ -305,7 +315,36 @@ ob_start();
                     </div>
                     <div class="text-end">
                       <div class="text-muted small">Status</div>
-                      <div class="fw-semibold"><?= htmlspecialchars((string)($pp['production_status'] ?? '')) ?></div>
+                      <?php
+                        $stVal = (string)($pp['production_status'] ?? '');
+                        $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
+                      ?>
+                      <div class="fw-semibold"><?= htmlspecialchars($stLbl) ?></div>
+                      <?php if ($canSetPPStatus): ?>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="mt-2">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <div class="input-group input-group-sm">
+                            <select class="form-select form-select-sm" name="production_status">
+                              <?php if (!in_array($stVal, $ppAllowedValues, true) && $stVal !== ''): ?>
+                                <option value="<?= htmlspecialchars($stVal) ?>" selected disabled><?= htmlspecialchars($stLbl) ?></option>
+                              <?php endif; ?>
+                              <?php foreach ($ppStatusesAll as $s): ?>
+                                <?php
+                                  $v = (string)$s['value'];
+                                  if (!in_array($v, $ppAllowedValues, true)) continue;
+                                ?>
+                                <option value="<?= htmlspecialchars($v) ?>" <?= ($stVal === $v) ? 'selected' : '' ?>>
+                                  <?= htmlspecialchars((string)$s['label']) ?>
+                                </option>
+                              <?php endforeach; ?>
+                            </select>
+                            <button class="btn btn-outline-primary" type="submit">Setează</button>
+                          </div>
+                          <?php if (!$canSetPPFinal): ?>
+                            <div class="text-muted small mt-1">Avizat/Livrat: doar Admin/Gestionar.</div>
+                          <?php endif; ?>
+                        </form>
+                      <?php endif; ?>
                     </div>
                   </div>
 
@@ -389,8 +428,11 @@ ob_start();
                         <div class="col-12 col-md-3">
                           <label class="form-label fw-semibold mb-1">Status</label>
                           <select class="form-select form-select-sm" name="production_status">
-                            <?php foreach (['DE_PREGATIT'=>'De pregătit','CNC'=>'CNC','ATELIER'=>'Atelier','FINISARE'=>'Finisare','GATA'=>'Gata','LIVRAT_PARTIAL'=>'Livrat parțial','LIVRAT_COMPLET'=>'Livrat complet','REBUT'=>'Rebut/Refăcut'] as $val => $lbl): ?>
-                              <option value="<?= htmlspecialchars($val) ?>" <?= ((string)($pp['production_status'] ?? '') === $val) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
+                            <?php foreach ($ppStatusesAll as $s): ?>
+                              <?php $val = (string)$s['value']; ?>
+                              <option value="<?= htmlspecialchars($val) ?>" <?= ((string)($pp['production_status'] ?? '') === $val) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars((string)$s['label']) ?>
+                              </option>
                             <?php endforeach; ?>
                           </select>
                         </div>
