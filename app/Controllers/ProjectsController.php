@@ -31,6 +31,7 @@ use App\Models\Label;
 use App\Models\EntityLabel;
 use App\Models\AppSetting;
 use App\Models\EntityComment;
+use App\Core\Env;
 
 final class ProjectsController
 {
@@ -741,149 +742,148 @@ final class ProjectsController
     public static function show(array $params): void
     {
         $id = (int)($params['id'] ?? 0);
-        $project = Project::find($id);
-        if (!$project) {
-            Session::flash('toast_error', 'Proiect inexistent.');
-            Response::redirect('/projects');
-        }
-
         $tab = isset($_GET['tab']) ? trim((string)($_GET['tab'] ?? '')) : '';
         if ($tab === '') $tab = 'general';
 
-        $projectProducts = [];
-        $magazieConsum = [];
-        $hplConsum = [];
-        $hplAlloc = [];
-        $hplBoards = [];
-        $magazieItems = [];
-        $deliveries = [];
-        $deliveryItems = [];
-        $projectFiles = [];
-        $workLogs = [];
-        $projectLabels = [];
-        $cncFiles = [];
-        $laborByProduct = [];
-        $materialsByProduct = [];
-        $projectCostSummary = [];
-        $discussions = [];
-        if ($tab === 'products') {
+        for ($attempt = 0; $attempt < 2; $attempt++) {
             try {
-                $projectProducts = ProjectProduct::forProject($id);
-            } catch (\Throwable $e) {
-                $projectProducts = [];
-            }
-            try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
-            $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
-            try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
-            try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
-            try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
-            $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
-            $hplBy = self::hplCostByProduct($projectProducts, $hplAlloc, $hplConsum);
-            foreach ($projectProducts as $pp) {
-                $ppId = (int)($pp['id'] ?? 0);
-                if ($ppId <= 0) continue;
-                $materialsByProduct[$ppId] = [
-                    'mag_cost' => (float)($magBy[$ppId]['mag_cost'] ?? 0.0),
-                    'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
-                ];
-            }
-            $projectCostSummary = self::projectCostSummary($workLogs, $magazieConsum, $hplConsum, $hplAlloc);
-        } elseif ($tab === 'consum') {
-            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
-            try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
-            try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
-            try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
-            try { $hplBoards = HplBoard::allWithTotals(null, null); } catch (\Throwable $e) { $hplBoards = []; }
-            try { $magazieItems = MagazieItem::all(null, 5000); } catch (\Throwable $e) { $magazieItems = []; }
-        } elseif ($tab === 'deliveries') {
-            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
-            try { $deliveries = ProjectDelivery::forProject($id); } catch (\Throwable $e) { $deliveries = []; }
-            $deliveryItems = [];
-            foreach ($deliveries as $d) {
-                $did = (int)($d['id'] ?? 0);
-                if ($did <= 0) continue;
-                try {
-                    $deliveryItems[$did] = ProjectDelivery::itemsForDelivery($did);
-                } catch (\Throwable $e) {
-                    $deliveryItems[$did] = [];
+                $project = Project::find($id);
+                if (!$project) {
+                    Session::flash('toast_error', 'Proiect inexistent.');
+                    Response::redirect('/projects');
                 }
-            }
-        } elseif ($tab === 'files') {
-            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
-            try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
-        } elseif ($tab === 'hours') {
-            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
-            try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
-        } elseif ($tab === 'history') {
-            // no heavy joins; filter in PHP
-            try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
-        } elseif ($tab === 'discutii') {
-            // proiect discussions (conversație)
-            try { $discussions = EntityComment::forEntity('projects', $id, 800); } catch (\Throwable $e) { $discussions = []; }
-        } elseif ($tab === 'general') {
-            try { $projectLabels = EntityLabel::labelsForEntity('projects', $id); } catch (\Throwable $e) { $projectLabels = []; }
-        } elseif ($tab === 'cnc') {
-            try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
-            $cncFiles = [];
-            try {
-                $cncFiles = array_merge($cncFiles, EntityFile::forEntity('projects', $id));
-            } catch (\Throwable $e) {}
-            foreach ($projectProducts as $pp) {
-                $ppId = (int)($pp['id'] ?? 0);
-                if ($ppId <= 0) continue;
-                try {
-                    $files = EntityFile::forEntity('project_products', $ppId);
-                    foreach ($files as $f) {
-                        $f['_product_name'] = (string)($pp['product_name'] ?? '');
-                        $cncFiles[] = $f;
+
+                $projectProducts = [];
+                $magazieConsum = [];
+                $hplConsum = [];
+                $hplAlloc = [];
+                $hplBoards = [];
+                $magazieItems = [];
+                $deliveries = [];
+                $deliveryItems = [];
+                $projectFiles = [];
+                $workLogs = [];
+                $projectLabels = [];
+                $cncFiles = [];
+                $laborByProduct = [];
+                $materialsByProduct = [];
+                $projectCostSummary = [];
+                $discussions = [];
+                if ($tab === 'products') {
+                    try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+                    try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
+                    $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
+                    try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
+                    try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
+                    try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
+                    $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
+                    $hplBy = self::hplCostByProduct($projectProducts, $hplAlloc, $hplConsum);
+                    foreach ($projectProducts as $pp) {
+                        $ppId = (int)($pp['id'] ?? 0);
+                        if ($ppId <= 0) continue;
+                        $materialsByProduct[$ppId] = [
+                            'mag_cost' => (float)($magBy[$ppId]['mag_cost'] ?? 0.0),
+                            'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
+                        ];
                     }
-                } catch (\Throwable $e) {}
-            }
-        }
+                    $projectCostSummary = self::projectCostSummary($workLogs, $magazieConsum, $hplConsum, $hplAlloc);
+                } elseif ($tab === 'consum') {
+                    try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+                    try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
+                    try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
+                    try { $hplAlloc = ProjectHplAllocation::forProject($id); } catch (\Throwable $e) { $hplAlloc = []; }
+                    try { $hplBoards = HplBoard::allWithTotals(null, null); } catch (\Throwable $e) { $hplBoards = []; }
+                    try { $magazieItems = MagazieItem::all(null, 5000); } catch (\Throwable $e) { $magazieItems = []; }
+                } elseif ($tab === 'deliveries') {
+                    try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+                    try { $deliveries = ProjectDelivery::forProject($id); } catch (\Throwable $e) { $deliveries = []; }
+                    $deliveryItems = [];
+                    foreach ($deliveries as $d) {
+                        $did = (int)($d['id'] ?? 0);
+                        if ($did <= 0) continue;
+                        try { $deliveryItems[$did] = ProjectDelivery::itemsForDelivery($did); } catch (\Throwable $e) { $deliveryItems[$did] = []; }
+                    }
+                } elseif ($tab === 'files') {
+                    try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+                    try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
+                } elseif ($tab === 'hours') {
+                    try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+                    try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
+                } elseif ($tab === 'history') {
+                    try { $projectFiles = EntityFile::forEntity('projects', $id); } catch (\Throwable $e) { $projectFiles = []; }
+                } elseif ($tab === 'discutii') {
+                    try { $discussions = EntityComment::forEntity('projects', $id, 800); } catch (\Throwable $e) { $discussions = []; }
+                } elseif ($tab === 'general') {
+                    try { $projectLabels = EntityLabel::labelsForEntity('projects', $id); } catch (\Throwable $e) { $projectLabels = []; }
+                } elseif ($tab === 'cnc') {
+                    try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
+                    $cncFiles = [];
+                    try { $cncFiles = array_merge($cncFiles, EntityFile::forEntity('projects', $id)); } catch (\Throwable $e) {}
+                    foreach ($projectProducts as $pp) {
+                        $ppId = (int)($pp['id'] ?? 0);
+                        if ($ppId <= 0) continue;
+                        try {
+                            $files = EntityFile::forEntity('project_products', $ppId);
+                            foreach ($files as $f) {
+                                $f['_product_name'] = (string)($pp['product_name'] ?? '');
+                                $cncFiles[] = $f;
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                }
 
-        $history = [];
-        if ($tab === 'history') {
-            try {
-                $history = AuditLog::forProject($id, 300);
-            } catch (\Throwable $e) {
                 $history = [];
+                if ($tab === 'history') {
+                    try { $history = AuditLog::forProject($id, 300); } catch (\Throwable $e) { $history = []; }
+                }
+
+                echo View::render('projects/show', [
+                    'title' => 'Proiect',
+                    'project' => $project,
+                    'tab' => $tab,
+                    'projectProducts' => $projectProducts,
+                    'magazieConsum' => $magazieConsum,
+                    'hplConsum' => $hplConsum,
+                    'hplAlloc' => $hplAlloc,
+                    'hplBoards' => $hplBoards,
+                    'magazieItems' => $magazieItems,
+                    'deliveries' => $deliveries,
+                    'deliveryItems' => $deliveryItems,
+                    'projectFiles' => $projectFiles,
+                    'workLogs' => $workLogs,
+                    'laborByProduct' => $laborByProduct,
+                    'materialsByProduct' => $materialsByProduct,
+                    'projectCostSummary' => $projectCostSummary,
+                    'discussions' => $discussions,
+                    'costSettings' => [
+                        'labor' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
+                        'cnc' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
+                    ],
+                    'history' => $history,
+                    'projectLabels' => $projectLabels,
+                    'cncFiles' => $cncFiles,
+                    'statuses' => self::statuses(),
+                    'allocationModes' => self::allocationModes(),
+                    'clients' => Client::allWithProjects(),
+                    'groups' => ClientGroup::forSelect(),
+                ]);
+                return;
+            } catch (\Throwable $e) {
+                if ($attempt === 0) {
+                    try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                    continue;
+                }
+                $u = Auth::user();
+                $env = strtolower((string)Env::get('APP_ENV', 'prod'));
+                $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro') || ($env !== 'prod' && $env !== 'production');
+                $msg = 'Proiect indisponibil momentan.';
+                if ($debug) {
+                    $msg .= ' Eroare: ' . get_class($e) . ' · ' . $e->getMessage() . ' · ' . basename((string)$e->getFile()) . ':' . (int)$e->getLine();
+                }
+                echo View::render('system/placeholder', ['title' => 'Proiect', 'message' => $msg]);
+                return;
             }
         }
-
-        echo View::render('projects/show', [
-            'title' => 'Proiect',
-            'project' => $project,
-            'tab' => $tab,
-            'projectProducts' => $projectProducts,
-            'magazieConsum' => $magazieConsum,
-            'hplConsum' => $hplConsum,
-            'hplAlloc' => $hplAlloc,
-            'hplBoards' => $hplBoards,
-            'magazieItems' => $magazieItems,
-            'deliveries' => $deliveries,
-            'deliveryItems' => $deliveryItems,
-            'projectFiles' => $projectFiles,
-            'workLogs' => $workLogs,
-            'laborByProduct' => $laborByProduct,
-            'materialsByProduct' => $materialsByProduct,
-            'projectCostSummary' => $projectCostSummary,
-            'discussions' => $discussions,
-            'costSettings' => [
-                'labor' => (function () {
-                    try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; }
-                })(),
-                'cnc' => (function () {
-                    try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; }
-                })(),
-            ],
-            'history' => $history,
-            'projectLabels' => $projectLabels,
-            'cncFiles' => $cncFiles,
-            'statuses' => self::statuses(),
-            'allocationModes' => self::allocationModes(),
-            'clients' => Client::allWithProjects(),
-            'groups' => ClientGroup::forSelect(),
-        ]);
     }
 
     public static function update(array $params): void
