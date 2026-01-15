@@ -1552,11 +1552,6 @@ ob_start();
       </script>
     <?php endif; ?>
   </div>
-<?php else: ?>
-  <div class="card app-card p-4">
-    <div class="h5 m-0"><?= htmlspecialchars($tabs[$tab]) ?></div>
-    <div class="text-muted mt-1">Acest tab va fi completat în pasul următor.</div>
-  </div>
 <?php elseif ($tab === 'discutii'): ?>
   <div class="row g-3">
     <div class="col-12 col-lg-8">
@@ -1601,6 +1596,11 @@ ob_start();
         <?php endif; ?>
       </div>
     </div>
+  </div>
+<?php else: ?>
+  <div class="card app-card p-4">
+    <div class="h5 m-0"><?= htmlspecialchars($tabs[$tab]) ?></div>
+    <div class="text-muted mt-1">Acest tab va fi completat în pasul următor.</div>
   </div>
 <?php endif; ?>
 
