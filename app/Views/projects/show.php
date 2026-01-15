@@ -323,6 +323,36 @@ ob_start();
             });
           </script>
 
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              const $ = window.jQuery;
+              $('.js-pp-magazie-item').each(function(){
+                const el = this;
+                const $el = $(el);
+                if ($el.data('select2')) return;
+                $el.select2({
+                  width: '100%',
+                  placeholder: 'Caută accesoriu…',
+                  allowClear: true,
+                  minimumInputLength: 1,
+                  ajax: {
+                    url: "<?= htmlspecialchars(Url::to('/api/magazie/items/search')) ?>",
+                    dataType: 'json',
+                    delay: 250,
+                    headers: { 'Accept': 'application/json' },
+                    data: function(params){ return { q: params.term }; },
+                    processResults: function(resp){
+                      const items = (resp && resp.items) ? resp.items : [];
+                      return { results: items };
+                    },
+                    cache: true
+                  }
+                });
+              });
+            });
+          </script>
+
           <style>
             .s2-thumb{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px}
             .s2-thumb2{width:34px;height:34px;object-fit:cover;border-radius:10px;border:1px solid #D9E3E6;margin-right:10px;margin-left:-8px}
@@ -716,6 +746,9 @@ ob_start();
 
                   <?php if ($canWrite): ?>
                     <div class="d-flex justify-content-end gap-2 mt-3">
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAcc<?= $ppId ?>">
+                        <i class="bi bi-box-seam me-1"></i> Adaugă accesorii
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
                         <i class="bi bi-pencil me-1"></i> Editează
                       </button>
@@ -726,6 +759,29 @@ ob_start();
                           <i class="bi bi-link-45deg me-1"></i> Scoate
                         </button>
                       </form>
+                    </div>
+
+                    <div class="collapse mt-3" id="ppAcc<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Accesorii (rezervate pentru această piesă)</div>
+                        <div class="text-muted small">Se rezervă automat. La “Gata de livrare” se consumă din stoc.</div>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/create')) ?>" class="row g-2 mt-2">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <div class="col-12 col-md-8">
+                            <label class="form-label fw-semibold mb-1">Accesoriu</label>
+                            <select class="form-select form-select-sm js-pp-magazie-item" name="item_id" data-pp-id="<?= (int)$ppId ?>" style="width:100%"></select>
+                          </div>
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Cantitate</label>
+                            <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty" value="1" required>
+                          </div>
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-plus-lg me-1"></i> Adaugă
+                            </button>
+                          </div>
+                        </form>
+                      </div>
                     </div>
                     <div class="collapse mt-3" id="ppEdit<?= $ppId ?>">
                       <?php

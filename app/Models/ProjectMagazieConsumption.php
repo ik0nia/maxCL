@@ -33,6 +33,30 @@ final class ProjectMagazieConsumption
         return $st->fetchAll();
     }
 
+    /** @return array<int, array<string,mixed>> */
+    public static function reservedForProjectProduct(int $projectId, int $projectProductId): array
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('
+            SELECT
+              c.*,
+              mi.winmentor_code,
+              mi.name AS item_name,
+              mi.unit AS item_unit,
+              mi.unit_price AS item_unit_price,
+              mi.stock_qty AS item_stock_qty
+            FROM project_magazie_consumptions c
+            INNER JOIN magazie_items mi ON mi.id = c.item_id
+            WHERE c.project_id = ?
+              AND c.project_product_id = ?
+              AND c.mode = \'RESERVED\'
+            ORDER BY c.created_at ASC, c.id ASC
+        ');
+        $st->execute([(int)$projectId, (int)$projectProductId]);
+        return $st->fetchAll();
+    }
+
     public static function find(int $id): ?array
     {
         /** @var PDO $pdo */

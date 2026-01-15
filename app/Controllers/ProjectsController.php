@@ -1483,6 +1483,16 @@ final class ProjectsController
                 }
             }
 
+            // Montaj -> Gata de livrare: consumăm automat accesoriile rezervate pe piesă (Magazie)
+            if ($next === 'GATA_DE_LIVRARE') {
+                try {
+                    self::autoConsumeMagazieOnReadyToDeliver($projectId, $ppId);
+                } catch (\Throwable $e) {
+                    Session::flash('toast_error', $e->getMessage());
+                    Response::redirect('/projects/' . $projectId . '?tab=products');
+                }
+            }
+
             ProjectProduct::updateStatus($ppId, $next);
             $after = $before;
             $after['production_status'] = $next;
@@ -1497,6 +1507,115 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot schimba statusul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
+     * Automat: când piesa trece la "Gata de livrare", consumăm accesoriile rezervate pe ea.
+     * - reserved (fără scădere stoc) -> consumed (OUT din stoc + mișcare)
+     * - fără notă (cerință)
+     */
+    private static function autoConsumeMagazieOnReadyToDeliver(int $projectId, int $projectProductId): void
+    {
+        if ($projectId <= 0 || $projectProductId <= 0) return;
+        $project = Project::find($projectId);
+        if (!$project) throw new \RuntimeException('Proiect inexistent.');
+
+        $rows = [];
+        try {
+            $rows = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $projectProductId);
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        if (!$rows) return;
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            // 1) verificăm stoc suficient per item (agregat)
+            $needByItem = [];
+            foreach ($rows as $r) {
+                $iid = (int)($r['item_id'] ?? 0);
+                $q = isset($r['qty']) ? (float)$r['qty'] : 0.0;
+                if ($iid <= 0 || $q <= 0) continue;
+                $needByItem[$iid] = ($needByItem[$iid] ?? 0.0) + $q;
+            }
+            foreach ($needByItem as $iid => $need) {
+                $beforeItem = MagazieItem::findForUpdate((int)$iid);
+                if (!$beforeItem) {
+                    throw new \RuntimeException('Accesoriu inexistent (id=' . (int)$iid . ').');
+                }
+                $stock = (float)($beforeItem['stock_qty'] ?? 0.0);
+                if ($need > $stock + 1e-9) {
+                    $code = (string)($beforeItem['winmentor_code'] ?? '');
+                    $name = (string)($beforeItem['name'] ?? '');
+                    throw new \RuntimeException('Stoc insuficient pentru accesoriu: ' . trim($code . ' · ' . $name) . ' (necesar ' . number_format($need, 3, '.', '') . ', stoc ' . number_format($stock, 3, '.', '') . ').');
+                }
+            }
+
+            // 2) procesăm fiecare rezervare: update mode + OUT din stoc
+            foreach ($rows as $r) {
+                $cid = (int)($r['id'] ?? 0);
+                $iid = (int)($r['item_id'] ?? 0);
+                $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
+                if ($cid <= 0 || $iid <= 0 || $qty <= 0) continue;
+
+                $beforeRow = ProjectMagazieConsumption::find($cid);
+                if (!$beforeRow) continue;
+                if ((string)($beforeRow['mode'] ?? '') !== 'RESERVED') continue;
+
+                $beforeItem = MagazieItem::findForUpdate($iid);
+                if (!$beforeItem) continue;
+
+                if (!MagazieItem::adjustStock($iid, -(float)$qty)) {
+                    throw new \RuntimeException('Nu pot scădea stocul (concurență / stoc insuficient).');
+                }
+
+                ProjectMagazieConsumption::update($cid, [
+                    'project_product_id' => $projectProductId,
+                    'qty' => (float)$qty,
+                    'unit' => (string)($beforeRow['unit'] ?? (string)($beforeItem['unit'] ?? 'buc')),
+                    'mode' => 'CONSUMED',
+                    'note' => null,
+                ]);
+
+                // mișcare Magazie (OUT) + log pe accesoriu
+                $movementId = \App\Models\MagazieMovement::create([
+                    'item_id' => $iid,
+                    'direction' => 'OUT',
+                    'qty' => (float)$qty,
+                    'unit_price' => (isset($beforeItem['unit_price']) && $beforeItem['unit_price'] !== '' && is_numeric($beforeItem['unit_price'])) ? (float)$beforeItem['unit_price'] : null,
+                    'project_id' => $projectId,
+                    'project_code' => (string)($project['code'] ?? null),
+                    'note' => null,
+                    'created_by' => Auth::id(),
+                ]);
+                $afterItem = MagazieItem::findForUpdate($iid) ?: $beforeItem;
+                Audit::log('MAGAZIE_OUT', 'magazie_items', $iid, $beforeItem, $afterItem, [
+                    'movement_id' => $movementId,
+                    'project_id' => $projectId,
+                    'project_code' => (string)($project['code'] ?? ''),
+                    'project_product_id' => $projectProductId,
+                    'qty' => (float)$qty,
+                ]);
+
+                $afterRow = $beforeRow;
+                $afterRow['mode'] = 'CONSUMED';
+                $afterRow['note'] = null;
+                Audit::log('PROJECT_CONSUMPTION_UPDATE', 'project_magazie_consumptions', $cid, $beforeRow, $afterRow, [
+                    'message' => 'Consum Magazie auto (Gata de livrare).',
+                    'project_id' => $projectId,
+                    'project_product_id' => $projectProductId,
+                    'item_id' => $iid,
+                    'qty' => (float)$qty,
+                ]);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            throw $e;
+        }
     }
 
     /**
@@ -1993,6 +2112,75 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot salva consumul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=consum');
+    }
+
+    /**
+     * Add accessories for a specific project product:
+     * - always RESERVED
+     * - linked to project_product_id
+     * - no note / no mode selection
+     */
+    public static function addMagazieConsumptionForProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        if ($itemId === null || $qty === null || $qty <= 0) {
+            Session::flash('toast_error', 'Consum invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $item = MagazieItem::find((int)$itemId);
+        if (!$item) {
+            Session::flash('toast_error', 'Accesoriu inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        $unit = trim((string)($item['unit'] ?? 'buc'));
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $cid = ProjectMagazieConsumption::create([
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'item_id' => (int)$itemId,
+                'qty' => (float)$qty,
+                'unit' => $unit !== '' ? $unit : 'buc',
+                'mode' => 'RESERVED',
+                'note' => null,
+                'created_by' => Auth::id(),
+            ]);
+            $pdo->commit();
+
+            Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_magazie_consumptions', $cid, null, null, [
+                'message' => 'Accesoriu rezervat pe piesă: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'item_id' => (int)$itemId,
+                'qty' => (float)$qty,
+                'unit' => $unit,
+                'mode' => 'RESERVED',
+            ]);
+            Session::flash('toast_success', 'Accesoriu rezervat pe piesă.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot salva accesoriul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
     }
 
     public static function addHplConsumption(array $params): void
