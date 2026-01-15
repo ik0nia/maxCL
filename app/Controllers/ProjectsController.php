@@ -35,6 +35,8 @@ use App\Core\Env;
 
 final class ProjectsController
 {
+    private const HPL_NOTE_HALF_REMAINDER = 'REST_JUMATATE';
+    private const HPL_NOTE_AUTO_CONSUME = 'CONSUM_AUTO';
     /**
      * @param array<int, array<string,mixed>> $projectProducts
      * @return array{ppIds:array<int,int>,qtyById:array<int,float>,sumQty:float,weightById:array<int,float>}
@@ -1598,6 +1600,20 @@ final class ProjectsController
         }
 
         try {
+            // CNC -> Montaj: consum HPL automat (doar pentru suprafață în plăci: 1 / 0.5)
+            if ($old === 'CNC' && $next === 'MONTAJ') {
+                try {
+                    $err = self::autoConsumeHplOnCncToMontaj($projectId, $before, (string)($_POST['remainder_action'] ?? ''));
+                    if ($err !== null) {
+                        Session::flash('toast_error', $err);
+                        Response::redirect('/projects/' . $projectId . '?tab=products');
+                    }
+                } catch (\Throwable $e) {
+                    Session::flash('toast_error', 'Nu pot consuma HPL automat: ' . $e->getMessage());
+                    Response::redirect('/projects/' . $projectId . '?tab=products');
+                }
+            }
+
             ProjectProduct::updateStatus($ppId, $next);
             $after = $before;
             $after['production_status'] = $next;
@@ -1612,6 +1628,199 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot schimba statusul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
+     * Automat: când piesa trece CNC -> Montaj, consumăm din rezervările proiectului.
+     * - dacă surface_type != BOARD sau surface_value nu e 1/0.5 => nu facem nimic
+     * - dacă nu are hpl_board_id => nu facem nimic
+     * - pentru 1 placă: trebuie să existe rezervare full (qty_boards) pe proiect
+     * - pentru 1/2 placă: dacă există resturi "REST_JUMATATE" le folosim; altfel luăm 1 placă rezervată
+     *   și cerem remainder_action: RETURN (rest în depozit) sau KEEP (rest rămâne rezervat ca jumătate)
+     *
+     * @param array<string,mixed> $ppRow (ProjectProduct::find row)
+     * @return string|null error
+     */
+    private static function autoConsumeHplOnCncToMontaj(int $projectId, array $ppRow, string $remainderAction): ?string
+    {
+        $boardId = isset($ppRow['hpl_board_id']) && $ppRow['hpl_board_id'] !== null && $ppRow['hpl_board_id'] !== '' ? (int)$ppRow['hpl_board_id'] : 0;
+        if ($boardId <= 0) return null;
+        $stype = (string)($ppRow['surface_type'] ?? '');
+        $sval = isset($ppRow['surface_value']) && $ppRow['surface_value'] !== null && $ppRow['surface_value'] !== '' ? (float)$ppRow['surface_value'] : null;
+        if ($stype !== 'BOARD' || $sval === null) return null;
+        if (!(abs($sval - 1.0) < 1e-9 || abs($sval - 0.5) < 1e-9)) return null;
+
+        $ppId = (int)($ppRow['id'] ?? 0);
+        $pname = '';
+        try {
+            $prodId = (int)($ppRow['product_id'] ?? 0);
+            if ($prodId > 0) {
+                $p = Product::find($prodId);
+                $pname = $p ? (string)($p['name'] ?? '') : '';
+            }
+        } catch (\Throwable $e) {}
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            [$hmm, $wmm] = self::boardStdDimsMm($boardId);
+            if ($hmm <= 0 || $wmm <= 0) throw new \RuntimeException('Dimensiuni placă lipsă.');
+            $fullM2 = ((float)$hmm * (float)$wmm) / 1000000.0;
+            $halfM2 = (((float)$hmm / 2.0) * (float)$wmm) / 1000000.0;
+
+            if (abs($sval - 1.0) < 1e-9) {
+                // 1 placă: consumăm 1 buc din rezervarea full
+                if (!self::takeReservedFullBoard($pdo, $projectId, $boardId, $fullM2)) {
+                    $pdo->rollBack();
+                    return 'Nu există placă rezervată disponibilă în proiect pentru consum (1 placă).';
+                }
+                self::insertProjectHplConsumption($pdo, $projectId, $boardId, 1, $fullM2, 'CONSUMED',
+                    self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+            } else {
+                // 1/2 placă
+                if (self::takeReservedHalfRemainder($pdo, $projectId, $boardId, $halfM2)) {
+                    self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
+                        self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                } else {
+                    // nu avem jumătate -> luăm 1 placă full rezervată
+                    if (!self::takeReservedFullBoard($pdo, $projectId, $boardId, $fullM2)) {
+                        $pdo->rollBack();
+                        return 'Nu există placă rezervată disponibilă în proiect pentru a tăia 1/2 placă.';
+                    }
+                    $ra = strtoupper(trim($remainderAction));
+                    if ($ra !== 'RETURN' && $ra !== 'KEEP') {
+                        $pdo->rollBack();
+                        return 'Alege ce se întâmplă cu restul pentru 1/2 placă: RETURN (în depozit) sau KEEP (rămâne rezervat).';
+                    }
+                    if ($ra === 'KEEP') {
+                        self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'RESERVED',
+                            self::HPL_NOTE_HALF_REMAINDER . ' · 1/2 placă (rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                    }
+                    self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
+                        self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă · piesă #' . $ppId . ' · rest=' . $ra . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                }
+            }
+
+            $pdo->commit();
+            // best-effort: alocări/costuri
+            try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
+            return null;
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            throw $e;
+        }
+    }
+
+    /** @return array{0:int,1:int} height_mm,width_mm */
+    private static function boardStdDimsMm(int $boardId): array
+    {
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $st = $pdo->prepare('SELECT std_height_mm, std_width_mm FROM hpl_boards WHERE id = ?');
+        $st->execute([(int)$boardId]);
+        $r = $st->fetch();
+        if (!$r) return [0, 0];
+        return [(int)($r['std_height_mm'] ?? 0), (int)($r['std_width_mm'] ?? 0)];
+    }
+
+    private static function insertProjectHplConsumption(\PDO $pdo, int $projectId, int $boardId, int $qtyBoards, float $qtyM2, string $mode, ?string $note, ?int $createdBy): int
+    {
+        $qtyM2 = max(0.0, (float)$qtyM2);
+        try {
+            $st = $pdo->prepare('
+                INSERT INTO project_hpl_consumptions
+                  (project_id, board_id, qty_boards, qty_m2, mode, note, created_by)
+                VALUES
+                  (:project_id, :board_id, :qty_boards, :qty_m2, :mode, :note, :created_by)
+            ');
+            $st->execute([
+                ':project_id' => $projectId,
+                ':board_id' => $boardId,
+                ':qty_boards' => $qtyBoards,
+                ':qty_m2' => $qtyM2,
+                ':mode' => $mode,
+                ':note' => ($note !== null && trim($note) !== '') ? trim($note) : null,
+                ':created_by' => $createdBy,
+            ]);
+            return (int)$pdo->lastInsertId();
+        } catch (\Throwable $e) {
+            // Compat: fără qty_boards
+            $st = $pdo->prepare('
+                INSERT INTO project_hpl_consumptions
+                  (project_id, board_id, qty_m2, mode, note, created_by)
+                VALUES
+                  (:project_id, :board_id, :qty_m2, :mode, :note, :created_by)
+            ');
+            $st->execute([
+                ':project_id' => $projectId,
+                ':board_id' => $boardId,
+                ':qty_m2' => $qtyM2,
+                ':mode' => $mode,
+                ':note' => ($note !== null && trim($note) !== '') ? trim($note) : null,
+                ':created_by' => $createdBy,
+            ]);
+            return (int)$pdo->lastInsertId();
+        }
+    }
+
+    private static function takeReservedFullBoard(\PDO $pdo, int $projectId, int $boardId, float $fullM2): bool
+    {
+        // luăm 1 buc din cel mai vechi rând RESERVED cu qty_boards>0
+        $st = $pdo->prepare("
+            SELECT id, qty_boards, qty_m2
+            FROM project_hpl_consumptions
+            WHERE project_id = ?
+              AND board_id = ?
+              AND mode = 'RESERVED'
+              AND COALESCE(qty_boards,0) > 0
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            FOR UPDATE
+        ");
+        $st->execute([(int)$projectId, (int)$boardId]);
+        $r = $st->fetch();
+        if (!$r) return false;
+        $id = (int)($r['id'] ?? 0);
+        $qb = (int)($r['qty_boards'] ?? 0);
+        $qm = (float)($r['qty_m2'] ?? 0.0);
+        if ($id <= 0 || $qb <= 0) return false;
+        $newQb = $qb - 1;
+        $newQm = max(0.0, $qm - $fullM2);
+        $pdo->prepare('UPDATE project_hpl_consumptions SET qty_boards=?, qty_m2=? WHERE id=?')->execute([$newQb, $newQm, $id]);
+        if ($newQb <= 0 && $newQm <= 0.00001) {
+            $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id=?')->execute([$id]);
+        }
+        return true;
+    }
+
+    private static function takeReservedHalfRemainder(\PDO $pdo, int $projectId, int $boardId, float $halfM2): bool
+    {
+        $st = $pdo->prepare("
+            SELECT id, qty_m2
+            FROM project_hpl_consumptions
+            WHERE project_id = ?
+              AND board_id = ?
+              AND mode = 'RESERVED'
+              AND COALESCE(qty_boards,0) = 0
+              AND note LIKE ?
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            FOR UPDATE
+        ");
+        $st->execute([(int)$projectId, (int)$boardId, self::HPL_NOTE_HALF_REMAINDER . '%']);
+        $r = $st->fetch();
+        if (!$r) return false;
+        $id = (int)($r['id'] ?? 0);
+        $qm = (float)($r['qty_m2'] ?? 0.0);
+        if ($id <= 0 || $qm + 1e-9 < $halfM2) return false;
+        $newQm = $qm - $halfM2;
+        if ($newQm <= 0.00001) {
+            $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id=?')->execute([$id]);
+        } else {
+            $pdo->prepare('UPDATE project_hpl_consumptions SET qty_m2=? WHERE id=?')->execute([$newQm, $id]);
+        }
+        return true;
     }
 
     public static function unlinkProjectProduct(array $params): void
