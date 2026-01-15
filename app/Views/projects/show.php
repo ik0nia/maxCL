@@ -428,8 +428,8 @@ ob_start();
           $sumMag = (float)($sum['mag_cost'] ?? 0);
           $sumHpl = (float)($sum['hpl_cost'] ?? 0);
           $sumTotal = (float)($sum['total_cost'] ?? 0);
-          $resM2 = (float)($sum['hpl_reserved_m2'] ?? 0);
-          $resCost = (float)($sum['hpl_reserved_cost'] ?? 0);
+          $resM2 = (float)($sum['hpl_reserved_remaining_m2'] ?? ($sum['hpl_reserved_m2'] ?? 0));
+          $resCost = (float)($sum['hpl_reserved_remaining_cost'] ?? ($sum['hpl_reserved_cost'] ?? 0));
         ?>
         <div class="mt-2">
           <div class="d-flex justify-content-between">
@@ -451,7 +451,7 @@ ob_start();
           </div>
           <div class="mt-3 p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
             <div class="fw-semibold">HPL rezervat rămas (neconsumat)</div>
-            <div class="text-muted small">Evidențiere financiară pentru plăcile rezervate în stoc, dar încă neconsumate.</div>
+            <div class="text-muted small">Calcul: rezervat mp − mp necesari (din mp/buc × cantitate), la costul mediu lei/mp al plăcilor din proiect.</div>
             <div class="d-flex justify-content-between mt-1">
               <div class="text-muted">Suprafață</div>
               <div class="fw-semibold"><?= number_format($resM2, 2, '.', '') ?> mp</div>

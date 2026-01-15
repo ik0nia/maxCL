@@ -326,10 +326,47 @@ final class ProjectsController
             return 0.0;
         };
 
+        // Cerință: dacă produsul are mp/buc setat, taxăm doar acei mp,
+        // folosind costul mediu lei/mp al plăcilor alocate în proiect.
+        $totM2 = 0.0;
+        $totCost = 0.0;
+        foreach ($hplConsum as $c) {
+            $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
+            if ($m2 <= 0) continue;
+            $ppm = $pricePm2($c);
+            if ($ppm <= 0) continue;
+            $totM2 += $m2;
+            $totCost += ($m2 * $ppm);
+        }
+        $avgPpm = ($totM2 > 0) ? ($totCost / $totM2) : 0.0;
+
+        // Map mp necesari pe produs (mp/buc × qty)
+        $needM2 = [];
+        foreach ($projectProducts as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+            $qty = (float)($pp['qty'] ?? 0);
+            $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+            $need = ($m2u > 0 && $qty > 0) ? ($m2u * $qty) : 0.0;
+            $needM2[$ppId] = $need;
+        }
+
+        if ($avgPpm > 0.0) {
+            foreach ($ppIds as $ppId) {
+                $need = (float)($needM2[$ppId] ?? 0.0);
+                if ($need > 0) {
+                    $out[$ppId]['hpl_cost'] = $need * $avgPpm;
+                }
+            }
+            // Pentru produsele fără mp/buc setat, păstrăm fallback-ul vechi (din alocări).
+        }
+
         if ($hplAlloc) {
             foreach ($hplAlloc as $a) {
                 $ppId = (int)($a['project_product_id'] ?? 0);
                 if ($ppId <= 0 || !isset($out[$ppId])) continue;
+                // dacă am taxat deja după mp/buc, nu mai suprascriem
+                if ((float)($needM2[$ppId] ?? 0.0) > 0 && $avgPpm > 0.0) continue;
                 $m2 = isset($a['qty_m2']) ? (float)$a['qty_m2'] : 0.0;
                 if ($m2 <= 0) continue;
                 $c = $m2 * $pricePm2($a);
@@ -345,6 +382,7 @@ final class ProjectsController
             $cost = $m2 * $pricePm2($c);
             if ($cost <= 0) continue;
             foreach ($ppIds as $pid) {
+                if ((float)($needM2[$pid] ?? 0.0) > 0 && $avgPpm > 0.0) continue;
                 $weight = (float)($w['weightById'][$pid] ?? 0.0);
                 if ($weight <= 0) continue;
                 $out[$pid]['hpl_cost'] += ($cost * $weight);
@@ -360,7 +398,7 @@ final class ProjectsController
      * @param array<int, array<string,mixed>> $hplAlloc
      * @return array{labor_cost:float,mag_cost:float,hpl_cost:float,total_cost:float,hpl_reserved_m2:float,hpl_reserved_cost:float,hpl_consumed_m2:float,hpl_consumed_cost:float}
      */
-    private static function projectCostSummary(array $workLogs, array $magConsum, array $hplConsum, array $hplAlloc): array
+    private static function projectCostSummary(array $projectProducts, array $workLogs, array $magConsum, array $hplConsum, array $hplAlloc): array
     {
         $labor = 0.0;
         foreach ($workLogs as $w) {
@@ -419,11 +457,18 @@ final class ProjectsController
         $hplResCost = 0.0;
         $hplConM2 = 0.0;
         $hplConCost = 0.0;
+        $hplAvgPpm = 0.0;
+        $hplTotM2 = 0.0;
+        $hplTotCost = 0.0;
         foreach ($hplConsum as $c) {
             $m2 = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
             if ($m2 <= 0) continue;
             $ppm = $pricePm2($c);
             $cost = ($ppm > 0) ? ($m2 * $ppm) : 0.0;
+            if ($ppm > 0) {
+                $hplTotM2 += $m2;
+                $hplTotCost += $cost;
+            }
             $mode = (string)($c['mode'] ?? '');
             if ($mode === 'RESERVED') {
                 $hplResM2 += $m2;
@@ -433,6 +478,17 @@ final class ProjectsController
                 $hplConCost += $cost;
             }
         }
+        if ($hplTotM2 > 0) $hplAvgPpm = $hplTotCost / $hplTotM2;
+
+        // mp necesari pe produse (mp/buc × qty) pentru evidențiere "rezervat rămas nefolosit"
+        $needM2 = 0.0;
+        foreach ($projectProducts as $pp) {
+            $qty = (float)($pp['qty'] ?? 0);
+            $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+            if ($qty > 0 && $m2u > 0) $needM2 += ($qty * $m2u);
+        }
+        $reservedRemainingM2 = max(0.0, $hplResM2 - $needM2);
+        $reservedRemainingCost = ($hplAvgPpm > 0) ? ($reservedRemainingM2 * $hplAvgPpm) : 0.0;
 
         $total = $labor + $mag + $hpl;
         return [
@@ -442,6 +498,10 @@ final class ProjectsController
             'total_cost' => $total,
             'hpl_reserved_m2' => $hplResM2,
             'hpl_reserved_cost' => $hplResCost,
+            'hpl_avg_ppm' => $hplAvgPpm,
+            'products_need_m2' => $needM2,
+            'hpl_reserved_remaining_m2' => $reservedRemainingM2,
+            'hpl_reserved_remaining_cost' => $reservedRemainingCost,
             'hpl_consumed_m2' => $hplConM2,
             'hpl_consumed_cost' => $hplConCost,
         ];
@@ -791,7 +851,7 @@ final class ProjectsController
                             'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
                         ];
                     }
-                    $projectCostSummary = self::projectCostSummary($workLogs, $magazieConsum, $hplConsum, $hplAlloc);
+            $projectCostSummary = self::projectCostSummary($projectProducts, $workLogs, $magazieConsum, $hplConsum, $hplAlloc);
                 } elseif ($tab === 'consum') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
