@@ -647,7 +647,7 @@ ob_start();
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Plăci (buc)</label>
-              <input class="form-control" type="number" step="1" min="1" name="qty_boards" value="1">
+              <input class="form-control" type="number" step="1" min="1" name="qty_boards" value="1" id="hplQtyBoards">
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Mod</label>
@@ -678,6 +678,7 @@ ob_start();
               if (!el || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
               const $ = window.jQuery;
               const $el = $(el);
+              const qtyEl = document.getElementById('hplQtyBoards');
               function fmtBoard(opt){
                 if (!opt.id) return opt.text;
                 const thumb = opt.thumb || null;
@@ -687,17 +688,38 @@ ob_start();
                 let colors = fc ? String(fc) : '';
                 if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
 
-                if (!thumb && !thumbBack && !colors) return opt.text;
+                // Construim textul consistent: grosime · <bold>denumire</bold> · dimensiune · texturi · stoc.
+                const th = (opt.thickness_mm !== undefined && opt.thickness_mm !== null) ? String(opt.thickness_mm) : '';
+                const name = String(opt.name || '');
+                const h = (opt.std_height_mm !== undefined && opt.std_height_mm !== null) ? String(opt.std_height_mm) : '';
+                const w = (opt.std_width_mm !== undefined && opt.std_width_mm !== null) ? String(opt.std_width_mm) : '';
+                const dim = (h && w) ? (h + '×' + w) : String(opt.text || '');
+                const ft = String(opt.face_texture_name || '');
+                const bt = String(opt.back_texture_name || '');
+                let tex = ft ? ft : '';
+                if (bt && bt !== ft) tex = tex ? (tex + '/' + bt) : bt;
+                const stock = (opt.stock_qty_full_available !== undefined && opt.stock_qty_full_available !== null)
+                  ? parseInt(String(opt.stock_qty_full_available), 10)
+                  : NaN;
+                const stockTxt = Number.isFinite(stock) ? stock : null;
+
+                if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex && stockTxt === null) return opt.text;
                 const $row = $('<span class="s2-row"></span>');
                 if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
                 if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
                 const $txt = $('<span></span>');
-                const safeText = String(opt.text || '');
+                const esc = (s) => String(s || '').replace(/</g,'&lt;');
+                let base = '';
+                if (th) base += esc(th) + 'mm';
+                if (name) base += (base ? ' · ' : '') + '<strong>' + esc(name) + '</strong>';
+                if (dim) base += (base ? ' · ' : '') + esc(dim);
+                if (tex) base += (base ? ' · ' : '') + esc(tex);
+                if (stockTxt !== null) base += ' · <span class="text-muted">stoc: <strong>' + esc(String(stockTxt)) + '</strong> buc</span>';
+
                 if (colors) {
-                  // opt.text nu conține codurile de culoare; le afișăm bold în față.
-                  $txt.html('<strong>' + String(colors).replace(/</g,'&lt;') + '</strong> · ' + safeText.replace(/</g,'&lt;'));
+                  $txt.html('<strong>' + esc(colors) + '</strong> · ' + base);
                 } else {
-                  $txt.text(safeText);
+                  $txt.html(base);
                 }
                 $row.append($txt);
                 return $row;
@@ -754,6 +776,40 @@ ob_start();
                   cache: true
                 }
               });
+
+              // UI guard: nu permite introducerea unei cantități > stoc disponibil pentru placa selectată.
+              function applyMaxFromSelection(sel){
+                if (!qtyEl) return;
+                const stock = sel && sel.stock_qty_full_available !== undefined ? parseInt(String(sel.stock_qty_full_available), 10) : NaN;
+                if (Number.isFinite(stock) && stock > 0) {
+                  qtyEl.max = String(stock);
+                  // dacă userul avea deja un număr mai mare, îl aducem în limită
+                  const cur = parseInt(String(qtyEl.value || '1'), 10);
+                  if (Number.isFinite(cur) && cur > stock) {
+                    qtyEl.value = String(stock);
+                    if (window.toastr) window.toastr.warning('Cantitatea a fost ajustată la stocul disponibil: ' + stock + ' buc.');
+                  }
+                } else {
+                  qtyEl.removeAttribute('max');
+                }
+              }
+              $el.on('select2:select', function(e){
+                const data = (e && e.params && e.params.data) ? e.params.data : null;
+                applyMaxFromSelection(data);
+              });
+              $el.on('select2:clear', function(){
+                if (qtyEl) qtyEl.removeAttribute('max');
+              });
+              if (qtyEl) {
+                qtyEl.addEventListener('input', function(){
+                  const max = qtyEl.max ? parseInt(String(qtyEl.max), 10) : NaN;
+                  const cur = parseInt(String(qtyEl.value || ''), 10);
+                  if (Number.isFinite(max) && Number.isFinite(cur) && cur > max) {
+                    qtyEl.value = String(max);
+                    if (window.toastr) window.toastr.warning('Nu poți depăși stocul disponibil: ' + max + ' buc.');
+                  }
+                });
+              }
             });
           </script>
         <?php endif; ?>

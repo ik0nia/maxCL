@@ -201,25 +201,60 @@ final class HplBoard
             }
         }
 
-        $sql = "
+        // Stoc FULL disponibil (buc) pentru fiecare placă.
+        // Compat: coloana is_accounting poate lipsi.
+        $stockJoinWithAcc = "
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS full_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'FULL'
+                AND status = 'AVAILABLE'
+                AND (is_accounting = 1 OR is_accounting IS NULL)
+              GROUP BY board_id
+            ) sfull ON sfull.board_id = b.id
+        ";
+        $stockJoinNoAcc = "
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS full_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'FULL'
+                AND status = 'AVAILABLE'
+              GROUP BY board_id
+            ) sfull ON sfull.board_id = b.id
+        ";
+
+        $sqlBase = "
             SELECT
               b.id, b.code, b.name, b.brand, b.thickness_mm, b.std_width_mm, b.std_height_mm,
               fc.code AS face_color_code,
               bc.code AS back_color_code,
               fc.thumb_path AS thumb,
               bc.thumb_path AS thumb_back,
-              $selTextures
+              $selTextures,
+              COALESCE(sfull.full_available, 0) AS stock_qty_full_available
             FROM hpl_boards b
             JOIN finishes fc ON fc.id = b.face_color_id
             LEFT JOIN finishes bc ON bc.id = b.back_color_id
+            %s
             $joinTextures
             $where
             ORDER BY b.code ASC
             LIMIT $limit
         ";
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        $rows = $st->fetchAll();
+        try {
+            $sql = sprintf($sqlBase, $stockJoinWithAcc);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'is_accounting')) {
+                throw $e;
+            }
+            $sql = sprintf($sqlBase, $stockJoinNoAcc);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll();
+        }
 
         $out = [];
         foreach ($rows as $r) {
@@ -258,6 +293,7 @@ final class HplBoard
                 'thickness_mm' => $th,
                 'std_width_mm' => $w,
                 'std_height_mm' => $h,
+                'stock_qty_full_available' => (int)($r['stock_qty_full_available'] ?? 0),
                 'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
                 'thumb_back' => (isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '') ? (string)$r['thumb_back'] : null,
                 'face_color_code' => $fc !== '' ? $fc : null,
