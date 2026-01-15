@@ -311,10 +311,13 @@ final class HplStockPiece
                   b.name AS board_name
                 FROM hpl_stock_pieces sp
                 INNER JOIN hpl_boards b ON b.id = sp.board_id
-                LEFT JOIN project_hpl_consumptions c
-                  ON c.project_id = ?
-                 AND sp.notes LIKE CONCAT(\'%consum HPL #\', c.id, \'%\')
-                WHERE (sp.project_id = ? OR c.id IS NOT NULL)
+                WHERE sp.project_id = ?
+                   OR EXISTS (
+                        SELECT 1
+                        FROM project_hpl_consumptions c
+                        WHERE c.project_id = ?
+                          AND sp.notes LIKE CONCAT(\'%consum HPL #\', c.id, \'%\')
+                   )
                 ORDER BY sp.board_id ASC, sp.status DESC, sp.piece_type DESC, sp.created_at DESC, sp.id DESC
             ');
             $st->execute([$projectId, $projectId]);
