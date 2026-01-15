@@ -266,7 +266,8 @@ final class ProjectsController
      */
     private static function magazieCostByProduct(array $projectProducts, array $magConsum): array
     {
-        $w = self::productQtyWeights($projectProducts);
+        // IMPORTANT: Magazie se distribuie pe bucăți (qty), nu pe mp.
+        $w = self::productQtyOnlyWeights($projectProducts);
         /** @var array<int,int> $ppIds */
         $ppIds = $w['ppIds'];
         $out = [];
