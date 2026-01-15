@@ -1486,11 +1486,25 @@ ob_start();
                     $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : null;
                     $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
                     $costEst = ($he !== null && $cph !== null) ? ($he * $cph) : null;
+
+                    $ppId = isset($w['project_product_id']) && $w['project_product_id'] !== null && $w['project_product_id'] !== '' ? (int)$w['project_product_id'] : 0;
+                    $prodName = trim((string)($w['product_name'] ?? ''));
+                    $isProductLinked = ($ppId > 0);
                   ?>
-                  <tr>
+                  <tr<?= $isProductLinked ? ' style="background:#F7FBFF"' : '' ?>>
                     <td class="text-muted"><?= htmlspecialchars((string)($w['created_at'] ?? '')) ?></td>
                     <td class="fw-semibold"><?= htmlspecialchars((string)($w['work_type'] ?? '')) ?></td>
-                    <td><?= htmlspecialchars((string)($w['product_name'] ?? '')) ?></td>
+                    <td>
+                      <?php if ($isProductLinked): ?>
+                        <span class="badge bg-primary-subtle text-primary-emphasis me-2">Produs</span>
+                        <span class="fw-semibold">
+                          <?= $prodName !== '' ? htmlspecialchars($prodName) : ('#' . (int)$ppId) ?>
+                        </span>
+                      <?php else: ?>
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Proiect</span>
+                        <span class="text-muted">—</span>
+                      <?php endif; ?>
+                    </td>
                     <td class="text-end"><?= $he !== null ? number_format($he, 2, '.', '') : '—' ?></td>
                     <td class="text-end"><?= $cph !== null ? number_format($cph, 2, '.', '') : '—' ?></td>
                     <td class="text-end fw-semibold"><?= $costEst !== null ? number_format((float)$costEst, 2, '.', '') : '—' ?></td>
