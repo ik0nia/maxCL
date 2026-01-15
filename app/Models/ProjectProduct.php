@@ -47,8 +47,16 @@ final class ProjectProduct
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         $st = $pdo->prepare('
-            INSERT INTO project_products (project_id, product_id, qty, unit, m2_per_unit, production_status, hpl_board_id, delivered_qty, notes, cnc_override_json)
-            VALUES (:project_id, :product_id, :qty, :unit, :m2, :st, :hpl_board_id, :del, :notes, :cnc)
+            INSERT INTO project_products (
+              project_id, product_id, qty, unit,
+              m2_per_unit, surface_type, surface_value,
+              production_status, hpl_board_id, delivered_qty, notes, cnc_override_json
+            )
+            VALUES (
+              :project_id, :product_id, :qty, :unit,
+              :m2, :surface_type, :surface_value,
+              :st, :hpl_board_id, :del, :notes, :cnc
+            )
         ');
         $st->execute([
             ':project_id' => (int)$data['project_id'],
@@ -56,6 +64,8 @@ final class ProjectProduct
             ':qty' => (float)($data['qty'] ?? 1),
             ':unit' => (string)($data['unit'] ?? 'buc'),
             ':m2' => (float)($data['m2_per_unit'] ?? 0),
+            ':surface_type' => $data['surface_type'] ?? null,
+            ':surface_value' => $data['surface_value'] ?? null,
             ':st' => (string)($data['production_status'] ?? 'CREAT'),
             ':hpl_board_id' => $data['hpl_board_id'] ?? null,
             ':del' => (float)($data['delivered_qty'] ?? 0),
@@ -72,7 +82,10 @@ final class ProjectProduct
         $pdo = DB::pdo();
         $st = $pdo->prepare('
             UPDATE project_products
-            SET qty=:qty, unit=:unit, m2_per_unit=:m2, production_status=:st, hpl_board_id=:hpl_board_id, delivered_qty=:del, notes=:notes
+            SET qty=:qty, unit=:unit,
+                m2_per_unit=:m2, surface_type=:surface_type, surface_value=:surface_value,
+                production_status=:st, hpl_board_id=:hpl_board_id,
+                delivered_qty=:del, notes=:notes
             WHERE id=:id
         ');
         $st->execute([
@@ -80,6 +93,8 @@ final class ProjectProduct
             ':qty' => (float)($data['qty'] ?? 1),
             ':unit' => (string)($data['unit'] ?? 'buc'),
             ':m2' => (float)($data['m2_per_unit'] ?? 0),
+            ':surface_type' => $data['surface_type'] ?? null,
+            ':surface_value' => $data['surface_value'] ?? null,
             ':st' => (string)($data['production_status'] ?? 'CREAT'),
             ':hpl_board_id' => $data['hpl_board_id'] ?? null,
             ':del' => (float)($data['delivered_qty'] ?? 0),

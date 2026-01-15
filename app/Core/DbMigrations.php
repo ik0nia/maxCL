@@ -886,6 +886,41 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-15_06_project_products_surface',
+                'label' => 'ALTER project_products ADD surface_type + surface_value',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    // surface_type: BOARD/M2; surface_value: 1, 0.5 (plăci/buc) sau mp/buc (2 zecimale)
+                    if (!self::columnExists($pdo, 'project_products', 'surface_type')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN surface_type ENUM('BOARD','M2') NULL AFTER m2_per_unit");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                    if (!self::columnExists($pdo, 'project_products', 'surface_value')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN surface_value DECIMAL(12,2) NULL AFTER surface_type");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                    // Best-effort: pentru datele existente, presupunem M2 = m2_per_unit.
+                    try {
+                        $pdo->exec("
+                            UPDATE project_products
+                            SET surface_type = 'M2',
+                                surface_value = ROUND(m2_per_unit, 2)
+                            WHERE (surface_type IS NULL OR surface_type = '')
+                              AND (surface_value IS NULL OR surface_value = 0)
+                              AND m2_per_unit > 0
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
         ];
     }
 

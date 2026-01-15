@@ -1285,22 +1285,28 @@ final class ProjectsController
         $surfaceM2 = Validator::dec(trim((string)($_POST['surface_m2'] ?? ''))) ?? null;
         if ($surfaceM2 !== null && $surfaceM2 < 0) $surfaceM2 = null;
 
-        // Calculăm m2/buc din select-ul "Suprafață"
-        $m2 = null;
-        if ($surfaceMode === 'HALF_BOARD' || $surfaceMode === 'FULL_BOARD') {
+        // Suprafață:
+        // - 1 placă => value=1 (plăci/buc)
+        // - 1/2 placă => value=0.5 (plăci/buc)
+        // - mp => value=surface_m2 (mp/buc, salvat cu 2 zecimale)
+        $surfaceType = null;
+        $surfaceValue = null;
+        $m2 = null; // m2_per_unit pentru calcule
+        if ($surfaceMode === '1' || $surfaceMode === '0.5') {
+            $surfaceType = 'BOARD';
+            $surfaceValue = (float)$surfaceMode; // 1 sau 0.5
             $boardArea = self::defaultBoardAreaM2ForProject($projectId);
             if ($boardArea <= 0) $boardArea = 5.796; // fallback 2800×2070
-            $m2 = ($surfaceMode === 'HALF_BOARD') ? ($boardArea / 2.0) : $boardArea;
+            $m2 = $boardArea * $surfaceValue;
         } elseif ($surfaceMode === 'M2') {
-            $m2 = $surfaceM2;
-        } else {
-            // invalid -> ignorăm
-            $m2 = null;
+            $surfaceType = 'M2';
+            $surfaceValue = $surfaceM2 !== null ? round((float)$surfaceM2, 2) : null;
+            $m2 = $surfaceValue !== null ? (float)$surfaceValue : null;
         }
-        if ($m2 === null || $m2 <= 0) {
+        if ($surfaceType === null || $surfaceValue === null || (float)$surfaceValue <= 0 || $m2 === null || $m2 <= 0) {
             $errors['surface_mode'] = 'Suprafață invalidă.';
         }
-        if ($surfaceMode === 'M2' && ($surfaceM2 === null || $surfaceM2 <= 0)) {
+        if ($surfaceMode === 'M2' && ($surfaceValue === null || (float)$surfaceValue <= 0)) {
             $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
         }
         if ($hplBoardId !== null) {
@@ -1335,6 +1341,8 @@ final class ProjectsController
                 'qty' => $qty,
                 'unit' => 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : 0.0,
+                'surface_type' => $surfaceType,
+                'surface_value' => $surfaceValue,
                 'production_status' => 'CREAT',
                 'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,
                 'delivered_qty' => 0,
@@ -1351,6 +1359,8 @@ final class ProjectsController
                 'qty' => $qty,
                 'unit' => 'buc',
                 'm2_per_unit' => $m2 !== null ? (float)$m2 : null,
+                'surface_type' => $surfaceType,
+                'surface_value' => $surfaceValue,
                 'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,
             ]);
             try { self::recalcHplAllocationsForProject($projectId); } catch (\Throwable $e) {}
@@ -1450,17 +1460,26 @@ final class ProjectsController
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($surfaceMode === '') $errors['surface_mode'] = 'Suprafață invalidă.';
 
-        // Calculăm m2/buc din "Suprafață"
+        $surfaceType = null;
+        $surfaceValue = null;
         $m2 = null;
-        if ($surfaceMode === 'HALF_BOARD' || $surfaceMode === 'FULL_BOARD') {
+        if ($surfaceMode === '1' || $surfaceMode === '0.5') {
+            $surfaceType = 'BOARD';
+            $surfaceValue = (float)$surfaceMode;
             $boardArea = self::defaultBoardAreaM2ForProject($projectId);
-            if ($boardArea <= 0) $boardArea = 5.796; // fallback 2800×2070
-            $m2 = ($surfaceMode === 'HALF_BOARD') ? ($boardArea / 2.0) : $boardArea;
+            if ($boardArea <= 0) $boardArea = 5.796;
+            $m2 = $boardArea * $surfaceValue;
         } elseif ($surfaceMode === 'M2') {
-            $m2 = $surfaceM2;
+            $surfaceType = 'M2';
+            $surfaceValue = $surfaceM2 !== null ? round((float)$surfaceM2, 2) : null;
+            $m2 = $surfaceValue !== null ? (float)$surfaceValue : null;
         }
-        if ($m2 === null || $m2 <= 0) $errors['surface_mode'] = 'Suprafață invalidă.';
-        if ($surfaceMode === 'M2' && ($surfaceM2 === null || $surfaceM2 <= 0)) $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
+        if ($surfaceType === null || $surfaceValue === null || (float)$surfaceValue <= 0 || $m2 === null || $m2 <= 0) {
+            $errors['surface_mode'] = 'Suprafață invalidă.';
+        }
+        if ($surfaceMode === 'M2' && ($surfaceValue === null || (float)$surfaceValue <= 0)) {
+            $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
+        }
 
         if ($hplBoardId !== null) {
             if (!self::isHplBoardReservedForProject($projectId, (int)$hplBoardId)) {
@@ -1480,6 +1499,8 @@ final class ProjectsController
             'qty' => $qty,
             'unit' => 'buc',
             'm2_per_unit' => (float)$m2,
+            'surface_type' => $surfaceType,
+            'surface_value' => $surfaceValue,
             // Statusul se schimbă doar pe flow (pas cu pas), nu din edit.
             'production_status' => (string)($before['production_status'] ?? 'CREAT'),
             'hpl_board_id' => $hplBoardId !== null ? (int)$hplBoardId : null,

@@ -279,11 +279,11 @@ ob_start();
               <label class="form-label fw-semibold">Suprafață</label>
               <div class="d-flex flex-wrap gap-3">
                 <label class="form-check form-check-inline m-0">
-                  <input class="form-check-input" type="radio" name="surface_mode" value="HALF_BOARD" required>
+                  <input class="form-check-input" type="radio" name="surface_mode" value="0.5" required>
                   <span class="form-check-label">1/2 placă</span>
                 </label>
                 <label class="form-check form-check-inline m-0">
-                  <input class="form-check-input" type="radio" name="surface_mode" value="FULL_BOARD" required checked>
+                  <input class="form-check-input" type="radio" name="surface_mode" value="1" required checked>
                   <span class="form-check-label">1 placă</span>
                 </label>
                 <label class="form-check form-check-inline m-0">
@@ -292,7 +292,7 @@ ob_start();
                 </label>
               </div>
               <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
-                <input class="form-control" type="number" step="0.0001" min="0.0001" name="surface_m2" placeholder="ex: 0.6000">
+                <input class="form-control" type="number" step="0.01" min="0.01" name="surface_m2" placeholder="ex: 0.60">
                 <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
               </div>
             </div>
@@ -583,13 +583,32 @@ ob_start();
                       <div class="text-muted small">Cantitate</div>
                       <div class="fw-semibold"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></div>
                     </div>
+                    <?php
+                      $sType = (string)($pp['surface_type'] ?? '');
+                      $sVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
+                      if ($sType === '' && $m2u > 0) { $sType = 'M2'; $sVal = round($m2u, 2); }
+                      $perTxt = '';
+                      $totTxt = '';
+                      if ($sType === 'BOARD' && $sVal !== null) {
+                        $perTxt = (abs($sVal - 0.5) < 1e-9) ? '1/2 placă' : '1 placă';
+                        $totBoards = $qty * $sVal;
+                        $unitLbl = (abs($totBoards - 1.0) < 1e-9) ? 'placă' : 'plăci';
+                        $totTxt = number_format($totBoards, 2, '.', '') . ' ' . $unitLbl;
+                      } elseif ($sType === 'M2' && $sVal !== null) {
+                        $perTxt = number_format($sVal, 2, '.', '') . ' mp';
+                        $totTxt = number_format($qty * $sVal, 2, '.', '') . ' mp';
+                      } else {
+                        $perTxt = number_format($m2u, 4, '.', '') . ' mp';
+                        $totTxt = number_format($m2t, 4, '.', '') . ' mp';
+                      }
+                    ?>
                     <div class="col-6 col-md-3">
                       <div class="text-muted small">Suprafață/buc</div>
-                      <div class="fw-semibold"><?= number_format($m2u, 4, '.', '') ?></div>
+                      <div class="fw-semibold"><?= htmlspecialchars($perTxt) ?></div>
                     </div>
                     <div class="col-6 col-md-3">
                       <div class="text-muted small">Suprafață totală</div>
-                      <div class="fw-semibold"><?= number_format($m2t, 4, '.', '') ?></div>
+                      <div class="fw-semibold"><?= htmlspecialchars($totTxt) ?></div>
                     </div>
                   </div>
                   <?php
@@ -649,12 +668,22 @@ ob_start();
                       <?php
                         $pDesc = (string)($pp['product_notes'] ?? '');
                         $curM2 = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
+                        $curSurfaceType = (string)($pp['surface_type'] ?? '');
+                        $curSurfaceVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
                         $curHplId = isset($pp['hpl_board_id']) && $pp['hpl_board_id'] !== null && $pp['hpl_board_id'] !== '' ? (int)$pp['hpl_board_id'] : 0;
                         $curHplText = trim((string)($pp['hpl_board_code'] ?? '') . ' · ' . (string)($pp['hpl_board_name'] ?? ''));
                         if ($curHplText === '·' || $curHplText === '· ') $curHplText = '';
+                        if ($curSurfaceType === '' && $curM2 > 0) { $curSurfaceType = 'M2'; $curSurfaceVal = round($curM2, 2); }
                       ?>
                       <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/update')) ?>" class="row g-2">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                        <?php
+                          $uiName = 'surface_mode_ui_' . (int)$ppId;
+                          $curMode = ($curSurfaceType === 'BOARD' && $curSurfaceVal !== null)
+                            ? (abs($curSurfaceVal - 0.5) < 1e-9 ? '0.5' : '1')
+                            : 'M2';
+                        ?>
+                        <input type="hidden" name="surface_mode" value="<?= htmlspecialchars($curMode) ?>" class="js-surface-mode-hidden">
                         <div class="col-12">
                           <label class="form-label fw-semibold mb-1">Denumire</label>
                           <input class="form-control form-control-sm" name="name" required value="<?= htmlspecialchars($pname) ?>">
@@ -675,20 +704,20 @@ ob_start();
                           <label class="form-label fw-semibold mb-1">Suprafață</label>
                           <div class="d-flex flex-wrap gap-3">
                             <label class="form-check form-check-inline m-0">
-                              <input class="form-check-input" type="radio" name="surface_mode" value="HALF_BOARD" required>
+                              <input class="form-check-input js-surface-mode-radio" type="radio" name="<?= htmlspecialchars($uiName) ?>" value="0.5" required <?= ($curMode === '0.5') ? 'checked' : '' ?>>
                               <span class="form-check-label">1/2 placă</span>
                             </label>
                             <label class="form-check form-check-inline m-0">
-                              <input class="form-check-input" type="radio" name="surface_mode" value="FULL_BOARD" required>
+                              <input class="form-check-input js-surface-mode-radio" type="radio" name="<?= htmlspecialchars($uiName) ?>" value="1" required <?= ($curMode === '1') ? 'checked' : '' ?>>
                               <span class="form-check-label">1 placă</span>
                             </label>
                             <label class="form-check form-check-inline m-0">
-                              <input class="form-check-input" type="radio" name="surface_mode" value="M2" required checked>
+                              <input class="form-check-input js-surface-mode-radio" type="radio" name="<?= htmlspecialchars($uiName) ?>" value="M2" required <?= ($curMode === 'M2') ? 'checked' : '' ?>>
                               <span class="form-check-label">mp</span>
                             </label>
                           </div>
-                          <div class="mt-2" id="ppEditSurfaceM2Wrap<?= $ppId ?>">
-                            <input class="form-control form-control-sm" type="number" step="0.0001" min="0.0001" name="surface_m2" value="<?= htmlspecialchars(number_format(max(0.0001, $curM2 > 0 ? $curM2 : 0.0001), 4, '.', '')) ?>">
+                          <div class="mt-2 <?= ($curSurfaceType === 'BOARD') ? 'd-none' : '' ?>" id="ppEditSurfaceM2Wrap<?= $ppId ?>">
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="surface_m2" value="<?= htmlspecialchars(number_format(max(0.01, ($curSurfaceType === 'M2' && $curSurfaceVal !== null) ? $curSurfaceVal : ($curM2 > 0 ? round($curM2, 2) : 0.01)), 2, '.', '')) ?>">
                             <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
                           </div>
                         </div>
@@ -706,6 +735,25 @@ ob_start();
                           </button>
                         </div>
                       </form>
+                      <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                          const root = document.getElementById('ppEdit<?= (int)$ppId ?>');
+                          if (!root) return;
+                          const hidden = root.querySelector('input.js-surface-mode-hidden');
+                          const wrap = document.getElementById('ppEditSurfaceM2Wrap<?= (int)$ppId ?>');
+                          const radios = root.querySelectorAll('input.js-surface-mode-radio');
+                          if (!hidden || !wrap || !radios.length) return;
+                          function sync() {
+                            let v = '';
+                            radios.forEach(function (r) { if (r.checked) v = String(r.value || ''); });
+                            if (v) hidden.value = v;
+                            if (v === 'M2') wrap.classList.remove('d-none');
+                            else wrap.classList.add('d-none');
+                          }
+                          radios.forEach(function (r) { r.addEventListener('change', sync); });
+                          sync();
+                        });
+                      </script>
                     </div>
                   <?php endif; ?>
                 </div>
