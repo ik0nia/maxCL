@@ -4,7 +4,7 @@ use App\Core\Url;
 use App\Core\View;
 
 $u = Auth::user();
-$canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+$canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
 $rows = $rows ?? [];
 $q = trim((string)($q ?? ''));
