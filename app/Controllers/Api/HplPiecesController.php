@@ -30,9 +30,21 @@ final class HplPiecesController
 
             if ($source === 'REST') {
                 $sql = "
-                    SELECT sp.*, b.code AS board_code, b.name AS board_name, b.thickness_mm, b.std_width_mm, b.std_height_mm
+                    SELECT
+                      sp.*,
+                      b.code AS board_code,
+                      b.name AS board_name,
+                      b.thickness_mm,
+                      b.std_width_mm,
+                      b.std_height_mm,
+                      fc.code AS face_color_code,
+                      bc.code AS back_color_code,
+                      fc.thumb_path AS thumb,
+                      bc.thumb_path AS thumb_back
                     FROM hpl_stock_pieces sp
                     INNER JOIN hpl_boards b ON b.id = sp.board_id
+                    INNER JOIN finishes fc ON fc.id = b.face_color_id
+                    LEFT JOIN finishes bc ON bc.id = b.back_color_id
                     WHERE sp.qty > 0
                       AND sp.status = 'AVAILABLE'
                       AND sp.is_accounting = 0
@@ -53,9 +65,21 @@ final class HplPiecesController
                     Response::json(['ok' => true, 'q' => $q, 'count' => 0, 'items' => []]);
                 }
                 $sql = "
-                    SELECT sp.*, b.code AS board_code, b.name AS board_name, b.thickness_mm, b.std_width_mm, b.std_height_mm
+                    SELECT
+                      sp.*,
+                      b.code AS board_code,
+                      b.name AS board_name,
+                      b.thickness_mm,
+                      b.std_width_mm,
+                      b.std_height_mm,
+                      fc.code AS face_color_code,
+                      bc.code AS back_color_code,
+                      fc.thumb_path AS thumb,
+                      bc.thumb_path AS thumb_back
                     FROM hpl_stock_pieces sp
                     INNER JOIN hpl_boards b ON b.id = sp.board_id
+                    INNER JOIN finishes fc ON fc.id = b.face_color_id
+                    LEFT JOIN finishes bc ON bc.id = b.back_color_id
                     WHERE sp.qty > 0
                       AND sp.status = 'RESERVED'
                       AND (sp.project_id = ?)
@@ -83,6 +107,10 @@ final class HplPiecesController
                 $qty = (int)($r['qty'] ?? 0);
                 $loc = (string)($r['location'] ?? '');
                 $pt = (string)($r['piece_type'] ?? '');
+                $thumb = isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '' ? (string)$r['thumb'] : null;
+                $thumbBack = isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '' ? (string)$r['thumb_back'] : null;
+                $fc = (string)($r['face_color_code'] ?? '');
+                $bc = (string)($r['back_color_code'] ?? '');
 
                 $text = trim($bcode . ' · ' . $bname);
                 $dims = ($t > 0 ? ($t . 'mm') : '') . ' · ' . ($h > 0 && $w > 0 ? ($h . '×' . $w . 'mm') : '');
@@ -95,7 +123,18 @@ final class HplPiecesController
                     'id' => $id,
                     'text' => $text,
                     'board_id' => $bid,
+                    'code' => $bcode,
+                    'name' => $bname,
+                    'thickness_mm' => $t,
+                    'std_width_mm' => (int)($r['std_width_mm'] ?? 0),
+                    'std_height_mm' => (int)($r['std_height_mm'] ?? 0),
+                    'thumb' => $thumb,
+                    'thumb_back' => $thumbBack,
+                    'face_color_code' => $fc !== '' ? $fc : null,
+                    'back_color_code' => $bc !== '' ? $bc : null,
                     'piece_type' => $pt,
+                    'piece_width_mm' => $w,
+                    'piece_height_mm' => $h,
                     'qty' => $qty,
                     'location' => $loc,
                     'source' => $source === 'REST' ? 'REST' : 'PROJECT',

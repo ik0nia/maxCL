@@ -363,11 +363,54 @@ ob_start();
                 const $el = $(el);
                 if ($el.data('select2')) return;
                 const projId = parseInt(String(el.getAttribute('data-project-id') || ''), 10) || 0;
+                function fmtPiece(opt){
+                  if (!opt || !opt.id) return (opt && opt.text) ? opt.text : '';
+                  const thumb = opt.thumb || null;
+                  const thumbBack = opt.thumb_back || null;
+                  const fc = opt.face_color_code || '';
+                  const bc = opt.back_color_code || '';
+                  let colors = fc ? String(fc) : '';
+                  if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
+
+                  const th = (opt.thickness_mm !== undefined && opt.thickness_mm !== null) ? String(opt.thickness_mm) : '';
+                  const code = String(opt.code || '');
+                  const name = String(opt.name || '');
+                  const ph = (opt.piece_height_mm !== undefined && opt.piece_height_mm !== null) ? String(opt.piece_height_mm) : '';
+                  const pw = (opt.piece_width_mm !== undefined && opt.piece_width_mm !== null) ? String(opt.piece_width_mm) : '';
+                  const dim = (ph && pw) ? (ph + '×' + pw) : '';
+                  const pt = String(opt.piece_type || '');
+                  const loc = String(opt.location || '');
+                  const qty = (opt.qty !== undefined && opt.qty !== null) ? String(opt.qty) : '';
+
+                  const esc = (s) => String(s || '').replace(/</g,'&lt;');
+                  const $row = $('<span class="s2-row"></span>');
+                  if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
+                  if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
+
+                  const $txt = $('<span></span>');
+                  let tail = '';
+                  // Cerință: coduri culori + thumbnails la început, apoi dimensiune/denumire/rest.
+                  if (th) tail += esc(th) + 'mm';
+                  if (dim) tail += (tail ? ' · ' : '') + esc(dim) + ' mm';
+                  const nm = (code || name) ? (esc(code) + (name ? (' · ' + esc(name)) : '')) : '';
+                  if (nm) tail += (tail ? ' · ' : '') + '<strong>' + nm + '</strong>';
+                  if (pt) tail += (tail ? ' · ' : '') + esc(pt);
+                  if (loc) tail += (tail ? ' · ' : '') + esc(loc);
+                  if (qty) tail += (tail ? ' · ' : '') + 'buc: ' + esc(qty);
+
+                  if (colors) $txt.html('<strong>' + esc(colors) + '</strong>' + (tail ? (' · ' + tail) : ''));
+                  else $txt.html(tail || esc(opt.text || ''));
+                  $row.append($txt);
+                  return $row;
+                }
                 $el.select2({
                   width: '100%',
                   placeholder: 'Alege piesa HPL…',
                   allowClear: true,
                   minimumInputLength: 0,
+                  templateResult: fmtPiece,
+                  templateSelection: fmtPiece,
+                  escapeMarkup: m => m,
                   ajax: {
                     url: "<?= htmlspecialchars(Url::to('/api/hpl/pieces/search')) ?>",
                     dataType: 'json',
