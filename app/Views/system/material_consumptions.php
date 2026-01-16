@@ -8,6 +8,8 @@ $dateFrom = (string)($date_from ?? '');
 $dateTo = (string)($date_to ?? '');
 $hplRows = is_array($hplRows ?? null) ? $hplRows : [];
 $magRows = is_array($magRows ?? null) ? $magRows : [];
+$hplAgg = is_array($hplAgg ?? null) ? $hplAgg : [];
+$magAgg = is_array($magAgg ?? null) ? $magAgg : [];
 
 $tabs = [
   'hpl' => 'Consum HPL',
@@ -64,6 +66,13 @@ ob_start();
   <?php endforeach; ?>
 </ul>
 
+<div class="d-flex justify-content-end mb-2">
+  <div class="form-check form-switch m-0">
+    <input class="form-check-input" type="checkbox" role="switch" id="toggleAgg">
+    <label class="form-check-label text-muted" for="toggleAgg">Afișează cumulat</label>
+  </div>
+</div>
+
 <?php if ($tab === 'hpl'): ?>
   <div class="card app-card p-3">
     <div class="h5 m-0">Consum HPL</div>
@@ -92,6 +101,18 @@ ob_start();
               $user = trim((string)($r['user_name'] ?? '') . ' ' . (string)($r['user_email'] ?? ''));
               $modeTxt = (string)($r['mode'] ?? '');
               $note = (string)($r['note'] ?? '');
+              $qb = isset($r['qty_boards']) ? (float)($r['qty_boards'] ?? 0) : 0.0;
+              $qm2 = isset($r['qty_m2']) ? (float)($r['qty_m2'] ?? 0) : 0.0;
+              $stdW = (int)($r['std_width_mm'] ?? 0);
+              $stdH = (int)($r['std_height_mm'] ?? 0);
+              $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+              $eq = $qb > 0 ? $qb : (($area > 0 && $qm2 > 0) ? ($qm2 / $area) : 0.0);
+              $eqTxt = '0';
+              if ($eq > 0) {
+                if (abs($eq - 0.5) < 0.06) $eqTxt = '0.5';
+                elseif (abs($eq - round($eq)) < 1e-6) $eqTxt = (string)((int)round($eq));
+                else $eqTxt = number_format($eq, 2, '.', '');
+              }
             ?>
             <tr>
               <td class="text-muted small"><?= htmlspecialchars((string)($r['created_at'] ?? '')) ?></td>
@@ -108,10 +129,60 @@ ob_start();
                 </a>
                 <div class="text-muted small"><?= htmlspecialchars((string)($r['thickness_mm'] ?? '')) ?>mm</div>
               </td>
-              <td class="text-end fw-semibold"><?= (int)($r['qty_boards'] ?? 0) ?></td>
+              <td class="text-end fw-semibold"><?= htmlspecialchars($eqTxt) ?></td>
               <td class="text-end fw-semibold"><?= number_format((float)($r['qty_m2'] ?? 0), 2, '.', '') ?></td>
               <td class="text-muted small"><?= htmlspecialchars($note) ?></td>
               <td class="text-muted small"><?= htmlspecialchars($user !== '' ? $user : '—') ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card app-card p-3 mt-3 d-none" id="aggWrap">
+    <div class="h5 m-0">Cumulat pe material</div>
+    <div class="text-muted">Grupat pe placă + mod</div>
+    <div class="table-responsive mt-2">
+      <table class="table table-hover align-middle mb-0" id="hplAggTable">
+        <thead>
+          <tr>
+            <th>Placă</th>
+            <th style="width:110px">Mod</th>
+            <th class="text-end" style="width:110px">Buc</th>
+            <th class="text-end" style="width:110px">mp</th>
+            <th class="text-end" style="width:110px">Rânduri</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($hplAgg as $r): ?>
+            <?php
+              $bid = (int)($r['board_id'] ?? 0);
+              $btxt = trim((string)($r['board_code'] ?? '') . ' · ' . (string)($r['board_name'] ?? ''));
+              $modeTxt = (string)($r['mode'] ?? '');
+              $qb = (float)($r['sum_qty_boards'] ?? 0.0);
+              $qm2 = (float)($r['sum_qty_m2'] ?? 0.0);
+              $stdW = (int)($r['std_width_mm'] ?? 0);
+              $stdH = (int)($r['std_height_mm'] ?? 0);
+              $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+              $eq = $qb > 0 ? $qb : (($area > 0 && $qm2 > 0) ? ($qm2 / $area) : 0.0);
+              $eqTxt = '0';
+              if ($eq > 0) {
+                if (abs($eq - 0.5) < 0.06) $eqTxt = '0.5';
+                elseif (abs($eq - round($eq)) < 1e-6) $eqTxt = (string)((int)round($eq));
+                else $eqTxt = number_format($eq, 2, '.', '');
+              }
+            ?>
+            <tr>
+              <td>
+                <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid)) ?>">
+                  <?= htmlspecialchars($btxt) ?>
+                </a>
+              </td>
+              <td class="fw-semibold"><?= htmlspecialchars($modeTxt) ?></td>
+              <td class="text-end fw-semibold"><?= htmlspecialchars($eqTxt) ?></td>
+              <td class="text-end fw-semibold"><?= number_format($qm2, 2, '.', '') ?></td>
+              <td class="text-end text-muted"><?= (int)($r['rows'] ?? 0) ?></td>
             </tr>
           <?php endforeach; ?>
         </tbody>
@@ -186,6 +257,48 @@ ob_start();
       </table>
     </div>
   </div>
+
+  <div class="card app-card p-3 mt-3 d-none" id="aggWrap">
+    <div class="h5 m-0">Cumulat pe accesorii</div>
+    <div class="text-muted">Grupat pe accesoriu + mod</div>
+    <div class="table-responsive mt-2">
+      <table class="table table-hover align-middle mb-0" id="magAggTable">
+        <thead>
+          <tr>
+            <th>Accesoriu</th>
+            <th style="width:110px">Mod</th>
+            <th class="text-end" style="width:160px">Cant.</th>
+            <th class="text-end" style="width:140px">Valoare</th>
+            <th class="text-end" style="width:110px">Rânduri</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($magAgg as $r): ?>
+            <?php
+              $iid = (int)($r['item_id'] ?? 0);
+              $itemTxt = trim((string)($r['winmentor_code'] ?? '') . ' · ' . (string)($r['item_name'] ?? ''));
+              $modeTxt = (string)($r['mode'] ?? '');
+              $sumQty = (float)($r['sum_qty'] ?? 0.0);
+              $unit = (string)($r['unit'] ?? '');
+              $sumVal = (float)($r['sum_value'] ?? 0.0);
+              $hasVal = isset($r['unit_price']) && $r['unit_price'] !== null && $r['unit_price'] !== '';
+            ?>
+            <tr>
+              <td class="fw-semibold">
+                <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $iid)) ?>">
+                  <?= htmlspecialchars($itemTxt) ?>
+                </a>
+              </td>
+              <td class="fw-semibold"><?= htmlspecialchars($modeTxt) ?></td>
+              <td class="text-end fw-semibold"><?= number_format($sumQty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+              <td class="text-end fw-semibold"><?= $hasVal ? (number_format($sumVal, 2, '.', '') . ' lei') : '—' ?></td>
+              <td class="text-end text-muted"><?= (int)($r['rows'] ?? 0) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 <?php endif; ?>
 
 <script>
@@ -201,6 +314,26 @@ ob_start();
     }
     init('hplTable');
     init('magTable');
+    init('hplAggTable');
+    init('magAggTable');
+
+    const cb = document.getElementById('toggleAgg');
+    const wrap = document.getElementById('aggWrap');
+    if (cb && wrap) {
+      const key = 'sys_material_consumptions_agg_v1';
+      const apply = (on) => { if (on) wrap.classList.remove('d-none'); else wrap.classList.add('d-none'); };
+      try {
+        const saved = localStorage.getItem(key);
+        const on = saved === '1';
+        cb.checked = on;
+        apply(on);
+      } catch (e) {}
+      cb.addEventListener('change', function(){
+        const on = !!cb.checked;
+        apply(on);
+        try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+      });
+    }
   });
 </script>
 <?php

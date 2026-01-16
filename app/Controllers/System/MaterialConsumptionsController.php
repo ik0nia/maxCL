@@ -25,6 +25,8 @@ final class MaterialConsumptionsController
 
         $hplRows = [];
         $magRows = [];
+        $hplAgg = [];
+        $magAgg = [];
 
         try {
             /** @var \PDO $pdo */
@@ -48,7 +50,7 @@ final class MaterialConsumptionsController
             $sql = "
                 SELECT
                   c.id, c.created_at, c.mode, c.qty_boards, c.qty_m2, c.note,
-                  b.id AS board_id, b.code AS board_code, b.name AS board_name, b.thickness_mm,
+                  b.id AS board_id, b.code AS board_code, b.name AS board_name, b.thickness_mm, b.std_width_mm, b.std_height_mm,
                   pr.id AS project_id, pr.code AS project_code, pr.name AS project_name,
                   u.name AS user_name, u.email AS user_email
                 FROM project_hpl_consumptions c
@@ -97,10 +99,63 @@ final class MaterialConsumptionsController
             $st = $pdo->prepare($sql);
             $st->execute($params);
             $magRows = $st->fetchAll();
+
+            // Aggregations (best-effort, in PHP)
+            foreach ($hplRows as $r) {
+                $bid = (int)($r['board_id'] ?? 0);
+                $m = (string)($r['mode'] ?? '');
+                $key = $bid . '|' . $m;
+                if (!isset($hplAgg[$key])) {
+                    $hplAgg[$key] = [
+                        'board_id' => $bid,
+                        'mode' => $m,
+                        'board_code' => (string)($r['board_code'] ?? ''),
+                        'board_name' => (string)($r['board_name'] ?? ''),
+                        'thickness_mm' => (int)($r['thickness_mm'] ?? 0),
+                        'std_width_mm' => (int)($r['std_width_mm'] ?? 0),
+                        'std_height_mm' => (int)($r['std_height_mm'] ?? 0),
+                        'sum_qty_boards' => 0.0,
+                        'sum_qty_m2' => 0.0,
+                        'rows' => 0,
+                    ];
+                }
+                $qb = isset($r['qty_boards']) ? (float)($r['qty_boards'] ?? 0) : 0.0;
+                $qm2 = isset($r['qty_m2']) ? (float)($r['qty_m2'] ?? 0) : 0.0;
+                $hplAgg[$key]['sum_qty_boards'] += $qb;
+                $hplAgg[$key]['sum_qty_m2'] += $qm2;
+                $hplAgg[$key]['rows'] += 1;
+            }
+            foreach ($magRows as $r) {
+                $iid = (int)($r['item_id'] ?? 0);
+                $m = (string)($r['mode'] ?? '');
+                $key = $iid . '|' . $m;
+                if (!isset($magAgg[$key])) {
+                    $magAgg[$key] = [
+                        'item_id' => $iid,
+                        'mode' => $m,
+                        'winmentor_code' => (string)($r['winmentor_code'] ?? ''),
+                        'item_name' => (string)($r['item_name'] ?? ''),
+                        'unit' => (string)($r['unit'] ?? ''),
+                        'unit_price' => (isset($r['unit_price']) && $r['unit_price'] !== null && $r['unit_price'] !== '' && is_numeric($r['unit_price'])) ? (float)$r['unit_price'] : null,
+                        'sum_qty' => 0.0,
+                        'sum_value' => 0.0,
+                        'rows' => 0,
+                    ];
+                }
+                $q = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+                $magAgg[$key]['sum_qty'] += $q;
+                $up = $magAgg[$key]['unit_price'];
+                if ($up !== null) $magAgg[$key]['sum_value'] += ($up * $q);
+                $magAgg[$key]['rows'] += 1;
+            }
+            $hplAgg = array_values($hplAgg);
+            $magAgg = array_values($magAgg);
         } catch (\Throwable $e) {
             // fallback: lăsăm tabelele goale; toast-ul e afișat din layout dacă e setat
             $hplRows = [];
             $magRows = [];
+            $hplAgg = [];
+            $magAgg = [];
         }
 
         echo View::render('system/material_consumptions', [
@@ -111,6 +166,8 @@ final class MaterialConsumptionsController
             'date_to' => $dateTo,
             'hplRows' => $hplRows,
             'magRows' => $magRows,
+            'hplAgg' => $hplAgg,
+            'magAgg' => $magAgg,
         ]);
     }
 
