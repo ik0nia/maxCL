@@ -308,7 +308,9 @@ final class HplStockPiece
                 SELECT
                   sp.*,
                   b.code AS board_code,
-                  b.name AS board_name
+                  b.name AS board_name,
+                  b.std_width_mm AS board_std_width_mm,
+                  b.std_height_mm AS board_std_height_mm
                 FROM hpl_stock_pieces sp
                 INNER JOIN hpl_boards b ON b.id = sp.board_id
                 WHERE sp.project_id = ?

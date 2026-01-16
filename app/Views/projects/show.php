@@ -498,36 +498,36 @@ ob_start();
           $ppAllowedValues = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
           if (!$canSetPPFinal) $ppAllowedValues = array_values(array_filter($ppAllowedValues, fn($v) => !in_array($v, ['AVIZAT','LIVRAT'], true)));
 
-          // HPL "stoc proiect" pentru CNC->Montaj:
-          // - plăci full rezervate (qty_boards) per board
-          // - jumătăți rezervate (qty_m2, note prefix REST_JUMATATE) per board
-          $hplConsumRows = is_array($hplConsum ?? null) ? $hplConsum : [];
+          // HPL "stoc proiect" pentru CNC->Montaj (din hpl_stock_pieces):
+          // - FULL RESERVED per board
+          // - OFFCUT RESERVED (jumătate) per board
+          $hplPieceRows = is_array($projectHplPieces ?? null) ? $projectHplPieces : [];
           $reservedFullByBoard = [];
-          $reservedHalfM2ByBoard = [];
-          $halfAreaByBoard = [];
-          foreach ($hplConsumRows as $c) {
-            if ((string)($c['mode'] ?? '') !== 'RESERVED') continue;
-            $bid = (int)($c['board_id'] ?? 0);
+          $reservedHalvesByBoard = [];
+          foreach ($hplPieceRows as $p) {
+            $bid = (int)($p['board_id'] ?? 0);
             if ($bid <= 0) continue;
-            $qb = (int)($c['qty_boards'] ?? 0);
-            $qm = isset($c['qty_m2']) ? (float)$c['qty_m2'] : 0.0;
-            if ($qb > 0) {
-              $reservedFullByBoard[$bid] = (int)($reservedFullByBoard[$bid] ?? 0) + $qb;
+            if ((string)($p['status'] ?? '') !== 'RESERVED') continue;
+            $qty = (int)($p['qty'] ?? 0);
+            if ($qty <= 0) continue;
+            $type = (string)($p['piece_type'] ?? '');
+            if ($type === 'FULL') {
+              $reservedFullByBoard[$bid] = (int)($reservedFullByBoard[$bid] ?? 0) + $qty;
               continue;
             }
-            $note = (string)($c['note'] ?? '');
-            if ($note === '' || strpos($note, 'REST_JUMATATE') !== 0) continue;
-            $hmm = (int)($c['board_std_height_mm'] ?? 0);
-            $wmm = (int)($c['board_std_width_mm'] ?? 0);
-            if ($hmm > 0 && $wmm > 0) {
-              $halfAreaByBoard[$bid] = (((float)$hmm / 2.0) * (float)$wmm) / 1000000.0;
+            if ($type !== 'OFFCUT') continue;
+            $note = (string)($p['notes'] ?? '');
+            $wmm = (int)($p['width_mm'] ?? 0);
+            $hmm = (int)($p['height_mm'] ?? 0);
+            $stdW = (int)($p['board_std_width_mm'] ?? 0);
+            $stdH = (int)($p['board_std_height_mm'] ?? 0);
+            $halfH = ($stdH > 0) ? (int)floor($stdH / 2.0) : 0;
+            $isHalf = false;
+            if ($note !== '' && strpos($note, 'REST_JUMATATE') === 0) $isHalf = true;
+            elseif ($halfH > 0 && $stdW > 0 && $hmm === $halfH && $wmm === $stdW) $isHalf = true;
+            if ($isHalf) {
+              $reservedHalvesByBoard[$bid] = (int)($reservedHalvesByBoard[$bid] ?? 0) + $qty;
             }
-            $reservedHalfM2ByBoard[$bid] = (float)($reservedHalfM2ByBoard[$bid] ?? 0.0) + $qm;
-          }
-          $reservedHalvesByBoard = [];
-          foreach ($reservedHalfM2ByBoard as $bid => $qm) {
-            $ha = (float)($halfAreaByBoard[$bid] ?? 0.0);
-            if ($ha > 0) $reservedHalvesByBoard[$bid] = (int)floor(($qm / $ha) + 1e-9);
           }
         ?>
 
@@ -586,99 +586,98 @@ ob_start();
                       <div class="h5 m-0"><?= htmlspecialchars($pname) ?></div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                     </div>
-                    <div class="text-end">
-                      <?php
-                        $stVal = (string)($pp['production_status'] ?? '');
-                        $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
-                        $idx = array_search($stVal, $ppAllowedValues, true);
-                      ?>
-                      <?php if ($canSetPPStatus): ?>
-                        <?php
-                          $flowAll = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
-                          $idxAll = array_search($stVal, $flowAll, true);
-                          if ($idxAll === false) $idxAll = 0;
-                          $nextVal = $flowAll[$idxAll + 1] ?? null;
-                          $nextLbl = $nextVal !== null ? ($ppStatusLabel[$nextVal] ?? $nextVal) : null;
-                          $canAdvance = ($nextVal !== null) && in_array($nextVal, $ppAllowedValues, true);
-                        ?>
-                        <div class="mt-2">
-                          <div class="d-flex flex-wrap align-items-center gap-1">
-                            <?php foreach ($ppStatusesAll as $i => $s): ?>
-                              <?php
-                                $v = (string)$s['value'];
-                                $lbl = (string)$s['label'];
-                                $isDone = ($i < $idxAll);
-                                $isCur = ($i === $idxAll);
-                                $isNext = ($i === $idxAll + 1);
-                                $isVisible = true;
-                                if (!$canSetPPFinal && in_array($v, ['AVIZAT','LIVRAT'], true) && !in_array($stVal, ['AVIZAT','LIVRAT'], true)) {
-                                  // Operator: arătăm statusurile finale ca "locked", dar nu le facem clickabile.
-                                  $isVisible = true;
-                                }
-                              ?>
-                              <?php if (!$isVisible) continue; ?>
+                  </div>
 
-                              <?php if ($isNext && $canAdvance): ?>
-                                <?php
-                                  $needHpl = ($stVal === 'CNC' && $v === 'MONTAJ');
-                                  $ppBoardId = isset($pp['hpl_board_id']) && $pp['hpl_board_id'] !== null && $pp['hpl_board_id'] !== '' ? (int)$pp['hpl_board_id'] : 0;
-                                  $ppSurfType = (string)($pp['surface_type'] ?? '');
-                                  $ppSurfVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
-                                  $needsBoardConsume = $needHpl && $ppBoardId > 0 && $ppSurfType === 'BOARD' && ($ppSurfVal !== null) && (abs($ppSurfVal - 1.0) < 1e-9 || abs($ppSurfVal - 0.5) < 1e-9);
-                                  $hasFull = $ppBoardId > 0 ? ((int)($reservedFullByBoard[$ppBoardId] ?? 0) > 0) : false;
-                                  $hasHalf = $ppBoardId > 0 ? ((int)($reservedHalvesByBoard[$ppBoardId] ?? 0) > 0) : false;
-                                ?>
-                                <?php if ($needsBoardConsume && abs((float)$ppSurfVal - 0.5) < 1e-9 && !$hasHalf && $hasFull): ?>
-                                  <div class="d-flex flex-wrap gap-1">
-                                    <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
-                                      <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                      <input type="hidden" name="remainder_action" value="RETURN">
-                                      <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="CNC→Montaj: consum 1/2 placă, rest în depozit">
-                                        Montaj (rest depozit)
-                                      </button>
-                                    </form>
-                                    <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
-                                      <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                      <input type="hidden" name="remainder_action" value="KEEP">
-                                      <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="CNC→Montaj: consum 1/2 placă, rest rămâne rezervat">
-                                        Montaj (rest rezervat)
-                                      </button>
-                                    </form>
-                                  </div>
-                                <?php elseif ($needsBoardConsume && ((abs((float)$ppSurfVal - 1.0) < 1e-9 && !$hasFull) || (abs((float)$ppSurfVal - 0.5) < 1e-9 && !$hasHalf && !$hasFull))): ?>
-                                  <button class="btn btn-sm btn-outline-secondary px-2 py-1" type="button" disabled title="Nu există rezervare suficientă pe proiect">
-                                    <?= htmlspecialchars($lbl) ?>
+                  <?php
+                    $stVal = (string)($pp['production_status'] ?? '');
+                    $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
+                    $idx = array_search($stVal, $ppAllowedValues, true);
+                  ?>
+                  <?php if ($canSetPPStatus): ?>
+                    <?php
+                      $flowAll = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
+                      $idxAll = array_search($stVal, $flowAll, true);
+                      if ($idxAll === false) $idxAll = 0;
+                      $nextVal = $flowAll[$idxAll + 1] ?? null;
+                      $nextLbl = $nextVal !== null ? ($ppStatusLabel[$nextVal] ?? $nextVal) : null;
+                      $canAdvance = ($nextVal !== null) && in_array($nextVal, $ppAllowedValues, true);
+                    ?>
+                    <div class="mt-2">
+                      <div class="d-flex flex-wrap align-items-center gap-1">
+                        <?php foreach ($ppStatusesAll as $i => $s): ?>
+                          <?php
+                            $v = (string)$s['value'];
+                            $lbl = (string)$s['label'];
+                            $isDone = ($i < $idxAll);
+                            $isCur = ($i === $idxAll);
+                            $isNext = ($i === $idxAll + 1);
+                            $isVisible = true;
+                            if (!$canSetPPFinal && in_array($v, ['AVIZAT','LIVRAT'], true) && !in_array($stVal, ['AVIZAT','LIVRAT'], true)) {
+                              // Operator: arătăm statusurile finale ca "locked", dar nu le facem clickabile.
+                              $isVisible = true;
+                            }
+                          ?>
+                          <?php if (!$isVisible) continue; ?>
+
+                          <?php if ($isNext && $canAdvance): ?>
+                            <?php
+                              $needHpl = ($stVal === 'CNC' && $v === 'MONTAJ');
+                              $ppBoardId = isset($pp['hpl_board_id']) && $pp['hpl_board_id'] !== null && $pp['hpl_board_id'] !== '' ? (int)$pp['hpl_board_id'] : 0;
+                              $ppSurfType = (string)($pp['surface_type'] ?? '');
+                              $ppSurfVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
+                              $needsBoardConsume = $needHpl && $ppBoardId > 0 && $ppSurfType === 'BOARD' && ($ppSurfVal !== null) && (abs($ppSurfVal - 1.0) < 1e-9 || abs($ppSurfVal - 0.5) < 1e-9);
+                              $hasFull = $ppBoardId > 0 ? ((int)($reservedFullByBoard[$ppBoardId] ?? 0) > 0) : false;
+                              $hasHalf = $ppBoardId > 0 ? ((int)($reservedHalvesByBoard[$ppBoardId] ?? 0) > 0) : false;
+                            ?>
+                            <?php if ($needsBoardConsume && abs((float)$ppSurfVal - 0.5) < 1e-9 && !$hasHalf && $hasFull): ?>
+                              <div class="d-flex flex-wrap gap-1">
+                                <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                  <input type="hidden" name="remainder_action" value="RETURN">
+                                  <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="CNC→Montaj: consum 1/2 placă, rest în depozit">
+                                    Montaj (rest depozit)
                                   </button>
-                                <?php else: ?>
-                                  <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
-                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                    <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
-                                      <?= htmlspecialchars($lbl) ?>
-                                    </button>
-                                  </form>
-                                <?php endif; ?>
-                              <?php else: ?>
-                                <?php
-                                  $cls = 'bg-secondary-subtle text-secondary-emphasis';
-                                  if ($isDone) $cls = 'bg-success-subtle text-success-emphasis';
-                                  if ($isCur) $cls = 'bg-success text-white';
-                                ?>
-                                <span class="badge rounded-pill <?= $cls ?> px-2 py-1"><?= htmlspecialchars($lbl) ?></span>
-                              <?php endif; ?>
-
-                              <?php if ($i < count($ppStatusesAll) - 1): ?>
-                                <span class="text-muted">—</span>
-                              <?php endif; ?>
-                            <?php endforeach; ?>
-                          </div>
-
-                          <?php if (!$canSetPPFinal): ?>
-                            <div class="text-muted small">Avizat/Livrat: doar Admin/Gestionar.</div>
+                                </form>
+                                <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                  <input type="hidden" name="remainder_action" value="KEEP">
+                                  <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="CNC→Montaj: consum 1/2 placă, rest rămâne rezervat">
+                                    Montaj (rest rezervat)
+                                  </button>
+                                </form>
+                              </div>
+                            <?php elseif ($needsBoardConsume && ((abs((float)$ppSurfVal - 1.0) < 1e-9 && !$hasFull) || (abs((float)$ppSurfVal - 0.5) < 1e-9 && !$hasHalf && !$hasFull))): ?>
+                              <button class="btn btn-sm btn-outline-secondary px-2 py-1" type="button" disabled title="Nu există rezervare suficientă pe proiect">
+                                <?= htmlspecialchars($lbl) ?>
+                              </button>
+                            <?php else: ?>
+                              <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
+                                  <?= htmlspecialchars($lbl) ?>
+                                </button>
+                              </form>
+                            <?php endif; ?>
+                          <?php else: ?>
+                            <?php
+                              $cls = 'bg-secondary-subtle text-secondary-emphasis';
+                              if ($isDone) $cls = 'bg-success-subtle text-success-emphasis';
+                              if ($isCur) $cls = 'bg-success text-white';
+                            ?>
+                            <span class="badge rounded-pill <?= $cls ?> px-2 py-1"><?= htmlspecialchars($lbl) ?></span>
                           <?php endif; ?>
-                        </div>
+
+                          <?php if ($i < count($ppStatusesAll) - 1): ?>
+                            <span class="text-muted">—</span>
+                          <?php endif; ?>
+                        <?php endforeach; ?>
+                      </div>
+
+                      <?php if (!$canSetPPFinal): ?>
+                        <div class="text-muted small">Avizat/Livrat: doar Admin/Gestionar.</div>
                       <?php endif; ?>
                     </div>
-                  </div>
+                  <?php endif; ?>
 
                   <div class="row g-2 mt-2">
                     <div class="col-6 col-md-3">

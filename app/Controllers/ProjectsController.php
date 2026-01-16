@@ -794,6 +794,8 @@ final class ProjectsController
                     $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
                     try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
+                    $projectHplPieces = [];
+                    try { $projectHplPieces = HplStockPiece::forProject($id); } catch (\Throwable $e) { $projectHplPieces = []; }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
         $hplBy = self::hplCostByProduct($projectProducts);
                     foreach ($projectProducts as $pp) {
