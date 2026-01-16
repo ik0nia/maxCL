@@ -103,12 +103,10 @@ final class MaterialConsumptionsController
             // Aggregations (best-effort, in PHP)
             foreach ($hplRows as $r) {
                 $bid = (int)($r['board_id'] ?? 0);
-                $m = (string)($r['mode'] ?? '');
-                $key = $bid . '|' . $m;
+                $key = (string)$bid;
                 if (!isset($hplAgg[$key])) {
                     $hplAgg[$key] = [
                         'board_id' => $bid,
-                        'mode' => $m,
                         'board_code' => (string)($r['board_code'] ?? ''),
                         'board_name' => (string)($r['board_name'] ?? ''),
                         'thickness_mm' => (int)($r['thickness_mm'] ?? 0),
@@ -127,12 +125,10 @@ final class MaterialConsumptionsController
             }
             foreach ($magRows as $r) {
                 $iid = (int)($r['item_id'] ?? 0);
-                $m = (string)($r['mode'] ?? '');
-                $key = $iid . '|' . $m;
+                $key = (string)$iid;
                 if (!isset($magAgg[$key])) {
                     $magAgg[$key] = [
                         'item_id' => $iid,
-                        'mode' => $m,
                         'winmentor_code' => (string)($r['winmentor_code'] ?? ''),
                         'item_name' => (string)($r['item_name'] ?? ''),
                         'unit' => (string)($r['unit'] ?? ''),

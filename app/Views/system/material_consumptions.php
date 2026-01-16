@@ -142,13 +142,12 @@ ob_start();
 
   <div class="card app-card p-3 mt-3 d-none" id="aggWrap">
     <div class="h5 m-0">Cumulat pe material</div>
-    <div class="text-muted">Grupat pe placă + mod</div>
+    <div class="text-muted">Grupat pe placă (cantități adunate)</div>
     <div class="table-responsive mt-2">
       <table class="table table-hover align-middle mb-0" id="hplAggTable">
         <thead>
           <tr>
             <th>Placă</th>
-            <th style="width:110px">Mod</th>
             <th class="text-end" style="width:110px">Buc</th>
             <th class="text-end" style="width:110px">mp</th>
             <th class="text-end" style="width:110px">Rânduri</th>
@@ -159,7 +158,6 @@ ob_start();
             <?php
               $bid = (int)($r['board_id'] ?? 0);
               $btxt = trim((string)($r['board_code'] ?? '') . ' · ' . (string)($r['board_name'] ?? ''));
-              $modeTxt = (string)($r['mode'] ?? '');
               $qb = (float)($r['sum_qty_boards'] ?? 0.0);
               $qm2 = (float)($r['sum_qty_m2'] ?? 0.0);
               $stdW = (int)($r['std_width_mm'] ?? 0);
@@ -179,7 +177,6 @@ ob_start();
                   <?= htmlspecialchars($btxt) ?>
                 </a>
               </td>
-              <td class="fw-semibold"><?= htmlspecialchars($modeTxt) ?></td>
               <td class="text-end fw-semibold"><?= htmlspecialchars($eqTxt) ?></td>
               <td class="text-end fw-semibold"><?= number_format($qm2, 2, '.', '') ?></td>
               <td class="text-end text-muted"><?= (int)($r['rows'] ?? 0) ?></td>
@@ -260,13 +257,12 @@ ob_start();
 
   <div class="card app-card p-3 mt-3 d-none" id="aggWrap">
     <div class="h5 m-0">Cumulat pe accesorii</div>
-    <div class="text-muted">Grupat pe accesoriu + mod</div>
+    <div class="text-muted">Grupat pe accesoriu (cantități adunate)</div>
     <div class="table-responsive mt-2">
       <table class="table table-hover align-middle mb-0" id="magAggTable">
         <thead>
           <tr>
             <th>Accesoriu</th>
-            <th style="width:110px">Mod</th>
             <th class="text-end" style="width:160px">Cant.</th>
             <th class="text-end" style="width:140px">Valoare</th>
             <th class="text-end" style="width:110px">Rânduri</th>
@@ -277,7 +273,6 @@ ob_start();
             <?php
               $iid = (int)($r['item_id'] ?? 0);
               $itemTxt = trim((string)($r['winmentor_code'] ?? '') . ' · ' . (string)($r['item_name'] ?? ''));
-              $modeTxt = (string)($r['mode'] ?? '');
               $sumQty = (float)($r['sum_qty'] ?? 0.0);
               $unit = (string)($r['unit'] ?? '');
               $sumVal = (float)($r['sum_value'] ?? 0.0);
@@ -289,7 +284,6 @@ ob_start();
                   <?= htmlspecialchars($itemTxt) ?>
                 </a>
               </td>
-              <td class="fw-semibold"><?= htmlspecialchars($modeTxt) ?></td>
               <td class="text-end fw-semibold"><?= number_format($sumQty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
               <td class="text-end fw-semibold"><?= $hasVal ? (number_format($sumVal, 2, '.', '') . ' lei') : '—' ?></td>
               <td class="text-end text-muted"><?= (int)($r['rows'] ?? 0) ?></td>
