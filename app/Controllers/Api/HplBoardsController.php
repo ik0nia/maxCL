@@ -13,7 +13,13 @@ final class HplBoardsController
     {
         $q = isset($_GET['q']) ? (string)$_GET['q'] : (isset($_GET['term']) ? (string)$_GET['term'] : '');
         try {
-            $items = HplBoard::searchForSelect($q, 25);
+            $projectId = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
+            $reservedOnly = isset($_GET['reserved_only']) && (string)$_GET['reserved_only'] !== '' && (string)$_GET['reserved_only'] !== '0';
+            if ($reservedOnly && $projectId > 0) {
+                $items = HplBoard::searchReservedForProjectForSelect($projectId, $q, 50);
+            } else {
+                $items = HplBoard::searchForSelect($q, 25);
+            }
             Response::json(['ok' => true, 'q' => $q, 'count' => count($items), 'items' => $items]);
         } catch (\Throwable $e) {
             $env = strtolower((string)Env::get('APP_ENV', 'prod'));

@@ -96,5 +96,64 @@ final class Upload
         imagedestroy($dst);
         imagedestroy($img);
     }
+
+    /**
+     * Salvează un fișier generic (DXF/GCODE/PDF/imagini etc.) în storage/uploads/files.
+     *
+     * @return array{stored_name:string, original_name:string, mime:string|null, size_bytes:int|null, fs_path:string, url:string}
+     */
+    public static function saveEntityFile(array $file): array
+    {
+        if (!isset($file['error']) || (int)$file['error'] !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('Upload eșuat. Încearcă din nou.');
+        }
+        $tmp = (string)($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_file($tmp)) {
+            throw new \RuntimeException('Fișier invalid.');
+        }
+
+        $orig = trim((string)($file['name'] ?? ''));
+        if ($orig === '') $orig = 'fisier';
+        $orig = preg_replace('/[^\w\.\-\(\)\[\]\s]+/u', '_', $orig) ?? $orig;
+        $orig = mb_substr($orig, 0, 180);
+
+        $size = isset($file['size']) && is_numeric($file['size']) ? (int)$file['size'] : null;
+        if ($size !== null && $size > 100 * 1024 * 1024) {
+            throw new \RuntimeException('Fișier prea mare (max 100MB).');
+        }
+
+        $mime = null;
+        try {
+            $finfo = new \finfo(FILEINFO_MIME_TYPE);
+            $mime = (string)$finfo->file($tmp);
+        } catch (\Throwable $e) {
+            $mime = null;
+        }
+
+        $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+        if ($ext === '') $ext = 'bin';
+        if (!preg_match('/^[a-z0-9]{1,8}$/', $ext)) $ext = 'bin';
+
+        $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException('Nu pot crea folderul de upload.');
+        }
+
+        $basename = bin2hex(random_bytes(16));
+        $stored = $basename . '.' . $ext;
+        $fs = $dir . '/' . $stored;
+        if (!move_uploaded_file($tmp, $fs)) {
+            throw new \RuntimeException('Nu pot salva fișierul încărcat.');
+        }
+
+        return [
+            'stored_name' => $stored,
+            'original_name' => $orig,
+            'mime' => $mime ?: null,
+            'size_bytes' => $size,
+            'fs_path' => $fs,
+            'url' => Url::to('/uploads/files/' . $stored),
+        ];
+    }
 }
 

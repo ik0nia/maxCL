@@ -81,6 +81,7 @@ final class HplBoard
             ? "JOIN textures ft ON ft.id = b.face_texture_id
                LEFT JOIN textures bt ON bt.id = b.back_texture_id"
             : "";
+        // IMPORTANT: aici urmează încă coloane după texturi, deci avem nevoie de virgulă la final.
         $selTextures = $hasTextures
             ? "ft.name AS face_texture_name,
                bt.name AS back_texture_name,"
@@ -145,6 +146,21 @@ final class HplBoard
             $st->execute($params);
             return $st->fetchAll();
         } catch (\Throwable $e) {
+            // Compat: dacă nu există coloana calculată area_total_m2 (schema veche),
+            // refacem query-ul folosind expresie calculată din dimensiuni.
+            if (self::isUnknownColumn($e, 'area_total_m2')) {
+                $calc = '(((sp.width_mm * sp.height_mm) / 1000000.0) * sp.qty)';
+                $sqlWithAccounting = str_replace('sp.area_total_m2', $calc, $sqlWithAccounting);
+                $sqlNoAccounting = str_replace('sp.area_total_m2', $calc, $sqlNoAccounting);
+                try {
+                    $st = $pdo->prepare($sqlWithAccounting);
+                    $st->execute($params);
+                    return $st->fetchAll();
+                } catch (\Throwable $e2) {
+                    // continuă cu fallback pe is_accounting, mai jos
+                    $e = $e2;
+                }
+            }
             // Compat: dacă încă nu există coloana, nu blocăm.
             if (!self::isUnknownColumn($e, 'is_accounting')) {
                 throw $e;
@@ -155,7 +171,7 @@ final class HplBoard
         }
     }
 
-    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int}> */
+    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int,thumb?:string|null,thumb_back?:string|null,face_color_code?:string|null,back_color_code?:string|null,face_texture_name?:string|null,back_texture_name?:string|null}> */
     public static function searchForSelect(?string $q, int $limit = 25): array
     {
         /** @var PDO $pdo */
@@ -164,24 +180,96 @@ final class HplBoard
         if ($limit < 1) $limit = 1;
         if ($limit > 200) $limit = 200;
 
+        $hasTextures = self::hasTable('textures');
+        $joinTextures = $hasTextures
+            ? "JOIN textures ft ON ft.id = b.face_texture_id
+               LEFT JOIN textures bt ON bt.id = b.back_texture_id"
+            : "";
+        // IMPORTANT: fără virgulă la final (altfel SQL syntax error înainte de FROM).
+        $selTextures = $hasTextures
+            ? "ft.name AS face_texture_name,
+               bt.name AS back_texture_name"
+            : "NULL AS face_texture_name,
+               NULL AS back_texture_name";
+
         $where = '';
         $params = [];
         if ($q !== '') {
             $like = '%' . $q . '%';
-            $where = 'WHERE (code LIKE ? OR name LIKE ? OR brand LIKE ?)';
-            $params = [$like, $like, $like];
+            $where = 'WHERE (
+                b.code LIKE ? OR b.name LIKE ? OR b.brand LIKE ?
+                OR fc.code LIKE ? OR bc.code LIKE ?
+                OR fc.color_name LIKE ? OR bc.color_name LIKE ?
+                OR ft.name LIKE ? OR bt.name LIKE ?
+            )';
+            // dacă nu există tabela textures, coloanele ft/bt sunt NULL, dar WHERE-ul cu ft/bt ar da eroare.
+            // de aceea construim condiția extra doar când există.
+            if ($hasTextures) {
+                $params = [$like, $like, $like, $like, $like, $like, $like, $like, $like];
+            } else {
+                $where = 'WHERE (
+                    b.code LIKE ? OR b.name LIKE ? OR b.brand LIKE ?
+                    OR fc.code LIKE ? OR bc.code LIKE ?
+                    OR fc.color_name LIKE ? OR bc.color_name LIKE ?
+                )';
+                $params = [$like, $like, $like, $like, $like, $like, $like];
+            }
         }
 
-        $sql = "
-            SELECT id, code, name, brand, thickness_mm, std_width_mm, std_height_mm
-            FROM hpl_boards
+        // Stoc FULL disponibil (buc) pentru fiecare placă.
+        // Compat: coloana is_accounting poate lipsi.
+        $stockJoinWithAcc = "
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS full_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'FULL'
+                AND status = 'AVAILABLE'
+                AND (is_accounting = 1 OR is_accounting IS NULL)
+              GROUP BY board_id
+            ) sfull ON sfull.board_id = b.id
+        ";
+        $stockJoinNoAcc = "
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS full_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'FULL'
+                AND status = 'AVAILABLE'
+              GROUP BY board_id
+            ) sfull ON sfull.board_id = b.id
+        ";
+
+        $sqlBase = "
+            SELECT
+              b.id, b.code, b.name, b.brand, b.thickness_mm, b.std_width_mm, b.std_height_mm,
+              fc.code AS face_color_code,
+              bc.code AS back_color_code,
+              fc.thumb_path AS thumb,
+              bc.thumb_path AS thumb_back,
+              $selTextures,
+              COALESCE(sfull.full_available, 0) AS stock_qty_full_available
+            FROM hpl_boards b
+            JOIN finishes fc ON fc.id = b.face_color_id
+            LEFT JOIN finishes bc ON bc.id = b.back_color_id
+            %s
+            $joinTextures
             $where
-            ORDER BY code ASC
+            ORDER BY b.code ASC
             LIMIT $limit
         ";
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        $rows = $st->fetchAll();
+        try {
+            $sql = sprintf($sqlBase, $stockJoinWithAcc);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'is_accounting')) {
+                throw $e;
+            }
+            $sql = sprintf($sqlBase, $stockJoinNoAcc);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll();
+        }
 
         $out = [];
         foreach ($rows as $r) {
@@ -192,7 +280,25 @@ final class HplBoard
             $th = (int)($r['thickness_mm'] ?? 0);
             $w = (int)($r['std_width_mm'] ?? 0);
             $h = (int)($r['std_height_mm'] ?? 0);
-            $text = trim($code . ' · ' . $name . ' · ' . $brand . ' · ' . $th . 'mm · ' . $h . '×' . $w);
+            $fc = (string)($r['face_color_code'] ?? '');
+            $bc = (string)($r['back_color_code'] ?? '');
+            $colors = $fc !== '' ? $fc : '';
+            if ($bc !== '' && $bc !== $fc) $colors = $colors !== '' ? ($colors . '/' . $bc) : $bc;
+            $ft = (string)($r['face_texture_name'] ?? '');
+            $bt = (string)($r['back_texture_name'] ?? '');
+            $tex = $ft !== '' ? $ft : '';
+            if ($bt !== '' && $bt !== $ft) $tex = $tex !== '' ? ($tex . '/' . $bt) : $bt;
+            // UI: în select nu afișăm codul plăcii (winmentor) și nici brandul;
+            // după dimensiune afișăm denumirea, apoi texturile față/verso.
+            $base = trim($th . 'mm · ' . $h . '×' . $w);
+            if ($name !== '') {
+                $base .= ' · ' . $name;
+            }
+            if ($tex !== '') {
+                $base .= ' · ' . $tex;
+            }
+            // Codurile de culoare se vor afișa (și bold) în formatter-ul Select2.
+            $text = $base;
             $out[] = [
                 'id' => $id,
                 'text' => $text,
@@ -202,6 +308,159 @@ final class HplBoard
                 'thickness_mm' => $th,
                 'std_width_mm' => $w,
                 'std_height_mm' => $h,
+                'stock_qty_full_available' => (int)($r['stock_qty_full_available'] ?? 0),
+                'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
+                'thumb_back' => (isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '') ? (string)$r['thumb_back'] : null,
+                'face_color_code' => $fc !== '' ? $fc : null,
+                'back_color_code' => $bc !== '' ? $bc : null,
+                'face_texture_name' => $ft !== '' ? $ft : null,
+                'back_texture_name' => $bt !== '' ? $bt : null,
+            ];
+        }
+        return $out;
+    }
+
+    /** @return array<int, array{id:int,text:string,code:string,name:string,brand:string,thickness_mm:int,std_width_mm:int,std_height_mm:int,thumb?:string|null,thumb_back?:string|null,face_color_code?:string|null,back_color_code?:string|null,face_texture_name?:string|null,back_texture_name?:string|null}> */
+    public static function searchReservedForProjectForSelect(int $projectId, ?string $q, int $limit = 25): array
+    {
+        $projectId = (int)$projectId;
+        if ($projectId <= 0) return [];
+
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $q = $q !== null ? trim($q) : '';
+        if ($limit < 1) $limit = 1;
+        if ($limit > 200) $limit = 200;
+
+        $hasTextures = self::hasTable('textures');
+        $joinTextures = $hasTextures
+            ? "JOIN textures ft ON ft.id = b.face_texture_id
+               LEFT JOIN textures bt ON bt.id = b.back_texture_id"
+            : "";
+        // IMPORTANT: fără virgulă la final
+        $selTextures = $hasTextures
+            ? "ft.name AS face_texture_name,
+               bt.name AS back_texture_name"
+            : "NULL AS face_texture_name,
+               NULL AS back_texture_name";
+
+        $where = "WHERE c.project_id = ?
+                  AND c.mode = 'RESERVED'
+                  AND COALESCE(c.qty_boards,0) > 0";
+        $params = [$projectId];
+        if ($q !== '') {
+            $like = '%' . $q . '%';
+            if ($hasTextures) {
+                $where .= ' AND (
+                    b.code LIKE ? OR b.name LIKE ? OR b.brand LIKE ?
+                    OR fc.code LIKE ? OR bc.code LIKE ?
+                    OR fc.color_name LIKE ? OR bc.color_name LIKE ?
+                    OR ft.name LIKE ? OR bt.name LIKE ?
+                )';
+                $params = array_merge($params, [$like, $like, $like, $like, $like, $like, $like, $like, $like]);
+            } else {
+                $where .= ' AND (
+                    b.code LIKE ? OR b.name LIKE ? OR b.brand LIKE ?
+                    OR fc.code LIKE ? OR bc.code LIKE ?
+                    OR fc.color_name LIKE ? OR bc.color_name LIKE ?
+                )';
+                $params = array_merge($params, [$like, $like, $like, $like, $like, $like, $like]);
+            }
+        }
+
+        // Stoc FULL disponibil (buc) pentru fiecare placă.
+        $stockJoinWithAcc = "
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS full_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'FULL'
+                AND status = 'AVAILABLE'
+                AND (is_accounting = 1 OR is_accounting IS NULL)
+              GROUP BY board_id
+            ) sfull ON sfull.board_id = b.id
+        ";
+        $stockJoinNoAcc = "
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS full_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'FULL'
+                AND status = 'AVAILABLE'
+              GROUP BY board_id
+            ) sfull ON sfull.board_id = b.id
+        ";
+
+        $sqlBase = "
+            SELECT DISTINCT
+              b.id, b.code, b.name, b.brand, b.thickness_mm, b.std_width_mm, b.std_height_mm,
+              fc.code AS face_color_code,
+              bc.code AS back_color_code,
+              fc.thumb_path AS thumb,
+              bc.thumb_path AS thumb_back,
+              $selTextures,
+              COALESCE(sfull.full_available, 0) AS stock_qty_full_available
+            FROM project_hpl_consumptions c
+            INNER JOIN hpl_boards b ON b.id = c.board_id
+            JOIN finishes fc ON fc.id = b.face_color_id
+            LEFT JOIN finishes bc ON bc.id = b.back_color_id
+            %s
+            $joinTextures
+            $where
+            ORDER BY b.code ASC
+            LIMIT $limit
+        ";
+
+        try {
+            $sql = sprintf($sqlBase, $stockJoinWithAcc);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'is_accounting')) {
+                throw $e;
+            }
+            $sql = sprintf($sqlBase, $stockJoinNoAcc);
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll();
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int)$r['id'];
+            $code = (string)($r['code'] ?? '');
+            $name = (string)($r['name'] ?? '');
+            $brand = (string)($r['brand'] ?? '');
+            $th = (int)($r['thickness_mm'] ?? 0);
+            $w = (int)($r['std_width_mm'] ?? 0);
+            $h = (int)($r['std_height_mm'] ?? 0);
+            $fc = (string)($r['face_color_code'] ?? '');
+            $bc = (string)($r['back_color_code'] ?? '');
+            $ft = (string)($r['face_texture_name'] ?? '');
+            $bt = (string)($r['back_texture_name'] ?? '');
+            $tex = $ft !== '' ? $ft : '';
+            if ($bt !== '' && $bt !== $ft) $tex = $tex !== '' ? ($tex . '/' . $bt) : $bt;
+
+            $base = trim($th . 'mm · ' . $h . '×' . $w);
+            if ($name !== '') $base .= ' · ' . $name;
+            if ($tex !== '') $base .= ' · ' . $tex;
+            $text = $base;
+
+            $out[] = [
+                'id' => $id,
+                'text' => $text,
+                'code' => $code,
+                'name' => $name,
+                'brand' => $brand,
+                'thickness_mm' => $th,
+                'std_width_mm' => $w,
+                'std_height_mm' => $h,
+                'stock_qty_full_available' => (int)($r['stock_qty_full_available'] ?? 0),
+                'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
+                'thumb_back' => (isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '') ? (string)$r['thumb_back'] : null,
+                'face_color_code' => $fc !== '' ? $fc : null,
+                'back_color_code' => $bc !== '' ? $bc : null,
+                'face_texture_name' => $ft !== '' ? $ft : null,
+                'back_texture_name' => $bt !== '' ? $bt : null,
             ];
         }
         return $out;

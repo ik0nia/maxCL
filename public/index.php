@@ -22,12 +22,17 @@ use App\Controllers\Hpl\OffcutsController as HplOffcutsController;
 use App\Controllers\Magazie\StockController as MagazieStockController;
 use App\Controllers\Magazie\ReceptionController as MagazieReceptionController;
 use App\Controllers\DashboardController;
+use App\Controllers\ProductsController;
 use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
+use App\Controllers\ProjectsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
+use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
+use App\Controllers\System\CostSettingsController;
 use App\Controllers\System\DbUpdateController;
+use App\Controllers\System\MaterialConsumptionsController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -143,6 +148,35 @@ $router->get('/uploads/finishes/{name}', function (array $params) {
     exit;
 }, [Auth::requireLogin()]);
 
+// ---- Uploads files (servite din storage/uploads/files)
+$router->get('/uploads/files/{name}', function (array $params) {
+    $name = (string)($params['name'] ?? '');
+    if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $name)) {
+        http_response_code(404);
+        exit;
+    }
+    $fs = __DIR__ . '/../storage/uploads/files/' . $name;
+    if (!is_file($fs)) {
+        http_response_code(404);
+        exit;
+    }
+    $ext = strtolower(pathinfo($fs, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'pdf' => 'application/pdf',
+        'jpg','jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'dxf' => 'application/dxf',
+        'nc','gcode','tap' => 'text/plain',
+        default => 'application/octet-stream',
+    };
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($name) . '"');
+    header('Cache-Control: private, max-age=86400');
+    readfile($fs);
+    exit;
+}, [Auth::requireLogin()]);
+
 // ---- Catalog (Admin, Gestionar)
 $catalogMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $hplReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
@@ -198,9 +232,44 @@ $auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
 $router->get('/audit', fn() => AuditController::index(), $auditMW);
 $router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW);
 
-$router->get('/projects', fn() => print View::render('system/placeholder', ['title' => 'Proiecte']), [
-    Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])
-]);
+$router->get('/system/costuri', fn() => CostSettingsController::index(), $usersMW);
+$router->post('/system/costuri', fn() => CostSettingsController::save(), $usersMW);
+
+$systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
+
+$projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsProductStatusMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsProductEditMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+
+$router->get('/projects', fn() => ProjectsController::index(), $projectsReadMW);
+$router->get('/projects/create', fn() => ProjectsController::createForm(), $projectsWriteMW);
+$router->post('/projects/create', fn() => ProjectsController::create(), $projectsWriteMW);
+$router->get('/projects/{id}', fn($p) => ProjectsController::show($p), $projectsReadMW);
+$router->post('/projects/{id}/edit', fn($p) => ProjectsController::update($p), $projectsWriteMW);
+$router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatus($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/add-existing', fn($p) => ProjectsController::addExistingProduct($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/create', fn($p) => ProjectsController::createProductInProject($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsController::updateProjectProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/status', fn($p) => ProjectsController::updateProjectProductStatus($p), $projectsProductStatusMW);
+$router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
+$router->post('/projects/{id}/products/{ppId}/magazie/create', fn($p) => ProjectsController::addMagazieConsumptionForProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
+$router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);
+$router->post('/projects/{id}/consum/magazie/{cid}/update', fn($p) => ProjectsController::updateMagazieConsumption($p), $projectsWriteMW);
+$router->post('/projects/{id}/consum/magazie/{cid}/delete', fn($p) => ProjectsController::deleteMagazieConsumption($p), $projectsWriteMW);
+$router->post('/projects/{id}/consum/hpl/{cid}/delete', fn($p) => ProjectsController::deleteHplConsumption($p), $projectsWriteMW);
+$router->post('/projects/{id}/deliveries/create', fn($p) => ProjectsController::createDelivery($p), $projectsWriteMW);
+$router->post('/projects/{id}/files/upload', fn($p) => ProjectsController::uploadProjectFile($p), $projectsWriteMW);
+$router->post('/projects/{id}/files/{fileId}/delete', fn($p) => ProjectsController::deleteProjectFile($p), $projectsWriteMW);
+$router->post('/projects/{id}/hours/create', fn($p) => ProjectsController::addWorkLog($p), $projectsWriteMW);
+$router->post('/projects/{id}/hours/{workId}/delete', fn($p) => ProjectsController::deleteWorkLog($p), $projectsWriteMW);
+$router->post('/projects/{id}/discutii/create', fn($p) => ProjectsController::addDiscussion($p), $projectsReadMW);
+$router->post('/projects/{id}/labels/add', fn($p) => ProjectsController::addProjectLabel($p), $projectsWriteMW);
+$router->post('/projects/{id}/labels/{labelId}/remove', fn($p) => ProjectsController::removeProjectLabel($p), $projectsWriteMW);
+
+$router->get('/products', fn() => ProductsController::index(), $projectsReadMW);
 
 $clientsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
@@ -237,8 +306,9 @@ $magReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::R
 $magWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 
 $router->get('/magazie/stoc', fn() => MagazieStockController::index(), $magReadMW);
+$router->get('/magazie/stoc/{id}', fn($p) => MagazieStockController::show($p), $magReadMW);
 $router->post('/magazie/stoc/{id}/consume', fn($p) => MagazieStockController::consume($p), $magReadMW);
-$router->get('/magazie/receptie', fn() => MagazieReceptionController::index(), $magWriteMW);
+$router->get('/magazie/receptie', fn() => MagazieReceptionController::index(), $magReadMW);
 $router->post('/magazie/receptie/create', fn() => MagazieReceptionController::create(), $magWriteMW);
 
 // API placeholder
@@ -248,6 +318,7 @@ $router->get('/api/health', function () {
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);
+$router->get('/api/magazie/items/search', fn() => ApiMagazieItemsController::search(), $magReadMW);
 
 $router->get('/system/db-update', fn() => DbUpdateController::index(), [Auth::requireLogin()]);
 $router->post('/system/db-update/run', fn() => DbUpdateController::runNow(), [Auth::requireLogin()]);

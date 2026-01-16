@@ -4,7 +4,10 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Audit;
+use App\Core\Auth;
 use App\Core\Csrf;
+use App\Core\DbMigrations;
+use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
@@ -86,6 +89,7 @@ final class StockController
 
     public static function index(): void
     {
+        $triedMigrate = false;
         try {
             // Filtru culoare: acceptă atât cod (ex: 617) cât și id intern (compat)
             $colorId = null;
@@ -117,10 +121,56 @@ final class StockController
                 'thicknessOptions' => HplBoard::thicknessOptions(),
             ]);
         } catch (\Throwable $e) {
-            // Cel mai des: tabelele noi nu există încă (nu s-a rulat setup după update).
+            // Încearcă încă o dată după auto-migrare (hosting poate servi request-ul înainte să se aplice).
+            if (!$triedMigrate) {
+                $triedMigrate = true;
+                try {
+                    DbMigrations::runAuto();
+                    $colorId = null;
+                    $color = null;
+                    $colorRaw = isset($_GET['color']) ? trim((string)$_GET['color']) : '';
+                    if ($colorRaw !== '') {
+                        $color = Finish::findByCode($colorRaw);
+                        if (!$color) {
+                            $maybeId = Validator::int($colorRaw, 1);
+                            if ($maybeId) $color = Finish::find($maybeId);
+                        }
+                    } elseif (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
+                        $maybeId = Validator::int((string)$_GET['color_id'], 1);
+                        if ($maybeId) $color = Finish::find($maybeId);
+                    }
+                    if ($color) $colorId = (int)$color['id'];
+
+                    $thicknessMm = null;
+                    if (isset($_GET['thickness_mm']) && (string)$_GET['thickness_mm'] !== '') {
+                        $thicknessMm = Validator::int((string)$_GET['thickness_mm'], 1);
+                    }
+                    $rows = HplBoard::allWithTotals($colorId ?: null, $thicknessMm ?: null);
+                    echo View::render('stock/index', [
+                        'title' => 'Stoc',
+                        'rows' => $rows,
+                        'filterColor' => $color,
+                        'filterColorQuery' => $color ? (string)($color['code'] ?? '') : $colorRaw,
+                        'filterThicknessMm' => $thicknessMm,
+                        'thicknessOptions' => HplBoard::thicknessOptions(),
+                    ]);
+                    return;
+                } catch (\Throwable $e2) {
+                    $e = $e2;
+                }
+            }
+
+            $u = Auth::user();
+            $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro');
+            $msg = 'Stoc indisponibil momentan.';
+            if ($debug) {
+                $msg .= ' Eroare: ' . get_class($e) . ' · ' . $e->getMessage() . ' · ' . basename((string)$e->getFile()) . ':' . (int)$e->getLine();
+            } else {
+                $msg .= ' Rulează din nou Setup (butonul „Instalează acum”) ca să creezi tabelele noi (textures/hpl_boards/hpl_stock_pieces).';
+            }
             echo View::render('system/placeholder', [
                 'title' => 'Stoc',
-                'message' => 'Stoc indisponibil momentan. Rulează din nou Setup (butonul „Instalează acum”) ca să creezi tabelele noi (textures/hpl_boards/hpl_stock_pieces).',
+                'message' => $msg,
             ]);
         }
     }
@@ -602,6 +652,7 @@ final class StockController
         try {
             $destId = null;
             $updatedFrom = $from;
+            $syncProject = null; // ['action'=>'update'|'delete','project_id'=>int,'consumption_id'=>int,'before'=>array,'after'=>array|null]
 
             $destExisting = HplStockPiece::findIdentical(
                 $boardId,
@@ -611,6 +662,7 @@ final class StockController
                 (int)$from['height_mm'],
                 $toLocation,
                 1,
+                ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                 (int)$from['id']
             );
 
@@ -623,9 +675,15 @@ final class StockController
                     $destId = (int)$destExisting['id'];
                     HplStockPiece::incrementQty($destId, $qty);
                     HplStockPiece::appendNote($destId, $note);
+                    try {
+                        HplStockPiece::updateFields($destId, [
+                            'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
+                        ]);
+                    } catch (\Throwable $e) {}
                 } else {
                     $destData = [
                         'board_id' => $boardId,
+                        'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                         'piece_type' => (string)$from['piece_type'],
                         'status' => $toStatus,
                         'width_mm' => (int)$from['width_mm'],
@@ -642,6 +700,11 @@ final class StockController
                     $destId = (int)$destExisting['id'];
                     HplStockPiece::incrementQty($destId, $qty);
                     HplStockPiece::appendNote($destId, $note);
+                    try {
+                        HplStockPiece::updateFields($destId, [
+                            'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
+                        ]);
+                    } catch (\Throwable $e) {}
                     HplStockPiece::delete((int)$from['id']);
                 } else {
                     // Update pe aceeași piesă
@@ -651,9 +714,128 @@ final class StockController
                     HplStockPiece::updateFields((int)$from['id'], [
                         'status' => $toStatus,
                         'location' => $toLocation,
+                        'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                         'notes' => $newNotes,
                     ]);
                     $destId = (int)$from['id'];
+                }
+            }
+
+            // LOGIC FIX: dacă mutăm plăci întregi RESERVED -> AVAILABLE în Depozit,
+            // sincronizăm și consumul din proiect (altfel rămâne "rezervare" în proiect, dar stocul e eliberat).
+            $isReturnToStock = ((string)($from['piece_type'] ?? '') === 'FULL')
+                && ($fromStatus === 'RESERVED')
+                && ($toStatus === 'AVAILABLE')
+                && ($toLocation === 'Depozit');
+            if ($isReturnToStock) {
+                // găsim ultimul HPL_STOCK_RESERVE pe placa asta, ca să știm ce consum să ajustăm
+                $consumptionId = null;
+                $projectId = null;
+                $meta = null;
+                try {
+                    $st = $pdo->prepare("
+                        SELECT id, meta_json
+                        FROM audit_log
+                        WHERE entity_type = 'hpl_boards'
+                          AND entity_id = ?
+                          AND action = 'HPL_STOCK_RESERVE'
+                        ORDER BY id DESC
+                        LIMIT 25
+                    ");
+                    $st->execute([(int)$boardId]);
+                    $logs = $st->fetchAll();
+                    foreach (($logs ?: []) as $lr) {
+                        $mj = (string)($lr['meta_json'] ?? '');
+                        if ($mj === '') continue;
+                        $m = json_decode($mj, true);
+                        if (!is_array($m)) continue;
+                        $cid = (int)($m['consumption_id'] ?? 0);
+                        $pid = (int)($m['project_id'] ?? 0);
+                        if ($cid > 0) {
+                            $consumptionId = $cid;
+                            $projectId = $pid > 0 ? $pid : null;
+                            $meta = $m;
+                            break;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // silent: nu blocăm mutarea dacă audit lookup eșuează
+                }
+
+                if ($consumptionId !== null && $consumptionId > 0) {
+                    // lock consumption row
+                    $st = $pdo->prepare('SELECT * FROM project_hpl_consumptions WHERE id = ? FOR UPDATE');
+                    $st->execute([(int)$consumptionId]);
+                    $c = $st->fetch();
+                    if ($c && (int)($c['board_id'] ?? 0) === $boardId) {
+                        $beforeC = $c;
+                        $oldBoards = isset($c['qty_boards']) ? (int)($c['qty_boards'] ?? 0) : 0;
+                        $oldM2 = (float)($c['qty_m2'] ?? 0);
+                        // fallback dacă qty_boards nu există / e 0
+                        $stdW = (int)($board['std_width_mm'] ?? 0);
+                        $stdH = (int)($board['std_height_mm'] ?? 0);
+                        $areaPer = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+                        if ($oldBoards <= 0 && $areaPer > 0.0 && $oldM2 > 0.0) {
+                            $oldBoards = (int)round($oldM2 / $areaPer);
+                        }
+
+                        $newBoards = max(0, $oldBoards - (int)$qty);
+                        $newM2 = ($areaPer > 0.0) ? ($areaPer * $newBoards) : (float)$oldM2;
+
+                        if ($newBoards <= 0) {
+                            $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id = ?')->execute([(int)$consumptionId]);
+                            $syncProject = [
+                                'action' => 'delete',
+                                'project_id' => (int)($c['project_id'] ?? ($projectId ?? 0)),
+                                'consumption_id' => (int)$consumptionId,
+                                'before' => $beforeC,
+                                'after' => null,
+                                'meta' => $meta,
+                            ];
+                        } else {
+                            // update consumption (qty_boards + qty_m2)
+                            try {
+                                $pdo->prepare('UPDATE project_hpl_consumptions SET qty_boards = ?, qty_m2 = ? WHERE id = ?')
+                                    ->execute([(int)$newBoards, (float)$newM2, (int)$consumptionId]);
+                            } catch (\Throwable $e) {
+                                // compat: dacă qty_boards nu există, păstrăm doar qty_m2
+                                $pdo->prepare('UPDATE project_hpl_consumptions SET qty_m2 = ? WHERE id = ?')
+                                    ->execute([(float)$newM2, (int)$consumptionId]);
+                            }
+
+                            // scale allocations proportionally (best-effort)
+                            try {
+                                $oldBase = $oldM2 > 0.0 ? $oldM2 : (($areaPer > 0.0) ? ($areaPer * $oldBoards) : 0.0);
+                                $factor = $oldBase > 0.0 ? ($newM2 / $oldBase) : 0.0;
+                                $stA = $pdo->prepare('SELECT project_product_id, qty_m2 FROM project_hpl_allocations WHERE consumption_id = ?');
+                                $stA->execute([(int)$consumptionId]);
+                                $allocs = $stA->fetchAll();
+                                if ($allocs) {
+                                    $upA = $pdo->prepare('UPDATE project_hpl_allocations SET qty_m2 = ? WHERE consumption_id = ? AND project_product_id = ?');
+                                    foreach ($allocs as $ar) {
+                                        $ppid = (int)($ar['project_product_id'] ?? 0);
+                                        $m2 = (float)($ar['qty_m2'] ?? 0);
+                                        if ($ppid <= 0 || $m2 <= 0) continue;
+                                        $upA->execute([(float)max(0.0, $m2 * $factor), (int)$consumptionId, $ppid]);
+                                    }
+                                }
+                            } catch (\Throwable $e) {
+                                // ignore allocations scaling failures
+                            }
+
+                            $st2 = $pdo->prepare('SELECT * FROM project_hpl_consumptions WHERE id = ?');
+                            $st2->execute([(int)$consumptionId]);
+                            $afterC = $st2->fetch() ?: $beforeC;
+                            $syncProject = [
+                                'action' => 'update',
+                                'project_id' => (int)($c['project_id'] ?? ($projectId ?? 0)),
+                                'consumption_id' => (int)$consumptionId,
+                                'before' => $beforeC,
+                                'after' => $afterC,
+                                'meta' => $meta,
+                            ];
+                        }
+                    }
                 }
             }
 
@@ -682,7 +864,43 @@ final class StockController
                 'merged' => $destExisting ? true : false,
             ]);
 
-            Session::flash('toast_success', 'Mutare efectuată.');
+            if ($syncProject && (int)($syncProject['project_id'] ?? 0) > 0) {
+                $pid = (int)$syncProject['project_id'];
+                $cid = (int)$syncProject['consumption_id'];
+                $a = (string)($syncProject['action'] ?? '');
+                $meta = is_array($syncProject['meta'] ?? null) ? $syncProject['meta'] : [];
+                $projCode = (string)($meta['project_code'] ?? '');
+                $projName = (string)($meta['project_name'] ?? '');
+                $boardCode = (string)($meta['board_code'] ?? ((string)($board['code'] ?? '')));
+                $txtProj = trim(($projCode !== '' ? $projCode : ('ID ' . $pid)) . ($projName !== '' ? (' · ' . $projName) : ''));
+                if ($a === 'delete') {
+                    Audit::log('PROJECT_HPL_CONSUMPTION_DELETE', 'projects', $pid, $syncProject['before'] ?? null, null, [
+                        'message' => 'Sincronizare automată: rezervarea HPL #' . $cid . ' a fost ștearsă deoarece stocul a fost mutat manual înapoi în Depozit (AVAILABLE). Proiect: ' . $txtProj . ' · Placă: ' . $boardCode,
+                        'project_id' => $pid,
+                        'project_code' => $projCode !== '' ? $projCode : null,
+                        'project_name' => $projName !== '' ? $projName : null,
+                        'consumption_id' => $cid,
+                        'board_id' => $boardId,
+                        'board_code' => $boardCode !== '' ? $boardCode : null,
+                        'via' => 'stock_move',
+                    ]);
+                } else {
+                    Audit::log('PROJECT_HPL_CONSUMPTION_UPDATE', 'projects', $pid, $syncProject['before'] ?? null, $syncProject['after'] ?? null, [
+                        'message' => 'Sincronizare automată: rezervarea HPL #' . $cid . ' a fost ajustată deoarece stocul a fost mutat manual înapoi în Depozit (AVAILABLE). Proiect: ' . $txtProj . ' · Placă: ' . $boardCode,
+                        'project_id' => $pid,
+                        'project_code' => $projCode !== '' ? $projCode : null,
+                        'project_name' => $projName !== '' ? $projName : null,
+                        'consumption_id' => $cid,
+                        'board_id' => $boardId,
+                        'board_code' => $boardCode !== '' ? $boardCode : null,
+                        'via' => 'stock_move',
+                    ]);
+                }
+                Session::flash('toast_success', 'Mutare efectuată. Consum proiect sincronizat.');
+            } else {
+                Session::flash('toast_success', 'Mutare efectuată.');
+            }
+
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot efectua mutarea: ' . $e->getMessage());

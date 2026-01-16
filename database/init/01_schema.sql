@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS hpl_boards (
 CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   board_id INT UNSIGNED NOT NULL,
+  project_id INT UNSIGNED NULL,
   -- 1 = intră în contabilitate / totaluri stoc; 0 = piese interne (nestocabile), nu intră în totaluri
   is_accounting TINYINT(1) NOT NULL DEFAULT 1,
   piece_type ENUM('FULL','OFFCUT') NOT NULL,
@@ -102,11 +103,13 @@ CREATE TABLE IF NOT EXISTS hpl_stock_pieces (
   area_total_m2 DECIMAL(12,4) AS (((width_mm * height_mm) / 1000000.0) * qty) STORED,
   PRIMARY KEY (id),
   KEY idx_hpl_stock_board (board_id),
+  KEY idx_hpl_stock_project (project_id),
   KEY idx_hpl_stock_accounting (is_accounting),
   KEY idx_hpl_stock_status (status),
   KEY idx_hpl_stock_piece_type (piece_type),
   KEY idx_hpl_stock_location (location),
-  CONSTRAINT fk_hpl_stock_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id)
+  CONSTRAINT fk_hpl_stock_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+  CONSTRAINT fk_hpl_stock_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS materials (
@@ -230,20 +233,235 @@ CREATE TABLE IF NOT EXISTS projects (
   code VARCHAR(64) NOT NULL,
   name VARCHAR(190) NOT NULL,
   client_id INT UNSIGNED NULL,
-  status ENUM('NOU','IN_LUCRU','IN_ASTEPTARE','FINALIZAT','ARHIVAT') NOT NULL DEFAULT 'NOU',
+  client_group_id INT UNSIGNED NULL,
+  status ENUM(
+    'DRAFT','CONFIRMAT','IN_PRODUCTIE','IN_ASTEPTARE','FINALIZAT_TEHNIC',
+    'LIVRAT_PARTIAL','LIVRAT_COMPLET','ANULAT',
+    'NOU','IN_LUCRU','FINALIZAT','ARHIVAT'
+  ) NOT NULL DEFAULT 'DRAFT',
+  priority INT NOT NULL DEFAULT 0,
+  category VARCHAR(190) NULL,
+  description TEXT NULL,
   start_date DATE NULL,
   due_date DATE NULL,
+  completed_at DATETIME NULL,
+  cancelled_at DATETIME NULL,
   notes TEXT NULL,
+  technical_notes TEXT NULL,
+  tags TEXT NULL,
+  allocation_mode ENUM('by_qty','by_area','manual') NOT NULL DEFAULT 'by_area',
+  allocations_locked TINYINT(1) NOT NULL DEFAULT 0,
   created_by INT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_projects_code (code),
   KEY idx_projects_client (client_id),
+  KEY idx_projects_group (client_group_id),
   KEY idx_projects_status (status),
   KEY idx_projects_created (created_at),
   CONSTRAINT fk_projects_client FOREIGN KEY (client_id) REFERENCES clients(id),
+  CONSTRAINT fk_projects_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id),
   CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Produse (piesele din proiect)
+CREATE TABLE IF NOT EXISTS products (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code VARCHAR(64) NULL,
+  name VARCHAR(190) NOT NULL,
+  sale_price DECIMAL(12,2) NULL,
+  width_mm INT NULL,
+  height_mm INT NULL,
+  notes TEXT NULL,
+  cnc_settings_json JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_products_code (code),
+  KEY idx_products_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS project_products (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  product_id INT UNSIGNED NOT NULL,
+  qty DECIMAL(12,2) NOT NULL DEFAULT 1,
+  unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+  m2_per_unit DECIMAL(12,4) NOT NULL DEFAULT 0,
+  surface_type ENUM('BOARD','M2') NULL,
+  surface_value DECIMAL(12,2) NULL,
+  production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
+  hpl_board_id INT UNSIGNED NULL,
+  delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
+  notes TEXT NULL,
+  cnc_override_json JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  finalized_at DATETIME NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_proj_prod (project_id, product_id),
+  KEY idx_proj_prod_project (project_id),
+  KEY idx_proj_prod_status (production_status),
+  KEY idx_proj_prod_hpl_board (hpl_board_id),
+  CONSTRAINT fk_proj_prod_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_proj_prod_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_proj_prod_hpl_board FOREIGN KEY (hpl_board_id) REFERENCES hpl_boards(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Etichete (labels)
+CREATE TABLE IF NOT EXISTS labels (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(64) NOT NULL,
+  color VARCHAR(32) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_labels_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS entity_labels (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  entity_type VARCHAR(64) NOT NULL,
+  entity_id BIGINT UNSIGNED NOT NULL,
+  label_id INT UNSIGNED NOT NULL,
+  source ENUM('DIRECT','INHERITED') NOT NULL DEFAULT 'DIRECT',
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_entity_label (entity_type, entity_id, label_id, source),
+  KEY idx_entity_labels_entity (entity_type, entity_id),
+  KEY idx_entity_labels_label (label_id),
+  CONSTRAINT fk_entity_labels_label FOREIGN KEY (label_id) REFERENCES labels(id),
+  CONSTRAINT fk_entity_labels_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Consumuri Magazie (accesorii)
+CREATE TABLE IF NOT EXISTS project_magazie_consumptions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  project_product_id BIGINT UNSIGNED NULL,
+  item_id INT UNSIGNED NOT NULL,
+  qty DECIMAL(12,3) NOT NULL,
+  unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+  mode ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'CONSUMED',
+  note VARCHAR(255) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pmc_project (project_id),
+  KEY idx_pmc_pp (project_product_id),
+  KEY idx_pmc_item (item_id),
+  KEY idx_pmc_mode (mode),
+  CONSTRAINT fk_pmc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pmc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pmc_item FOREIGN KEY (item_id) REFERENCES magazie_items(id),
+  CONSTRAINT fk_pmc_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Consumuri HPL (m2) + alocare pe produse
+CREATE TABLE IF NOT EXISTS project_hpl_consumptions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  board_id INT UNSIGNED NOT NULL,
+  qty_boards INT NOT NULL DEFAULT 0,
+  qty_m2 DECIMAL(12,4) NOT NULL,
+  mode ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'RESERVED',
+  note VARCHAR(255) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_phc_project (project_id),
+  KEY idx_phc_board (board_id),
+  KEY idx_phc_mode (mode),
+  CONSTRAINT fk_phc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_phc_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+  CONSTRAINT fk_phc_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS project_hpl_allocations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  consumption_id BIGINT UNSIGNED NOT NULL,
+  project_product_id BIGINT UNSIGNED NOT NULL,
+  qty_m2 DECIMAL(12,4) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_ph_alloc (consumption_id, project_product_id),
+  KEY idx_ph_alloc_cons (consumption_id),
+  KEY idx_ph_alloc_pp (project_product_id),
+  CONSTRAINT fk_ph_alloc_cons FOREIGN KEY (consumption_id) REFERENCES project_hpl_consumptions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ph_alloc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Livrări
+CREATE TABLE IF NOT EXISTS project_deliveries (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  delivery_date DATE NOT NULL,
+  note VARCHAR(255) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_deliv_project (project_id),
+  KEY idx_deliv_date (delivery_date),
+  CONSTRAINT fk_deliv_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_deliv_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS project_delivery_items (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  delivery_id BIGINT UNSIGNED NOT NULL,
+  project_product_id BIGINT UNSIGNED NOT NULL,
+  qty DECIMAL(12,2) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_delivery_item (delivery_id, project_product_id),
+  KEY idx_delivery_items_delivery (delivery_id),
+  KEY idx_delivery_items_pp (project_product_id),
+  CONSTRAINT fk_delivery_items_delivery FOREIGN KEY (delivery_id) REFERENCES project_deliveries(id) ON DELETE CASCADE,
+  CONSTRAINT fk_delivery_items_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Fișiere pe entități (proiect/produs/consum etc.)
+CREATE TABLE IF NOT EXISTS entity_files (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  entity_type VARCHAR(64) NOT NULL,
+  entity_id BIGINT UNSIGNED NOT NULL,
+  category VARCHAR(64) NULL,
+  original_name VARCHAR(255) NOT NULL,
+  stored_name VARCHAR(255) NOT NULL,
+  mime VARCHAR(128) NULL,
+  size_bytes BIGINT UNSIGNED NULL,
+  uploaded_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_entity_files_entity (entity_type, entity_id),
+  KEY idx_entity_files_created (created_at),
+  CONSTRAINT fk_entity_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Ore CNC / Atelier
+CREATE TABLE IF NOT EXISTS project_work_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  project_product_id BIGINT UNSIGNED NULL,
+  work_type ENUM('CNC','ATELIER') NOT NULL,
+  hours_estimated DECIMAL(10,2) NULL,
+  hours_actual DECIMAL(10,2) NULL,
+  cost_per_hour DECIMAL(12,2) NULL,
+  note VARCHAR(255) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_work_project (project_id),
+  KEY idx_work_pp (project_product_id),
+  KEY idx_work_type (work_type),
+  CONSTRAINT fk_work_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_work_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
+  CONSTRAINT fk_work_user FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Magazie (accesorii)
@@ -251,8 +469,9 @@ CREATE TABLE IF NOT EXISTS magazie_items (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   winmentor_code VARCHAR(64) NOT NULL,
   name VARCHAR(190) NOT NULL,
+  unit VARCHAR(16) NOT NULL DEFAULT 'buc',
   unit_price DECIMAL(12,2) NULL,
-  stock_qty INT NOT NULL DEFAULT 0,
+  stock_qty DECIMAL(12,3) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -265,7 +484,7 @@ CREATE TABLE IF NOT EXISTS magazie_movements (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   item_id INT UNSIGNED NOT NULL,
   direction ENUM('IN','OUT','ADJUST') NOT NULL,
-  qty INT NOT NULL,
+  qty DECIMAL(12,3) NOT NULL,
   unit_price DECIMAL(12,2) NULL,
   project_id INT UNSIGNED NULL,
   project_code VARCHAR(64) NULL,
@@ -388,5 +607,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
   KEY idx_audit_entity (entity_type, entity_id),
   KEY idx_audit_created (created_at),
   CONSTRAINT fk_audit_user FOREIGN KEY (actor_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  `key` VARCHAR(64) NOT NULL,
+  value VARCHAR(255) NULL,
+  updated_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`key`),
+  KEY idx_app_settings_updated (updated_at),
+  CONSTRAINT fk_app_settings_user FOREIGN KEY (updated_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

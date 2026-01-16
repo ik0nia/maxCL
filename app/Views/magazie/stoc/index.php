@@ -60,16 +60,24 @@ ob_start();
       <?php foreach ($items as $it): ?>
         <?php
           $id = (int)($it['id'] ?? 0);
-          $qty = (int)($it['stock_qty'] ?? 0);
+          $qty = (float)($it['stock_qty'] ?? 0);
           $price = null;
           if (isset($it['unit_price']) && $it['unit_price'] !== null && $it['unit_price'] !== '' && is_numeric($it['unit_price'])) {
             $price = (float)$it['unit_price'];
           }
         ?>
         <tr>
-          <td class="fw-semibold"><?= htmlspecialchars((string)($it['winmentor_code'] ?? '')) ?></td>
-          <td><?= htmlspecialchars((string)($it['name'] ?? '')) ?></td>
-          <td class="text-end fw-semibold"><?= $qty ?></td>
+          <td class="fw-semibold">
+            <a href="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $id)) ?>" class="text-decoration-none">
+              <?= htmlspecialchars((string)($it['winmentor_code'] ?? '')) ?>
+            </a>
+          </td>
+          <td>
+            <a href="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $id)) ?>" class="text-decoration-none">
+              <?= htmlspecialchars((string)($it['name'] ?? '')) ?>
+            </a>
+          </td>
+          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>
@@ -77,7 +85,7 @@ ob_start();
             <?php if ($canConsume): ?>
               <form method="post" action="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $id . '/consume')) ?>" class="d-inline-flex gap-2 align-items-center flex-wrap justify-content-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                <input type="number" min="1" max="<?= max(1, $qty) ?>" name="qty" value="1" class="form-control form-control-sm" style="width:88px" <?= $qty <= 0 ? 'disabled' : '' ?>>
+                <input type="number" step="0.001" min="0.001" max="<?= max(0.001, $qty) ?>" name="qty" value="1" class="form-control form-control-sm" style="width:96px" <?= $qty <= 0 ? 'disabled' : '' ?>>
                 <input type="text" name="project_code" class="form-control form-control-sm" style="width:160px"
                        placeholder="Cod proiect…" <?= $qty <= 0 ? 'disabled' : '' ?>>
                 <button class="btn btn-outline-secondary btn-sm" type="submit" <?= $qty <= 0 ? 'disabled' : '' ?>

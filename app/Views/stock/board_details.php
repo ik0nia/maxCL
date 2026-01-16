@@ -1,6 +1,7 @@
 <?php
 use App\Core\Csrf;
 use App\Core\Auth;
+use App\Core\DB;
 use App\Core\Url;
 use App\Core\View;
 use App\Models\Finish;
@@ -28,6 +29,153 @@ foreach ($pieces as $p) {
 $availableValueLei = ($canWrite && $salePerM2 !== null && is_finite($salePerM2) && $salePerM2 >= 0)
   ? ($availableM2 * $salePerM2)
   : null;
+
+// Cerință UI: piesele CONSUMED nu apar în același tabel cu cele disponibile/rezervate.
+$piecesConsumed = [];
+$piecesActive = [];
+foreach ($pieces as $p) {
+  if ((string)($p['status'] ?? '') === 'CONSUMED') $piecesConsumed[] = $p;
+  else $piecesActive[] = $p;
+}
+
+// Mapare consum HPL (#id) -> project_id (pentru link-uri din notițele pieselor rezervate)
+$hplConsumptionToProject = [];
+try {
+  $ids = [];
+  foreach ($pieces as $p) {
+    $note = (string)($p['notes'] ?? '');
+    if ($note === '') continue;
+    if (preg_match_all('/consum\s+HPL\s*#\s*(\d+)/i', $note, $m)) {
+      foreach (($m[1] ?? []) as $cidRaw) {
+        $cid = is_numeric($cidRaw) ? (int)$cidRaw : 0;
+        if ($cid > 0) $ids[$cid] = true;
+      }
+    }
+  }
+  $ids = array_keys($ids);
+  if ($ids) {
+    /** @var \PDO $pdo */
+    $pdo = DB::pdo();
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $st = $pdo->prepare("SELECT id, project_id FROM project_hpl_consumptions WHERE id IN ($ph)");
+    $st->execute($ids);
+    foreach ($st->fetchAll() as $r) {
+      $cid = (int)($r['id'] ?? 0);
+      $pid = (int)($r['project_id'] ?? 0);
+      if ($cid > 0 && $pid > 0) $hplConsumptionToProject[$cid] = $pid;
+    }
+  }
+} catch (\Throwable $e) {
+  // ignore (nu blocăm pagina)
+}
+
+// Context consumuri pentru piesele CONSUMED: proiect + piesă (produs) + user.
+$ppInfoById = [];        // ppId => [project_id, project_code, project_name, product_name]
+$ppLastLogById = [];     // ppId => [created_at, user_name, user_email]
+$pieceConsumeLogById = []; // pieceId => [created_at, user_name, user_email]
+try {
+  /** @var \PDO $pdo */
+  $pdo = DB::pdo();
+
+  // 1) Extract project_product_ids from notes (ex: "piesă #14")
+  $ppIds = [];
+  $pieceIds = [];
+  foreach ($piecesConsumed as $p) {
+    $pieceId = (int)($p['id'] ?? 0);
+    if ($pieceId > 0) $pieceIds[$pieceId] = true;
+    $note = (string)($p['notes'] ?? '');
+    if ($note !== '' && preg_match_all('/piesă\s*#\s*(\d+)/iu', $note, $m)) {
+      foreach (($m[1] ?? []) as $raw) {
+        $id = is_numeric($raw) ? (int)$raw : 0;
+        if ($id > 0) $ppIds[$id] = true;
+      }
+    }
+  }
+  $ppIds = array_keys($ppIds);
+  $pieceIds = array_keys($pieceIds);
+
+  // 2) ppId -> project/product details
+  if ($ppIds) {
+    $ph = implode(',', array_fill(0, count($ppIds), '?'));
+    $st = $pdo->prepare("
+      SELECT
+        pp.id,
+        pr.id AS project_id,
+        pr.code AS project_code,
+        pr.name AS project_name,
+        p.name AS product_name
+      FROM project_products pp
+      INNER JOIN projects pr ON pr.id = pp.project_id
+      INNER JOIN products p ON p.id = pp.product_id
+      WHERE pp.id IN ($ph)
+    ");
+    $st->execute($ppIds);
+    foreach ($st->fetchAll() as $r) {
+      $id = (int)($r['id'] ?? 0);
+      if ($id <= 0) continue;
+      $ppInfoById[$id] = [
+        'project_id' => (int)($r['project_id'] ?? 0),
+        'project_code' => (string)($r['project_code'] ?? ''),
+        'project_name' => (string)($r['project_name'] ?? ''),
+        'product_name' => (string)($r['product_name'] ?? ''),
+      ];
+    }
+
+    // 3) Last status change log per ppId (fallback "cine a dat în consum")
+    $ph2 = implode(',', array_fill(0, count($ppIds), '?'));
+    $st2 = $pdo->prepare("
+      SELECT a.entity_id, a.created_at, a.meta_json, u.name AS user_name, u.email AS user_email
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.actor_user_id
+      WHERE a.entity_type = 'project_products'
+        AND a.action = 'PROJECT_PRODUCT_STATUS_CHANGE'
+        AND a.entity_id IN ($ph2)
+      ORDER BY a.id DESC
+      LIMIT 2000
+    ");
+    $st2->execute($ppIds);
+    foreach ($st2->fetchAll() as $r) {
+      $eid = is_numeric($r['entity_id'] ?? null) ? (int)$r['entity_id'] : 0;
+      if ($eid <= 0 || isset($ppLastLogById[$eid])) continue;
+      $ppLastLogById[$eid] = [
+        'created_at' => (string)($r['created_at'] ?? ''),
+        'user_name' => (string)($r['user_name'] ?? ''),
+        'user_email' => (string)($r['user_email'] ?? ''),
+      ];
+    }
+  }
+
+  // 4) If we have explicit STOCK_PIECE_MOVE to CONSUMED, prefer that actor
+  if ($pieceIds) {
+    $ph3 = implode(',', array_fill(0, count($pieceIds), '?'));
+    $st3 = $pdo->prepare("
+      SELECT a.entity_id, a.created_at, a.meta_json, u.name AS user_name, u.email AS user_email
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.actor_user_id
+      WHERE a.entity_type = 'hpl_stock_pieces'
+        AND a.action = 'STOCK_PIECE_MOVE'
+        AND a.entity_id IN ($ph3)
+      ORDER BY a.id DESC
+      LIMIT 2000
+    ");
+    $st3->execute($pieceIds);
+    foreach ($st3->fetchAll() as $r) {
+      $eid = is_numeric($r['entity_id'] ?? null) ? (int)$r['entity_id'] : 0;
+      if ($eid <= 0 || isset($pieceConsumeLogById[$eid])) continue;
+      $mj = (string)($r['meta_json'] ?? '');
+      $m = $mj !== '' ? json_decode($mj, true) : null;
+      $to = (is_array($m) && isset($m['to_status'])) ? (string)$m['to_status'] : '';
+      if ($to !== 'CONSUMED') continue;
+      $pieceConsumeLogById[$eid] = [
+        'created_at' => (string)($r['created_at'] ?? ''),
+        'user_name' => (string)($r['user_name'] ?? ''),
+        'user_email' => (string)($r['user_email'] ?? ''),
+      ];
+    }
+  }
+} catch (\Throwable $e) {
+  // ignore (best-effort context)
+}
 
 // Culori + finisaje (texturi) pentru față/verso
 $faceFinish = null;
@@ -200,6 +348,10 @@ ob_start();
                 $action = (string)($h['action'] ?? '');
                 $msg = trim((string)($h['message'] ?? ''));
                 if ($msg === '') $msg = $action;
+                $meta = is_array($h['meta'] ?? null) ? $h['meta'] : null;
+                $projId = (is_array($meta) && isset($meta['project_id']) && is_numeric($meta['project_id'])) ? (int)$meta['project_id'] : 0;
+                $projCode = (is_array($meta) && isset($meta['project_code'])) ? (string)$meta['project_code'] : '';
+                $projName = (is_array($meta) && isset($meta['project_name'])) ? (string)$meta['project_name'] : '';
 
                 // Pe pagina plăcii nu repetăm identificarea plăcii (cod/denumire/brand/grosime),
                 // fiindcă sunt deja în "Detalii placă".
@@ -218,6 +370,19 @@ ob_start();
                   <div class="text-muted small"><?= htmlspecialchars((string)($h['created_at'] ?? '')) ?></div>
                 </div>
                 <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($msg) ?></div>
+                <?php if ($projId > 0): ?>
+                  <div class="mt-1 d-flex flex-wrap gap-2">
+                    <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                      Proiect <?= htmlspecialchars($projCode !== '' ? $projCode : ('#' . $projId)) ?>
+                    </a>
+                    <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=consum')) ?>">
+                      Consum materiale
+                    </a>
+                    <?php if (trim($projName) !== ''): ?>
+                      <span class="text-muted small"><?= htmlspecialchars($projName) ?></span>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
               </div>
             <?php endforeach; ?>
           </div>
@@ -243,7 +408,7 @@ ob_start();
           </tr>
         </thead>
         <tbody>
-          <?php foreach ($pieces as $p): ?>
+          <?php foreach ($piecesActive as $p): ?>
             <?php
               $noteRaw = (string)($p['notes'] ?? '');
               $noteTrim = trim($noteRaw);
@@ -255,8 +420,17 @@ ob_start();
               }
               $pStatus = (string)($p['status'] ?? '');
               $pLoc = (string)($p['location'] ?? '');
-              // Cerință: la "Piese asociate" afișăm notița DOAR dacă NU e AVAILABLE și NU e în Depozit.
-              $showNote = ($noteShort !== '') && ($pStatus !== 'AVAILABLE') && ($pLoc !== 'Depozit');
+              // Cerință: ascundem notița DOAR când piesa este în Depozit și Disponibilă.
+              $showNote = ($noteShort !== '') && !($pStatus === 'AVAILABLE' && $pLoc === 'Depozit');
+
+              $noteLink = null;
+              if ($showNote && preg_match('/consum\s+HPL\s*#\s*(\d+)/i', $noteShort, $mm)) {
+                $cid = is_numeric($mm[1] ?? null) ? (int)$mm[1] : 0;
+                $pid = ($cid > 0 && isset($hplConsumptionToProject[$cid])) ? (int)$hplConsumptionToProject[$cid] : 0;
+                if ($pid > 0) {
+                  $noteLink = Url::to('/projects/' . $pid . '?tab=consum');
+                }
+              }
             ?>
             <tr>
               <td class="fw-semibold"><?= htmlspecialchars((string)$p['piece_type']) ?></td>
@@ -264,10 +438,18 @@ ob_start();
                 <div class="d-flex flex-column align-items-start">
                   <div><?= htmlspecialchars($pStatus) ?></div>
                   <?php if ($showNote): ?>
-                    <div class="small d-inline-block rounded"
+                    <?php if ($noteLink): ?>
+                      <a class="small d-inline-block rounded text-decoration-none"
+                         href="<?= htmlspecialchars($noteLink) ?>"
                          style="margin-top:2px;align-self:flex-start;max-width:520px;text-align:left;white-space:pre-line;line-height:1.15;padding:.1rem .45rem;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
-                      <?= htmlspecialchars($noteShort) ?>
-                    </div>
+                        <?= htmlspecialchars($noteShort) ?>
+                      </a>
+                    <?php else: ?>
+                      <div class="small d-inline-block rounded"
+                           style="margin-top:2px;align-self:flex-start;max-width:520px;text-align:left;white-space:pre-line;line-height:1.15;padding:.1rem .45rem;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
+                        <?= htmlspecialchars($noteShort) ?>
+                      </div>
+                    <?php endif; ?>
                   <?php endif; ?>
                 </div>
               </td>
@@ -290,6 +472,111 @@ ob_start();
           <?php endforeach; ?>
         </tbody>
       </table>
+    </div>
+
+    <div class="card app-card p-3 mt-3">
+      <div class="h5 m-0">Consumuri</div>
+      <div class="text-muted">Piese HPL consumate (cu proiect, piesă și cine a consumat)</div>
+      <?php if (!$piecesConsumed): ?>
+        <div class="text-muted mt-2">Nu există consumuri încă.</div>
+      <?php else: ?>
+        <div class="table-responsive mt-2">
+          <table class="table table-hover align-middle mb-0" id="consumedPiecesTable">
+            <thead>
+              <tr>
+                <th>Tip</th>
+                <th>Status</th>
+                <th>Dimensiuni</th>
+                <th class="text-end">Buc</th>
+                <th>Locație</th>
+                <th class="text-end">mp</th>
+                <th>Consum</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($piecesConsumed as $p): ?>
+                <?php
+                  $pid = (int)($p['id'] ?? 0);
+                  $noteRaw = (string)($p['notes'] ?? '');
+                  $noteTrim = trim($noteRaw);
+                  $noteShort = $noteTrim;
+                  if ($noteShort !== '' && mb_strlen($noteShort) > 500) $noteShort = mb_substr($noteShort, 0, 500) . '…';
+
+                  $ppId = 0;
+                  if ($noteTrim !== '' && preg_match('/piesă\s*#\s*(\d+)/iu', $noteTrim, $mm)) {
+                    $ppId = is_numeric($mm[1] ?? null) ? (int)$mm[1] : 0;
+                  }
+
+                  $projId = 0;
+                  $projCode = '';
+                  $projName = '';
+                  $prodName = '';
+                  if ($ppId > 0 && isset($ppInfoById[$ppId])) {
+                    $projId = (int)($ppInfoById[$ppId]['project_id'] ?? 0);
+                    $projCode = (string)($ppInfoById[$ppId]['project_code'] ?? '');
+                    $projName = (string)($ppInfoById[$ppId]['project_name'] ?? '');
+                    $prodName = (string)($ppInfoById[$ppId]['product_name'] ?? '');
+                  } elseif ($noteTrim !== '' && preg_match('/consum\s+HPL\s*#\s*(\d+)/i', $noteTrim, $mm2)) {
+                    $cid = is_numeric($mm2[1] ?? null) ? (int)$mm2[1] : 0;
+                    if ($cid > 0 && isset($hplConsumptionToProject[$cid])) $projId = (int)$hplConsumptionToProject[$cid];
+                  }
+
+                  $who = '';
+                  $when = '';
+                  if ($pid > 0 && isset($pieceConsumeLogById[$pid])) {
+                    $who = trim((string)($pieceConsumeLogById[$pid]['user_name'] ?? '') . ' ' . (string)($pieceConsumeLogById[$pid]['user_email'] ?? ''));
+                    $when = (string)($pieceConsumeLogById[$pid]['created_at'] ?? '');
+                  } elseif ($ppId > 0 && isset($ppLastLogById[$ppId])) {
+                    $who = trim((string)($ppLastLogById[$ppId]['user_name'] ?? '') . ' ' . (string)($ppLastLogById[$ppId]['user_email'] ?? ''));
+                    $when = (string)($ppLastLogById[$ppId]['created_at'] ?? '');
+                  }
+                ?>
+                <tr>
+                  <td class="fw-semibold"><?= htmlspecialchars((string)($p['piece_type'] ?? '')) ?></td>
+                  <td class="fw-semibold">
+                    <?= htmlspecialchars((string)($p['status'] ?? '')) ?>
+                    <?php if ($noteShort !== ''): ?>
+                      <div class="small d-inline-block rounded"
+                           style="margin-top:2px;align-self:flex-start;max-width:720px;text-align:left;white-space:pre-line;line-height:1.15;padding:.1rem .45rem;background:#F8D7DA;border:1px solid #f5c2c7;color:#842029">
+                        <?= htmlspecialchars($noteShort) ?>
+                      </div>
+                    <?php endif; ?>
+                  </td>
+                  <td><?= (int)($p['height_mm'] ?? 0) ?> × <?= (int)($p['width_mm'] ?? 0) ?> mm</td>
+                  <td class="text-end"><?= (int)($p['qty'] ?? 0) ?></td>
+                  <td><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
+                  <td class="text-end fw-semibold"><?= number_format((float)($p['area_total_m2'] ?? 0), 2, '.', '') ?></td>
+                  <td>
+                    <?php if ($projId > 0): ?>
+                      <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                          Proiect <?= htmlspecialchars($projCode !== '' ? $projCode : ('#' . $projId)) ?>
+                        </a>
+                        <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=consum')) ?>">
+                          Consum materiale
+                        </a>
+                        <?php if (trim($projName) !== ''): ?>
+                          <span class="text-muted small"><?= htmlspecialchars($projName) ?></span>
+                        <?php endif; ?>
+                      </div>
+                    <?php endif; ?>
+                    <?php if ($ppId > 0): ?>
+                      <div class="text-muted small mt-1">
+                        Piesă #<?= (int)$ppId ?><?= $prodName !== '' ? (' · ' . htmlspecialchars($prodName)) : '' ?>
+                      </div>
+                    <?php endif; ?>
+                    <?php if ($who !== ''): ?>
+                      <div class="text-muted small mt-1">
+                        <?= htmlspecialchars($who) ?><?= $when !== '' ? (' · ' . htmlspecialchars($when)) : '' ?>
+                      </div>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
     </div>
 
     <div class="card app-card p-3 mt-3">
@@ -362,7 +649,7 @@ ob_start();
             <label class="form-label small">Din piesă</label>
             <select class="form-select" name="from_piece_id" required>
               <option value="">Alege piesa sursă...</option>
-              <?php foreach ($pieces as $p): ?>
+              <?php foreach ($piecesActive as $p): ?>
                 <?php
                   $pid = (int)$p['id'];
                   $lbl = (string)$p['piece_type'] . ' · ' . (int)$p['height_mm'] . '×' . (int)$p['width_mm'] . ' mm · ' . (int)$p['qty'] . ' buc · ' . (string)$p['location'] . ' · ' . (string)$p['status'];

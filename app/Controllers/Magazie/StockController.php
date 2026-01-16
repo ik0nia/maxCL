@@ -7,6 +7,8 @@ use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\DB;
+use App\Core\DbMigrations;
+use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
@@ -19,6 +21,7 @@ final class StockController
 {
     public static function index(): void
     {
+        $triedMigrate = false;
         try {
             $q = isset($_GET['q']) ? trim((string)($_GET['q'] ?? '')) : '';
             $items = MagazieItem::all($q !== '' ? $q : null, 5000);
@@ -28,9 +31,32 @@ final class StockController
                 'q' => $q,
             ]);
         } catch (\Throwable $e) {
+            if (!$triedMigrate) {
+                $triedMigrate = true;
+                try {
+                    DbMigrations::runAuto();
+                    $q = isset($_GET['q']) ? trim((string)($_GET['q'] ?? '')) : '';
+                    $items = MagazieItem::all($q !== '' ? $q : null, 5000);
+                    echo View::render('magazie/stoc/index', [
+                        'title' => 'Stoc Magazie',
+                        'items' => $items,
+                        'q' => $q,
+                    ]);
+                    return;
+                } catch (\Throwable $e2) {
+                    $e = $e2;
+                }
+            }
+
+            $u = Auth::user();
+            $debug = Env::bool('APP_DEBUG', false) || ($u && strtolower((string)($u['email'] ?? '')) === 'sacodrut@ikonia.ro');
+            $msg = 'Magazia nu este disponibilă momentan. Rulează Update DB ca să creezi tabelele necesare.';
+            if ($debug) {
+                $msg .= ' Eroare: ' . get_class($e) . ' · ' . $e->getMessage() . ' · ' . basename((string)$e->getFile()) . ':' . (int)$e->getLine();
+            }
             echo View::render('system/placeholder', [
                 'title' => 'Stoc Magazie',
-                'message' => 'Magazia nu este disponibilă momentan. Rulează Setup/Update DB ca să creezi tabelele necesare.',
+                'message' => $msg,
             ]);
         }
     }
@@ -46,12 +72,12 @@ final class StockController
         ]);
         $errors = $check['errors'];
 
-        $qty = Validator::int((string)($_POST['qty'] ?? ''), 1, 1000000);
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? '')));
         $projectCode = trim((string)($_POST['project_code'] ?? ''));
         $projectName = trim((string)($_POST['project_name'] ?? ''));
         $note = trim((string)($_POST['note'] ?? ''));
 
-        if ($qty === null) $errors['qty'] = 'Cantitate invalidă.';
+        if ($qty === null || $qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($projectCode !== '' && mb_strlen($projectCode) > 64) $errors['project_code'] = 'Cod proiect prea lung.';
         if ($projectName !== '' && mb_strlen($projectName) > 190) $errors['project_name'] = 'Denumire proiect prea lungă.';
         if ($note !== '' && mb_strlen($note) > 255) $errors['note'] = 'Notă prea lungă.';
@@ -75,7 +101,7 @@ final class StockController
             if (!$before) {
                 throw new \RuntimeException('Produs inexistent.');
             }
-            $beforeQty = (int)($before['stock_qty'] ?? 0);
+            $beforeQty = (float)($before['stock_qty'] ?? 0);
             if ($qty > $beforeQty) {
                 throw new \RuntimeException('Stoc insuficient.');
             }
@@ -92,14 +118,14 @@ final class StockController
                 }
             }
 
-            if (!MagazieItem::adjustStock($id, -$qty)) {
+            if (!MagazieItem::adjustStock($id, -(float)$qty)) {
                 throw new \RuntimeException('Nu pot scădea stocul (concurență sau stoc insuficient).');
             }
 
             $movementId = MagazieMovement::create([
                 'item_id' => $id,
                 'direction' => 'OUT',
-                'qty' => $qty,
+                'qty' => (float)$qty,
                 'unit_price' => (isset($before['unit_price']) && $before['unit_price'] !== '' && is_numeric($before['unit_price'])) ? (float)$before['unit_price'] : null,
                 'project_id' => $projectId,
                 'project_code' => $projectCode !== '' ? $projectCode : null,
@@ -115,7 +141,7 @@ final class StockController
                 'project_id' => $projectId,
                 'project_code' => $projectCode,
                 'project_name' => $proj ? (string)($proj['name'] ?? '') : null,
-                'qty' => $qty,
+                'qty' => (float)$qty,
                 'note' => $note !== '' ? $note : null,
             ]);
 
@@ -131,6 +157,32 @@ final class StockController
         }
 
         Response::redirect('/magazie/stoc');
+    }
+
+    public static function show(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        if ($id <= 0) {
+            Session::flash('toast_error', 'Produs invalid.');
+            Response::redirect('/magazie/stoc');
+        }
+
+        try {
+            $item = MagazieItem::find($id);
+            if (!$item) {
+                Session::flash('toast_error', 'Produs inexistent.');
+                Response::redirect('/magazie/stoc');
+            }
+            $movements = MagazieMovement::forItem($id, 300);
+            echo View::render('magazie/stoc/show', [
+                'title' => 'Produs Magazie',
+                'item' => $item,
+                'movements' => $movements,
+            ]);
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot încărca produsul.');
+            Response::redirect('/magazie/stoc');
+        }
     }
 }
 

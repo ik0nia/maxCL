@@ -113,7 +113,8 @@ final class AuditLog
      *   entity_id:?string,
      *   user_name:?string,
      *   user_email:?string,
-     *   message:?string
+     *   message:?string,
+     *   meta?:array<string,mixed>|null
      * }>
      */
     public static function forBoard(int $boardId, int $limit = 120): array
@@ -175,10 +176,101 @@ final class AuditLog
                 'user_name' => isset($r['user_name']) ? (string)$r['user_name'] : null,
                 'user_email' => isset($r['user_email']) ? (string)$r['user_email'] : null,
                 'message' => $message,
+                'meta' => is_array($metaDecoded) ? $metaDecoded : null,
             ];
             if (count($out) >= $limit) break;
         }
 
+        return $out;
+    }
+
+    /**
+     * Istoric pentru un proiect: include evenimente pe proiect + pe entități legate,
+     * filtrat în PHP pentru compat hosting (fără JSON SQL).
+     *
+     * @return array<int, array{
+     *   id:int,
+     *   created_at:string,
+     *   action:string,
+     *   entity_type:?string,
+     *   entity_id:?string,
+     *   user_name:?string,
+     *   user_email:?string,
+     *   message:?string,
+     *   note:?string
+     * }>
+     */
+    public static function forProject(int $projectId, int $limit = 200): array
+    {
+        $projectId = (int)$projectId;
+        $limit = max(1, min(800, $limit));
+
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare("
+          SELECT
+            a.id, a.created_at, a.action, a.entity_type, a.entity_id,
+            a.before_json, a.after_json, a.meta_json,
+            u.name AS user_name, u.email AS user_email
+          FROM audit_log a
+          LEFT JOIN users u ON u.id = a.actor_user_id
+          WHERE a.entity_type IN (
+            'projects',
+            'project_products',
+            'project_magazie_consumptions',
+            'project_hpl_consumptions',
+            'project_deliveries',
+            'project_work_logs',
+            'entity_files'
+          )
+          ORDER BY a.id DESC
+          LIMIT 2000
+        ");
+        $st->execute();
+        $rows = $st->fetchAll();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $etype = isset($r['entity_type']) ? (string)$r['entity_type'] : null;
+            $eid = $r['entity_id'] ?? null;
+            $eidInt = is_numeric($eid) ? (int)$eid : 0;
+
+            $match = false;
+            if ($etype === 'projects' && $eidInt === $projectId) {
+                $match = true;
+            } else {
+                $before = is_string($r['before_json'] ?? null) ? json_decode((string)$r['before_json'], true) : null;
+                $after = is_string($r['after_json'] ?? null) ? json_decode((string)$r['after_json'], true) : null;
+                $meta = is_string($r['meta_json'] ?? null) ? json_decode((string)$r['meta_json'], true) : null;
+                $pid = null;
+                if (is_array($meta) && isset($meta['project_id'])) $pid = (int)$meta['project_id'];
+                if ($pid === null && is_array($before) && isset($before['project_id'])) $pid = (int)$before['project_id'];
+                if ($pid === null && is_array($after) && isset($after['project_id'])) $pid = (int)$after['project_id'];
+                if ($pid !== null && $pid === $projectId) $match = true;
+            }
+            if (!$match) continue;
+
+            $metaDecoded = is_string($r['meta_json'] ?? null) ? json_decode((string)$r['meta_json'], true) : null;
+            $message = (is_array($metaDecoded) && isset($metaDecoded['message']) && is_string($metaDecoded['message']))
+                ? (string)$metaDecoded['message']
+                : null;
+            $note = (is_array($metaDecoded) && isset($metaDecoded['note']) && is_string($metaDecoded['note']))
+                ? (string)$metaDecoded['note']
+                : null;
+
+            $out[] = [
+                'id' => (int)$r['id'],
+                'created_at' => (string)$r['created_at'],
+                'action' => (string)$r['action'],
+                'entity_type' => $etype,
+                'entity_id' => $eid !== null ? (string)$eid : null,
+                'user_name' => isset($r['user_name']) ? (string)$r['user_name'] : null,
+                'user_email' => isset($r['user_email']) ? (string)$r['user_email'] : null,
+                'message' => $message,
+                'note' => $note,
+            ];
+            if (count($out) >= $limit) break;
+        }
         return $out;
     }
 }

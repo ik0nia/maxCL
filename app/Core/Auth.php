@@ -34,6 +34,12 @@ final class Auth
     {
         return function (): void {
             if (!self::check()) {
+                $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+                $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+                $isApi = str_starts_with($path, '/api/') || str_contains($accept, 'application/json');
+                if ($isApi) {
+                    Response::json(['ok' => false, 'error' => 'Te rugăm să te autentifici.'], 401);
+                }
                 Session::flash('toast_error', 'Te rugăm să te autentifici.');
                 Response::redirect('/login');
             }
@@ -48,10 +54,22 @@ final class Auth
         return function () use ($roles): void {
             $u = self::user();
             if (!$u) {
+                $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+                $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+                $isApi = str_starts_with($path, '/api/') || str_contains($accept, 'application/json');
+                if ($isApi) {
+                    Response::json(['ok' => false, 'error' => 'Te rugăm să te autentifici.'], 401);
+                }
                 Session::flash('toast_error', 'Te rugăm să te autentifici.');
                 Response::redirect('/login');
             }
             if (!in_array((string)$u['role'], $roles, true)) {
+                $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+                $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+                $isApi = str_starts_with($path, '/api/') || str_contains($accept, 'application/json');
+                if ($isApi) {
+                    Response::json(['ok' => false, 'error' => 'Acces interzis.'], 403);
+                }
                 http_response_code(403);
                 echo View::render('errors/403', ['title' => 'Acces interzis']);
                 exit;
