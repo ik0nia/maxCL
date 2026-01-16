@@ -1673,7 +1673,7 @@ final class ProjectsController
                     self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
             } else {
                 // 1/2 placă
-                if (self::takeReservedHalfRemainder($pdo, $projectId, $boardId, $halfM2)) {
+                if (self::takeReservedHalfRemainder($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, $halfM2)) {
                     // consumăm 1 buc dintr-un offcut rezervat (jumătate), dacă există
                     self::consumeReservedHalfOffcut($pdo, $projectId, $boardId, $halfHmm, (int)$wmm,
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''));
@@ -1771,60 +1771,124 @@ final class ProjectsController
 
     private static function takeReservedFullBoard(\PDO $pdo, int $projectId, int $boardId, float $fullM2): bool
     {
-        // luăm 1 buc din cel mai vechi rând RESERVED cu qty_boards>0
-        $st = $pdo->prepare("
-            SELECT id, qty_boards, qty_m2
-            FROM project_hpl_consumptions
-            WHERE project_id = ?
-              AND board_id = ?
-              AND mode = 'RESERVED'
-              AND COALESCE(qty_boards,0) > 0
-            ORDER BY created_at ASC, id ASC
-            LIMIT 1
-            FOR UPDATE
-        ");
-        $st->execute([(int)$projectId, (int)$boardId]);
-        $r = $st->fetch();
-        if (!$r) return false;
-        $id = (int)($r['id'] ?? 0);
-        $qb = (int)($r['qty_boards'] ?? 0);
-        $qm = (float)($r['qty_m2'] ?? 0.0);
-        if ($id <= 0 || $qb <= 0) return false;
-        $newQb = $qb - 1;
-        $newQm = max(0.0, $qm - $fullM2);
-        $pdo->prepare('UPDATE project_hpl_consumptions SET qty_boards=?, qty_m2=? WHERE id=?')->execute([$newQb, $newQm, $id]);
-        if ($newQb <= 0 && $newQm <= 0.00001) {
-            $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id=?')->execute([$id]);
+        // IMPORTANT: folosim stocul proiectului (hpl_stock_pieces), nu doar project_hpl_consumptions.
+        // 1) Verificăm că există cel puțin 1 FULL rezervat în stoc pentru proiect.
+        $ok = false;
+        try {
+            $st = $pdo->prepare("
+                SELECT id
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND project_id = ?
+                  AND piece_type = 'FULL'
+                  AND status = 'RESERVED'
+                  AND qty > 0
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $st->execute([(int)$boardId, (int)$projectId]);
+            $ok = (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            $ok = false;
         }
+        if (!$ok) return false;
+
+        // 2) Best-effort: dacă există și rânduri RESERVED în project_hpl_consumptions, le decrementăm (pentru raportări).
+        try {
+            $st2 = $pdo->prepare("
+                SELECT id, qty_boards, qty_m2
+                FROM project_hpl_consumptions
+                WHERE project_id = ?
+                  AND board_id = ?
+                  AND mode = 'RESERVED'
+                  AND COALESCE(qty_boards,0) > 0
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $st2->execute([(int)$projectId, (int)$boardId]);
+            $r = $st2->fetch();
+            if ($r) {
+                $id = (int)($r['id'] ?? 0);
+                $qb = (int)($r['qty_boards'] ?? 0);
+                $qm = (float)($r['qty_m2'] ?? 0.0);
+                if ($id > 0 && $qb > 0) {
+                    $newQb = $qb - 1;
+                    $newQm = max(0.0, $qm - $fullM2);
+                    $pdo->prepare('UPDATE project_hpl_consumptions SET qty_boards=?, qty_m2=? WHERE id=?')->execute([$newQb, $newQm, $id]);
+                    if ($newQb <= 0 && $newQm <= 0.00001) {
+                        $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id=?')->execute([$id]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         return true;
     }
 
-    private static function takeReservedHalfRemainder(\PDO $pdo, int $projectId, int $boardId, float $halfM2): bool
+    private static function takeReservedHalfRemainder(\PDO $pdo, int $projectId, int $boardId, int $halfHeightMm, int $widthMm, float $halfM2): bool
     {
-        $st = $pdo->prepare("
-            SELECT id, qty_m2
-            FROM project_hpl_consumptions
-            WHERE project_id = ?
-              AND board_id = ?
-              AND mode = 'RESERVED'
-              AND COALESCE(qty_boards,0) = 0
-              AND note LIKE ?
-            ORDER BY created_at ASC, id ASC
-            LIMIT 1
-            FOR UPDATE
-        ");
-        $st->execute([(int)$projectId, (int)$boardId, self::HPL_NOTE_HALF_REMAINDER . '%']);
-        $r = $st->fetch();
-        if (!$r) return false;
-        $id = (int)($r['id'] ?? 0);
-        $qm = (float)($r['qty_m2'] ?? 0.0);
-        if ($id <= 0 || $qm + 1e-9 < $halfM2) return false;
-        $newQm = $qm - $halfM2;
-        if ($newQm <= 0.00001) {
-            $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id=?')->execute([$id]);
-        } else {
-            $pdo->prepare('UPDATE project_hpl_consumptions SET qty_m2=? WHERE id=?')->execute([$newQm, $id]);
+        // IMPORTANT: folosim stocul proiectului (hpl_stock_pieces).
+        // 1) Verificăm că există un OFFCUT rezervat "jumătate" în stoc.
+        if ($halfHeightMm <= 0 || $widthMm <= 0) return false;
+        $ok = false;
+        try {
+            $st = $pdo->prepare("
+                SELECT id
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND project_id = ?
+                  AND piece_type = 'OFFCUT'
+                  AND status = 'RESERVED'
+                  AND width_mm = ?
+                  AND height_mm = ?
+                  AND qty > 0
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $st->execute([(int)$boardId, (int)$projectId, (int)$widthMm, (int)$halfHeightMm]);
+            $ok = (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            $ok = false;
         }
+        if (!$ok) return false;
+
+        // 2) Best-effort: decrementăm și rândul RESERVED "REST_JUMATATE" din project_hpl_consumptions (dacă există).
+        try {
+            $st2 = $pdo->prepare("
+                SELECT id, qty_m2
+                FROM project_hpl_consumptions
+                WHERE project_id = ?
+                  AND board_id = ?
+                  AND mode = 'RESERVED'
+                  AND COALESCE(qty_boards,0) = 0
+                  AND note LIKE ?
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $st2->execute([(int)$projectId, (int)$boardId, self::HPL_NOTE_HALF_REMAINDER . '%']);
+            $r = $st2->fetch();
+            if ($r) {
+                $id = (int)($r['id'] ?? 0);
+                $qm = (float)($r['qty_m2'] ?? 0.0);
+                if ($id > 0 && $qm + 1e-9 >= $halfM2) {
+                    $newQm = $qm - $halfM2;
+                    if ($newQm <= 0.00001) {
+                        $pdo->prepare('DELETE FROM project_hpl_consumptions WHERE id=?')->execute([$id]);
+                    } else {
+                        $pdo->prepare('UPDATE project_hpl_consumptions SET qty_m2=? WHERE id=?')->execute([$newQm, $id]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         return true;
     }
 
