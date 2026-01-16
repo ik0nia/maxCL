@@ -149,7 +149,9 @@ ob_start();
         <thead>
           <tr>
             <th>Placă</th>
-            <th class="text-end" style="width:110px">Buc</th>
+            <th class="text-end" style="width:120px">Întregi</th>
+            <th class="text-end" style="width:120px">Jumătăți</th>
+            <th class="text-end" style="width:130px">Buc (echiv.)</th>
             <th class="text-end" style="width:110px">mp</th>
             <th class="text-end" style="width:110px">Rânduri</th>
           </tr>
@@ -166,6 +168,14 @@ ob_start();
               $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
               // Preferăm mp/aria plăcii, ca să includă și jumătăți (qty_boards e 0 la 1/2).
               $eq = ($area > 0 && $qm2 > 0) ? ($qm2 / $area) : $qb;
+              $fullTxt = (abs($qb - round($qb)) < 1e-6) ? (string)((int)round($qb)) : number_format($qb, 2, '.', '');
+              // presupunem fracții doar de 0.5 (jumătăți). Convertim restul la număr de jumătăți.
+              $halfCount = 0.0;
+              if ($area > 0 && $eq > 0) {
+                $restEq = max(0.0, $eq - max(0.0, $qb));
+                $halfCount = $restEq / 0.5;
+              }
+              $halfTxt = (abs($halfCount - round($halfCount)) < 0.06) ? (string)((int)round($halfCount)) : number_format($halfCount, 2, '.', '');
               $eqTxt = '0';
               if ($eq > 0) {
                 if (abs($eq - 0.5) < 0.06) $eqTxt = '0.5';
@@ -179,6 +189,8 @@ ob_start();
                   <?= htmlspecialchars($btxt) ?>
                 </a>
               </td>
+              <td class="text-end fw-semibold"><?= htmlspecialchars($fullTxt) ?></td>
+              <td class="text-end fw-semibold"><?= htmlspecialchars($halfTxt) ?></td>
               <td class="text-end fw-semibold"><?= htmlspecialchars($eqTxt) ?></td>
               <td class="text-end fw-semibold"><?= number_format($qm2, 2, '.', '') ?></td>
               <td class="text-end text-muted"><?= (int)($r['rows'] ?? 0) ?></td>
