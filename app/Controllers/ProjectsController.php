@@ -3149,7 +3149,7 @@ final class ProjectsController
     /**
      * Consum HPL pe piesă:
      * - source=PROJECT: selectăm o piesă RESERVED din stocul proiectului
-     * - source=REST: selectăm o placă FULL AVAILABLE (is_accounting=0) și o rezervăm pe proiect
+     * - source=REST: selectăm o piesă AVAILABLE (is_accounting=0) și o rezervăm pe proiect
      * La Gata de livrare -> se consumă automat.
      */
     public static function addHplConsumptionForProduct(array $params): void
@@ -3216,7 +3216,6 @@ final class ProjectsController
             } else {
                 // REST: trebuie să fie FULL, AVAILABLE, is_accounting=0
                 if ($isAcc !== 0) throw new \RuntimeException('Piesa REST trebuie să fie „nestocată”.');
-                if ((string)($piece['piece_type'] ?? '') !== 'FULL') throw new \RuntimeException('La REST consumăm doar plăci FULL.');
                 if ($status !== 'AVAILABLE') throw new \RuntimeException('Placa REST nu este disponibilă.');
                 // rezervăm pe proiect ca să nu mai fie disponibilă
                 HplStockPiece::updateFields((int)$pieceId, ['status' => 'RESERVED', 'project_id' => $projectId]);

@@ -35,7 +35,6 @@ final class HplPiecesController
                     INNER JOIN hpl_boards b ON b.id = sp.board_id
                     WHERE sp.qty > 0
                       AND sp.status = 'AVAILABLE'
-                      AND sp.piece_type = 'FULL'
                       AND sp.is_accounting = 0
                 ";
                 $params = [];
