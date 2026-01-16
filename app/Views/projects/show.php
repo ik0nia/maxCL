@@ -83,7 +83,8 @@ ob_start();
 
             <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">Cod</label>
-              <input class="form-control" name="code" value="<?= htmlspecialchars((string)($project['code'] ?? '')) ?>">
+              <input class="form-control" name="code" value="<?= htmlspecialchars((string)($project['code'] ?? '')) ?>" readonly>
+              <div class="text-muted small mt-1">Se generează automat (incremental).</div>
             </div>
             <div class="col-12 col-md-8">
               <label class="form-label fw-semibold">Nume</label>
@@ -102,10 +103,6 @@ ob_start();
             <div class="col-12 col-md-3">
               <label class="form-label fw-semibold">Categorie</label>
               <input class="form-control" name="category" value="<?= htmlspecialchars((string)($project['category'] ?? '')) ?>">
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">Start</label>
-              <input class="form-control" type="date" name="start_date" value="<?= htmlspecialchars((string)($project['start_date'] ?? '')) ?>">
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label fw-semibold">Deadline</label>
@@ -135,12 +132,6 @@ ob_start();
                 <?php endforeach; ?>
               </select>
               <div class="text-muted small mt-1">Alege fie client, fie grup.</div>
-            </div>
-
-            <div class="col-12">
-              <label class="form-label fw-semibold">Etichete (tags)</label>
-              <input class="form-control" name="tags" value="<?= htmlspecialchars((string)($project['tags'] ?? '')) ?>">
-              <div class="text-muted small mt-1">Separă cu virgulă.</div>
             </div>
 
             <div class="col-12 col-md-6">

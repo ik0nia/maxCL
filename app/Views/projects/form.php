@@ -9,6 +9,24 @@ $errors = is_array($errors ?? null) ? $errors : [];
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
+$labelsAll = is_array($labelsAll ?? null) ? $labelsAll : [];
+$labelsSelected = is_array($labelsSelected ?? null) ? $labelsSelected : [];
+
+$labelsInit = [];
+$labelsCsv = trim((string)($row['labels'] ?? ''));
+if ($labelsCsv !== '') {
+  $parts = preg_split('/[,\n]+/', $labelsCsv) ?: [];
+  foreach ($parts as $p) {
+    $p = trim((string)$p);
+    if ($p !== '') $labelsInit[] = $p;
+  }
+} else {
+  foreach ($labelsSelected as $l) {
+    if (is_array($l) && isset($l['name'])) $labelsInit[] = trim((string)$l['name']);
+    elseif (is_string($l)) $labelsInit[] = trim($l);
+  }
+}
+$labelsInit = array_values(array_unique(array_filter($labelsInit, fn($s) => $s !== '')));
 
 ob_start();
 ?>
@@ -28,8 +46,8 @@ ob_start();
 
     <div class="col-12 col-md-3">
       <label class="form-label fw-semibold">Cod</label>
-      <input class="form-control <?= isset($errors['code']) ? 'is-invalid' : '' ?>" name="code" value="<?= htmlspecialchars((string)($row['code'] ?? '')) ?>">
-      <?php if (isset($errors['code'])): ?><div class="invalid-feedback"><?= htmlspecialchars((string)$errors['code']) ?></div><?php endif; ?>
+      <input class="form-control" value="<?= htmlspecialchars((string)($row['code'] ?? '')) ?>" readonly>
+      <div class="text-muted small mt-1">Se generează automat (începând de la 1000).</div>
     </div>
     <div class="col-12 col-md-6">
       <label class="form-label fw-semibold">Nume</label>
@@ -55,10 +73,6 @@ ob_start();
     <div class="col-12 col-md-3">
       <label class="form-label fw-semibold">Categorie</label>
       <input class="form-control" name="category" value="<?= htmlspecialchars((string)($row['category'] ?? '')) ?>">
-    </div>
-    <div class="col-12 col-md-3">
-      <label class="form-label fw-semibold">Start</label>
-      <input class="form-control" type="date" name="start_date" value="<?= htmlspecialchars((string)($row['start_date'] ?? '')) ?>">
     </div>
     <div class="col-12 col-md-3">
       <label class="form-label fw-semibold">Deadline</label>
@@ -98,9 +112,33 @@ ob_start();
     </div>
 
     <div class="col-12">
-      <label class="form-label fw-semibold">Etichete (tags)</label>
-      <input class="form-control" name="tags" value="<?= htmlspecialchars((string)($row['tags'] ?? '')) ?>" placeholder="ex: urgent, client VIP, etc">
-      <div class="text-muted small mt-1">Separă cu virgulă.</div>
+      <label class="form-label fw-semibold">Etichete (labels)</label>
+      <div class="text-muted small">Se propagă automat la produsele din proiect.</div>
+
+      <div class="d-flex flex-wrap gap-2 mt-2" id="labelsChips">
+        <?php foreach ($labelsInit as $ln): ?>
+          <span class="badge rounded-pill bg-success-subtle text-success-emphasis fw-semibold px-3 py-2 d-inline-flex align-items-center gap-2">
+            <span><?= htmlspecialchars($ln) ?></span>
+            <button type="button" class="btn btn-sm p-0" style="border:0;background:transparent" aria-label="Șterge" data-label-remove="<?= htmlspecialchars($ln) ?>">
+              <i class="bi bi-x-circle"></i>
+            </button>
+          </span>
+        <?php endforeach; ?>
+      </div>
+
+      <div class="input-group mt-2">
+        <input class="form-control" id="labelInput" list="labelsDatalist" placeholder="Adaugă etichetă…" maxlength="64">
+        <button class="btn btn-outline-secondary" type="button" id="labelAddBtn" title="Adaugă">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
+      <datalist id="labelsDatalist">
+        <?php foreach ($labelsAll as $l): ?>
+          <?php $nm = trim((string)($l['name'] ?? '')); if ($nm === '') continue; ?>
+          <option value="<?= htmlspecialchars($nm) ?>"></option>
+        <?php endforeach; ?>
+      </datalist>
+      <input type="hidden" name="labels" id="labelsHidden" value="<?= htmlspecialchars(implode(', ', $labelsInit)) ?>">
     </div>
 
     <div class="col-12 col-md-6">
@@ -119,6 +157,87 @@ ob_start();
     </div>
   </form>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const chips = document.getElementById('labelsChips');
+    const input = document.getElementById('labelInput');
+    const addBtn = document.getElementById('labelAddBtn');
+    const hidden = document.getElementById('labelsHidden');
+    if (!chips || !input || !addBtn || !hidden) return;
+
+    function norm(s) {
+      return String(s || '').trim();
+    }
+    function normKey(s) {
+      return norm(s).toLowerCase();
+    }
+    function getLabels() {
+      const out = [];
+      chips.querySelectorAll('[data-label-chip]').forEach(function (el) {
+        const v = norm(el.getAttribute('data-label-chip'));
+        if (v) out.push(v);
+      });
+      return out;
+    }
+    function syncHidden() {
+      hidden.value = getLabels().join(', ');
+    }
+    function hasLabel(v) {
+      const k = normKey(v);
+      if (!k) return true;
+      return getLabels().some(function (x) { return normKey(x) === k; });
+    }
+    function addOne(v) {
+      v = norm(v);
+      if (!v || hasLabel(v)) return;
+      const span = document.createElement('span');
+      span.className = 'badge rounded-pill bg-success-subtle text-success-emphasis fw-semibold px-3 py-2 d-inline-flex align-items-center gap-2';
+      span.setAttribute('data-label-chip', v);
+      span.innerHTML = '<span></span><button type="button" class="btn btn-sm p-0" style="border:0;background:transparent" aria-label="Șterge"><i class="bi bi-x-circle"></i></button>';
+      span.querySelector('span').textContent = v;
+      span.querySelector('button').addEventListener('click', function () {
+        span.remove();
+        syncHidden();
+      });
+      chips.appendChild(span);
+      syncHidden();
+    }
+    function addFromInput() {
+      const raw = norm(input.value);
+      if (!raw) return;
+      raw.split(',').map(function (x) { return norm(x); }).filter(Boolean).forEach(addOne);
+      input.value = '';
+      input.focus();
+    }
+
+    // init: convert server-rendered remove buttons
+    chips.querySelectorAll('[data-label-remove]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const chip = btn.closest('span');
+        if (chip) chip.remove();
+        syncHidden();
+      });
+      const chip = btn.closest('span');
+      if (chip) {
+        const val = norm(btn.getAttribute('data-label-remove'));
+        if (val) chip.setAttribute('data-label-chip', val);
+      }
+    });
+    syncHidden();
+
+    addBtn.addEventListener('click', addFromInput);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addFromInput();
+      }
+    });
+    input.addEventListener('blur', function () {
+      addFromInput();
+    });
+  });
+</script>
 <?php
 $content = ob_get_clean();
 echo View::render('layout/app', compact('title', 'content'));

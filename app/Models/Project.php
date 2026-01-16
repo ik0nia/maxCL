@@ -14,6 +14,23 @@ final class Project
         return str_contains($m, 'unknown column') && str_contains($m, strtolower($col));
     }
 
+    public static function nextAutoCode(int $startAt = 1000, bool $forUpdate = false): string
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $startAt = max(1, (int)$startAt);
+
+        $sql = "SELECT MAX(CAST(code AS UNSIGNED)) AS mx
+                FROM projects
+                WHERE code REGEXP '^[0-9]+$'";
+        if ($forUpdate) $sql .= ' FOR UPDATE';
+
+        $row = $pdo->query($sql)->fetch();
+        $mx = isset($row['mx']) ? (int)$row['mx'] : 0;
+        $next = max($startAt, $mx + 1);
+        return (string)$next;
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function all(?string $q = null, ?string $status = null, int $limit = 500): array
     {
