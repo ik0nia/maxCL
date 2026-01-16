@@ -19,33 +19,55 @@ final class Client
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $sql = "
-            SELECT
-              c.*,
-              cg.name AS client_group_name,
-              COUNT(p.id) AS project_count,
-              GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
-            FROM clients c
-            LEFT JOIN client_groups cg ON cg.id = c.client_group_id
-            LEFT JOIN projects p ON p.client_id = c.id
-            GROUP BY c.id
-            ORDER BY c.name ASC
-        ";
         try {
-            return $pdo->query($sql)->fetchAll();
-        } catch (\Throwable $e) {
-            // Compat: dacă nu există încă grupuri/coloana, revenim la query-ul vechi.
-            $sql2 = "
+            $sql = "
                 SELECT
                   c.*,
+                  cg.name AS client_group_name,
                   COUNT(p.id) AS project_count,
                   GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
                 FROM clients c
-                LEFT JOIN projects p ON p.client_id = c.id
+                LEFT JOIN client_groups cg ON cg.id = c.client_group_id
+                LEFT JOIN projects p
+                  ON p.client_id = c.id
+                 AND (p.deleted_at IS NULL OR p.deleted_at = '' OR p.deleted_at = '0000-00-00 00:00:00')
                 GROUP BY c.id
                 ORDER BY c.name ASC
             ";
-            return $pdo->query($sql2)->fetchAll();
+            return $pdo->query($sql)->fetchAll();
+        } catch (\Throwable $e) {
+            // Compat: instalări vechi fără client_groups / fără deleted_at pe projects.
+            if (!self::isUnknownColumn($e, 'client_group_id') && !self::isUnknownColumn($e, 'deleted_at')) {
+                throw $e;
+            }
+            try {
+                $sql2 = "
+                    SELECT
+                      c.*,
+                      COUNT(p.id) AS project_count,
+                      GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
+                    FROM clients c
+                    LEFT JOIN projects p
+                      ON p.client_id = c.id
+                     AND (p.deleted_at IS NULL OR p.deleted_at = '' OR p.deleted_at = '0000-00-00 00:00:00')
+                    GROUP BY c.id
+                    ORDER BY c.name ASC
+                ";
+                return $pdo->query($sql2)->fetchAll();
+            } catch (\Throwable $e2) {
+                if (!self::isUnknownColumn($e2, 'deleted_at')) throw $e2;
+                $sql3 = "
+                    SELECT
+                      c.*,
+                      COUNT(p.id) AS project_count,
+                      GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
+                    FROM clients c
+                    LEFT JOIN projects p ON p.client_id = c.id
+                    GROUP BY c.id
+                    ORDER BY c.name ASC
+                ";
+                return $pdo->query($sql3)->fetchAll();
+            }
         }
     }
 

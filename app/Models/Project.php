@@ -97,7 +97,13 @@ final class Project
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         try {
-            $st = $pdo->prepare('SELECT * FROM projects WHERE client_id = ? AND deleted_at IS NULL ORDER BY created_at DESC');
+            $st = $pdo->prepare("
+                SELECT *
+                FROM projects
+                WHERE client_id = ?
+                  AND (deleted_at IS NULL OR deleted_at = '' OR deleted_at = '0000-00-00 00:00:00')
+                ORDER BY created_at DESC
+            ");
             $st->execute([$clientId]);
             return $st->fetchAll();
         } catch (\Throwable $e) {
