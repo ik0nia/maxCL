@@ -579,7 +579,6 @@ final class ProjectsController
                 $projectId,
                 $projectId,
                 $projectId,
-                $projectId,
             ]);
             $rows = $st->fetchAll();
         } catch (\Throwable $e) {
@@ -611,7 +610,6 @@ final class ProjectsController
                 $fromStatus,
                 $fromLocation,
                 $fromLocation,
-                $projectId,
                 $projectId,
                 $projectId,
                 $projectId,
