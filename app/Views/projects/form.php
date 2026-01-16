@@ -115,21 +115,46 @@ ob_start();
       <label class="form-label fw-semibold">Etichete (labels)</label>
       <div class="text-muted small">Se propagă automat la produsele din proiect.</div>
 
+      <style>
+        /* UI pentru etichete ca în pagina proiectului (chips verzi) */
+        .pp-label-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: .5rem;
+          padding: .55rem 1rem;
+          border-radius: .8rem;
+          background: #EAF6EA;
+          border: 1px solid #B7DDB7;
+          color: #111;
+          font-weight: 700;
+        }
+        .pp-label-chip .pp-label-x {
+          width: 26px;
+          height: 26px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(0,0,0,.2);
+          background: transparent;
+          padding: 0;
+          line-height: 1;
+        }
+      </style>
+
       <div class="d-flex flex-wrap gap-2 mt-2" id="labelsChips">
         <?php foreach ($labelsInit as $ln): ?>
-          <span class="badge rounded-pill bg-success-subtle text-success-emphasis fw-semibold px-3 py-2 d-inline-flex align-items-center gap-2">
+          <span class="pp-label-chip">
             <span><?= htmlspecialchars($ln) ?></span>
-            <button type="button" class="btn btn-sm p-0" style="border:0;background:transparent" aria-label="Șterge" data-label-remove="<?= htmlspecialchars($ln) ?>">
-              <i class="bi bi-x-circle"></i>
-            </button>
+            <button type="button" class="pp-label-x" aria-label="Șterge" data-label-remove="<?= htmlspecialchars($ln) ?>">×</button>
           </span>
         <?php endforeach; ?>
       </div>
 
-      <div class="input-group mt-2">
-        <input class="form-control" id="labelInput" list="labelsDatalist" placeholder="Adaugă etichetă…" maxlength="64">
-        <button class="btn btn-outline-secondary" type="button" id="labelAddBtn" title="Adaugă">
-          <i class="bi bi-plus-lg"></i>
+      <div class="d-flex gap-2 mt-2 align-items-stretch">
+        <input class="form-control form-control-lg" id="labelInput" list="labelsDatalist" placeholder="Adaugă etichetă..." maxlength="64">
+        <button class="btn btn-outline-secondary px-4" type="button" id="labelAddBtn" title="Adaugă">
+          <span style="font-size:26px; line-height:1">+</span>
         </button>
       </div>
       <datalist id="labelsDatalist">
@@ -192,9 +217,9 @@ ob_start();
       v = norm(v);
       if (!v || hasLabel(v)) return;
       const span = document.createElement('span');
-      span.className = 'badge rounded-pill bg-success-subtle text-success-emphasis fw-semibold px-3 py-2 d-inline-flex align-items-center gap-2';
+      span.className = 'pp-label-chip';
       span.setAttribute('data-label-chip', v);
-      span.innerHTML = '<span></span><button type="button" class="btn btn-sm p-0" style="border:0;background:transparent" aria-label="Șterge"><i class="bi bi-x-circle"></i></button>';
+      span.innerHTML = '<span></span><button type="button" class="pp-label-x" aria-label="Șterge">×</button>';
       span.querySelector('span').textContent = v;
       span.querySelector('button').addEventListener('click', function () {
         span.remove();
@@ -230,6 +255,17 @@ ob_start();
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
+        addFromInput();
+      } else if (e.key === ',') {
+        e.preventDefault();
+        addFromInput();
+      }
+    });
+    input.addEventListener('input', function () {
+      // dacă user-ul tastează "cuvânt," transformăm imediat în etichetă
+      const v = norm(input.value);
+      if (v.endsWith(',')) {
+        input.value = v.replace(/,+$/, '');
         addFromInput();
       }
     });
