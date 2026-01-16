@@ -1376,6 +1376,17 @@ final class ProjectsController
                 $errors['hpl_board_id'] = 'Placa HPL selectată nu este rezervată pe acest proiect.';
             }
         }
+        // Pentru suprafață în plăci (1 / 1/2), avem nevoie de o placă HPL selectată (sau inferată).
+        if ($surfaceType === 'BOARD' && $surfaceValue !== null && (abs((float)$surfaceValue - 1.0) < 1e-9 || abs((float)$surfaceValue - 0.5) < 1e-9)) {
+            if ($hplBoardId === null) {
+                $inf = self::inferSingleReservedBoardIdForProject($projectId);
+                if ($inf !== null) {
+                    $hplBoardId = $inf;
+                } else {
+                    $errors['hpl_board_id'] = 'Selectează placa HPL pentru această piesă (suprafață în plăci).';
+                }
+            }
+        }
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($salePriceRaw !== '' && ($salePrice === null || $salePrice < 0)) {
@@ -1525,6 +1536,57 @@ final class ProjectsController
         }
     }
 
+    /**
+     * Dacă proiectul are EXACT o singură placă rezervată (tip) returnează board_id, altfel null.
+     * UX fallback când utilizatorul nu selectează explicit placa pe piesă.
+     */
+    private static function inferSingleReservedBoardIdForProject(int $projectId): ?int
+    {
+        if ($projectId <= 0) return null;
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        try {
+            $st = $pdo->prepare("
+                SELECT board_id
+                FROM project_hpl_consumptions
+                WHERE project_id = ?
+                  AND mode = 'RESERVED'
+                  AND COALESCE(qty_boards,0) > 0
+                GROUP BY board_id
+                ORDER BY board_id ASC
+                LIMIT 2
+            ");
+            $st->execute([(int)$projectId]);
+            $rows = $st->fetchAll();
+            if (count($rows) === 1) {
+                $bid = (int)($rows[0]['board_id'] ?? 0);
+                return $bid > 0 ? $bid : null;
+            }
+            return null;
+        } catch (\Throwable $e) {
+            // Compat fără qty_boards: folosim qty_m2 > 0
+            try {
+                $st = $pdo->prepare("
+                    SELECT board_id
+                    FROM project_hpl_consumptions
+                    WHERE project_id = ?
+                      AND mode = 'RESERVED'
+                      AND qty_m2 > 0
+                    GROUP BY board_id
+                    ORDER BY board_id ASC
+                    LIMIT 2
+                ");
+                $st->execute([(int)$projectId]);
+                $rows = $st->fetchAll();
+                if (count($rows) === 1) {
+                    $bid = (int)($rows[0]['board_id'] ?? 0);
+                    return $bid > 0 ? $bid : null;
+                }
+            } catch (\Throwable $e2) {}
+            return null;
+        }
+    }
+
     public static function updateProjectProduct(array $params): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);
@@ -1578,6 +1640,17 @@ final class ProjectsController
         if ($hplBoardId !== null) {
             if (!self::isHplBoardReservedForProject($projectId, (int)$hplBoardId)) {
                 $errors['hpl_board_id'] = 'Placa HPL selectată nu este rezervată pe acest proiect.';
+            }
+        }
+        // Pentru suprafață în plăci (1 / 1/2), avem nevoie de o placă HPL selectată (sau inferată).
+        if ($surfaceType === 'BOARD' && $surfaceValue !== null && (abs((float)$surfaceValue - 1.0) < 1e-9 || abs((float)$surfaceValue - 0.5) < 1e-9)) {
+            if ($hplBoardId === null) {
+                $inf = self::inferSingleReservedBoardIdForProject($projectId);
+                if ($inf !== null) {
+                    $hplBoardId = $inf;
+                } else {
+                    $errors['hpl_board_id'] = 'Selectează placa HPL pentru această piesă (suprafață în plăci).';
+                }
             }
         }
         if ($salePriceRaw !== '' && ($salePrice === null || $salePrice < 0)) {
@@ -1647,6 +1720,31 @@ final class ProjectsController
         if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        // Dacă piesa e pe suprafață în plăci (1/0.5), asigurăm că are selectat un HPL (sau îl inferăm dacă există exact unul rezervat).
+        $stype0 = (string)($before['surface_type'] ?? '');
+        $sval0 = isset($before['surface_value']) && $before['surface_value'] !== null && $before['surface_value'] !== '' ? (float)$before['surface_value'] : null;
+        $needsHpl = ($stype0 === 'BOARD' && $sval0 !== null && (abs($sval0 - 1.0) < 1e-9 || abs($sval0 - 0.5) < 1e-9));
+        $curBid = isset($before['hpl_board_id']) && $before['hpl_board_id'] !== null && $before['hpl_board_id'] !== '' ? (int)$before['hpl_board_id'] : 0;
+        if ($needsHpl && $curBid <= 0) {
+            $inf = self::inferSingleReservedBoardIdForProject($projectId);
+            if ($inf !== null) {
+                try {
+                    ProjectProduct::updateFields($ppId, ['hpl_board_id' => (int)$inf]);
+                    $before['hpl_board_id'] = (int)$inf;
+                    Audit::log('PROJECT_PRODUCT_UPDATE', 'project_products', $ppId, null, null, [
+                        'message' => 'Auto-select placă HPL pe piesă (singura rezervată în proiect).',
+                        'project_id' => $projectId,
+                        'project_product_id' => $ppId,
+                        'board_id' => (int)$inf,
+                        'via' => 'status_flow',
+                    ]);
+                } catch (\Throwable $e) {}
+            } else {
+                Session::flash('toast_error', 'Piesa are suprafață în plăci (1/1⁄2), dar nu are selectată nicio placă HPL. Editează piesa și selectează placa.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
         }
 
         $flow = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
