@@ -7,6 +7,7 @@ use App\Core\View;
 
 $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
+$canEditProducts = ProjectsController::canEditProjectProducts();
 $canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
 $project = $project ?? [];
@@ -720,40 +721,11 @@ ob_start();
                   <?php // HPL se afișează în secțiunea "Consum" de mai jos. ?>
 
                   <?php
-                    // Accesorii pe piesă (din consumuri proiect Magazie)
+                    // Accesorii alocate (DIRECT + PROIECT), calculate în controller (respectă finalizarea piesei).
                     $accRows = [];
-                    if (is_array($magazieConsum ?? null)) {
-                      foreach ($magazieConsum as $mc) {
-                        $mcPpId = (int)($mc['project_product_id'] ?? 0);
-                        $isProjectLevel = $mcPpId <= 0;
-                        if (!$isProjectLevel && $mcPpId !== $ppId) continue;
-
-                        // Dacă e la nivel de proiect, alocăm proporțional cu qty (buc) pe produs
-                        $allocQty = (float)($mc['qty'] ?? 0);
-                        $allocTag = null;
-                        if ($isProjectLevel) {
-                          $w = ($ppTotalQty > 0.0) ? (max(0.0, $qty) / $ppTotalQty) : 0.0;
-                          $allocQty = $allocQty * $w;
-                          $allocTag = 'PROIECT';
-                          if ($allocQty <= 0) continue;
-                        }
-                        $iid = (int)($mc['item_id'] ?? 0);
-                        $mode = (string)($mc['mode'] ?? '');
-                        $key = $iid . '|' . $mode . '|' . ($allocTag ?? 'DIRECT');
-                        if (!isset($accRows[$key])) {
-                          $accRows[$key] = [
-                            'item_id' => $iid,
-                            'mode' => $mode,
-                            'src' => $allocTag,
-                            'code' => (string)($mc['winmentor_code'] ?? ''),
-                            'name' => (string)($mc['item_name'] ?? ''),
-                            'unit' => (string)($mc['unit'] ?? ''),
-                            'qty' => 0.0,
-                            'unit_price' => (isset($mc['item_unit_price']) && $mc['item_unit_price'] !== null && $mc['item_unit_price'] !== '' && is_numeric($mc['item_unit_price'])) ? (float)$mc['item_unit_price'] : null,
-                          ];
-                        }
-                        $accRows[$key]['qty'] += (float)$allocQty;
-                      }
+                    $mbr = $materialsByProduct[$ppId] ?? null;
+                    if (is_array($mbr) && isset($mbr['acc_rows']) && is_array($mbr['acc_rows'])) {
+                      $accRows = $mbr['acc_rows'];
                     }
                   ?>
 
@@ -823,7 +795,7 @@ ob_start();
                                 <tr>
                                   <td class="fw-semibold">
                                     <?= htmlspecialchars(trim((string)($ar['code'] ?? '') . ' · ' . (string)($ar['name'] ?? ''))) ?>
-                                    <?php if ($srcTag !== ''): ?>
+                                    <?php if ($srcTag === 'PROIECT'): ?>
                                       <span class="badge rounded-pill bg-light text-secondary-emphasis ms-1"><?= htmlspecialchars($srcTag) ?></span>
                                     <?php endif; ?>
                                     <?php if ($mode !== ''): ?>
@@ -881,7 +853,10 @@ ob_start();
                     </div>
                   </div>
 
-                  <?php if ($canWrite): ?>
+                  <?php
+                    $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
+                  ?>
+                  <?php if ($canEditThis): ?>
                     <div class="d-flex justify-content-end gap-2 mt-3">
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAcc<?= $ppId ?>">
                         <i class="bi bi-box-seam me-1"></i> Adaugă accesorii

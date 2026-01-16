@@ -958,6 +958,19 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-16_02_project_products_finalized_at',
+                'label' => 'ALTER project_products ADD finalized_at',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (self::columnExists($pdo, 'project_products', 'finalized_at')) return;
+                    try {
+                        $pdo->exec("ALTER TABLE project_products ADD COLUMN finalized_at DATETIME NULL AFTER updated_at");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
         ];
     }
 

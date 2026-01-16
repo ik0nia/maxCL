@@ -100,6 +100,69 @@ final class ProjectsController
         return ['ppIds' => $ppIds, 'sumQty' => $sum, 'weightById' => $weightById];
     }
 
+    private static function dtToTs(?string $dt): ?int
+    {
+        $dt = $dt !== null ? trim($dt) : '';
+        if ($dt === '') return null;
+        $t = strtotime($dt);
+        return $t !== false ? (int)$t : null;
+    }
+
+    private static function isFinalProductStatus(string $st): bool
+    {
+        $st = strtoupper(trim($st));
+        return in_array($st, ['GATA_DE_LIVRARE', 'AVIZAT', 'LIVRAT'], true);
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $projectProducts
+     * @return array<int, array{qty:float,finalized_ts:?int}>
+     */
+    private static function productMetaForAlloc(array $projectProducts): array
+    {
+        $out = [];
+        foreach ($projectProducts as $pp) {
+            $id = (int)($pp['id'] ?? 0);
+            if ($id <= 0) continue;
+            $qty = (float)($pp['qty'] ?? 0);
+            $qty = $qty > 0 ? $qty : 0.0;
+            $finalTs = self::dtToTs(isset($pp['finalized_at']) ? (string)$pp['finalized_at'] : null);
+            $out[$id] = ['qty' => $qty, 'finalized_ts' => $finalTs];
+        }
+        return $out;
+    }
+
+    /** @param array<int, array{qty:float,finalized_ts:?int}> $meta */
+    private static function weightsForIds(array $meta, array $ids): array
+    {
+        $sum = 0.0;
+        foreach ($ids as $id) $sum += (float)($meta[$id]['qty'] ?? 0.0);
+        $n = count($ids);
+        $w = [];
+        foreach ($ids as $id) {
+            if ($sum > 0.0) $w[$id] = ((float)($meta[$id]['qty'] ?? 0.0)) / $sum;
+            elseif ($n > 0) $w[$id] = 1.0 / $n;
+            else $w[$id] = 0.0;
+        }
+        return $w;
+    }
+
+    /** @param array<int, array{qty:float,finalized_ts:?int}> $meta */
+    private static function eligibleIdsForEvent(array $meta, ?int $eventTs): array
+    {
+        $ids = [];
+        foreach ($meta as $id => $m) {
+            $fin = $m['finalized_ts'] ?? null;
+            // dacă nu știm data evenimentului, nu influențăm piesele finalizate (doar active)
+            if ($eventTs === null) {
+                if ($fin === null) $ids[] = (int)$id;
+                continue;
+            }
+            if ($fin === null || $fin >= $eventTs) $ids[] = (int)$id;
+        }
+        return $ids;
+    }
+
     // NOTĂ: alocarea automată HPL pe produse a fost eliminată (cerință).
 
     /**
@@ -114,17 +177,16 @@ final class ProjectsController
     private static function laborEstimateByProduct(array $projectProducts, array $workLogs): array
     {
         // IMPORTANT: manopera se distribuie pe bucăți (qty), nu pe mp.
-        $w2 = self::productQtyOnlyWeights($projectProducts);
-        /** @var array<int,int> $ppIds */
-        $ppIds = $w2['ppIds'];
+        // Cerință: după Gata de livrare, piesa nu mai e influențată de manopere/proiect-level create ulterior.
+        $meta = self::productMetaForAlloc($projectProducts);
+        $ppIds = array_keys($meta);
         $validPp = array_fill_keys($ppIds, true);
 
-        // sum direct + project-level
         $direct = [];
-        $projCncHours = 0.0;
-        $projCncCost = 0.0;
-        $projAtHours = 0.0;
-        $projAtCost = 0.0;
+        $projShares = []; // per ppId: cnc/atelier share from project-level
+        foreach ($ppIds as $ppId) {
+            $projShares[$ppId] = ['cnc_hours' => 0.0, 'cnc_cost' => 0.0, 'atelier_hours' => 0.0, 'atelier_cost' => 0.0];
+        }
 
         foreach ($workLogs as $w) {
             $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
@@ -132,8 +194,9 @@ final class ProjectsController
             $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
             if ($cph === null || $cph < 0 || !is_finite($cph)) continue;
             $cost = $he * $cph;
-
             $type = (string)($w['work_type'] ?? '');
+            $logTs = self::dtToTs(isset($w['created_at']) ? (string)$w['created_at'] : null);
+
             $ppId = isset($w['project_product_id']) && $w['project_product_id'] !== null && $w['project_product_id'] !== ''
                 ? (int)$w['project_product_id']
                 : 0;
@@ -150,41 +213,33 @@ final class ProjectsController
                     $direct[$ppId]['atelier_hours'] += $he;
                     $direct[$ppId]['atelier_cost'] += $cost;
                 }
-            } else {
+                continue;
+            }
+
+            // Project-level -> distribuim doar către piesele eligibile la momentul logului
+            $eligible = self::eligibleIdsForEvent($meta, $logTs);
+            if (!$eligible) continue;
+            $weights = self::weightsForIds($meta, $eligible);
+            foreach ($eligible as $pid) {
+                $wgt = (float)($weights[$pid] ?? 0.0);
+                if ($wgt <= 0) continue;
                 if ($type === 'CNC') {
-                    $projCncHours += $he;
-                    $projCncCost += $cost;
+                    $projShares[$pid]['cnc_hours'] += $he * $wgt;
+                    $projShares[$pid]['cnc_cost'] += $cost * $wgt;
                 } elseif ($type === 'ATELIER') {
-                    $projAtHours += $he;
-                    $projAtCost += $cost;
+                    $projShares[$pid]['atelier_hours'] += $he * $wgt;
+                    $projShares[$pid]['atelier_cost'] += $cost * $wgt;
                 }
             }
         }
 
         $out = [];
         foreach ($ppIds as $ppId) {
-            $qty = 0.0;
-            // qty real (buc) pentru afișare
-            foreach ($projectProducts as $pp) {
-                if ((int)($pp['id'] ?? 0) === $ppId) {
-                    $qq = (float)($pp['qty'] ?? 0);
-                    $qty = $qq > 0 ? $qq : 0.0;
-                    break;
-                }
-            }
-            $weight = (float)($w2['weightById'][$ppId] ?? 0.0);
-
-            $shareCncHours = $projCncHours * $weight;
-            $shareCncCost = $projCncCost * $weight;
-            $shareAtHours = $projAtHours * $weight;
-            $shareAtCost = $projAtCost * $weight;
-
-            $cncH = ($direct[$ppId]['cnc_hours'] ?? 0.0) + $shareCncHours;
-            $cncC = ($direct[$ppId]['cnc_cost'] ?? 0.0) + $shareCncCost;
-            $atH = ($direct[$ppId]['atelier_hours'] ?? 0.0) + $shareAtHours;
-            $atC = ($direct[$ppId]['atelier_cost'] ?? 0.0) + $shareAtCost;
-            $cncRate = $cncH > 0 ? ($cncC / $cncH) : 0.0;
-            $atRate = $atH > 0 ? ($atC / $atH) : 0.0;
+            $qty = (float)($meta[$ppId]['qty'] ?? 0.0);
+            $cncH = ($direct[$ppId]['cnc_hours'] ?? 0.0) + ($projShares[$ppId]['cnc_hours'] ?? 0.0);
+            $cncC = ($direct[$ppId]['cnc_cost'] ?? 0.0) + ($projShares[$ppId]['cnc_cost'] ?? 0.0);
+            $atH = ($direct[$ppId]['atelier_hours'] ?? 0.0) + ($projShares[$ppId]['atelier_hours'] ?? 0.0);
+            $atC = ($direct[$ppId]['atelier_cost'] ?? 0.0) + ($projShares[$ppId]['atelier_cost'] ?? 0.0);
             $out[$ppId] = [
                 'qty' => $qty,
                 'cnc_hours' => $cncH,
@@ -192,8 +247,8 @@ final class ProjectsController
                 'atelier_hours' => $atH,
                 'atelier_cost' => $atC,
                 'total_cost' => $cncC + $atC,
-                'cnc_rate' => $cncRate,
-                'atelier_rate' => $atRate,
+                'cnc_rate' => $cncH > 0 ? ($cncC / $cncH) : 0.0,
+                'atelier_rate' => $atH > 0 ? ($atC / $atH) : 0.0,
             ];
         }
         return $out;
@@ -207,9 +262,9 @@ final class ProjectsController
     private static function magazieCostByProduct(array $projectProducts, array $magConsum): array
     {
         // IMPORTANT: Magazie se distribuie pe bucăți (qty), nu pe mp.
-        $w = self::productQtyOnlyWeights($projectProducts);
-        /** @var array<int,int> $ppIds */
-        $ppIds = $w['ppIds'];
+        // Cerință: după Gata de livrare, piesa nu mai e influențată de consumuri/proiect-level create ulterior.
+        $meta = self::productMetaForAlloc($projectProducts);
+        $ppIds = array_keys($meta);
         $out = [];
         foreach ($ppIds as $ppId) $out[$ppId] = ['mag_cost' => 0.0];
 
@@ -222,21 +277,92 @@ final class ProjectsController
             $cost = $qty * $unitPrice;
             if ($cost <= 0) continue;
 
+            $evtTs = self::dtToTs(isset($c['created_at']) ? (string)$c['created_at'] : null);
             $ppId = isset($c['project_product_id']) && $c['project_product_id'] !== null && $c['project_product_id'] !== ''
                 ? (int)$c['project_product_id']
                 : 0;
             if ($ppId > 0 && isset($out[$ppId])) {
                 $out[$ppId]['mag_cost'] += $cost;
-            } else {
-                // nivel proiect -> distribuim pe bucăți
-                foreach ($ppIds as $pid) {
-                    $weight = (float)($w['weightById'][$pid] ?? 0.0);
-                    if ($weight <= 0) continue;
-                    $out[$pid]['mag_cost'] += ($cost * $weight);
-                }
+                continue;
+            }
+
+            // nivel proiect -> distribuim doar către piesele eligibile la momentul consumului
+            $eligible = self::eligibleIdsForEvent($meta, $evtTs);
+            if (!$eligible) continue;
+            $weights = self::weightsForIds($meta, $eligible);
+            foreach ($eligible as $pid) {
+                $wgt = (float)($weights[$pid] ?? 0.0);
+                if ($wgt <= 0) continue;
+                $out[$pid]['mag_cost'] += ($cost * $wgt);
             }
         }
         return $out;
+    }
+
+    /**
+     * Accesorii (cantitativ) pe produs pentru afișarea în cardul "Consum".
+     * - consumurile legate direct de produs rămân pe produs
+     * - consumurile la nivel de proiect se distribuie pe bucăți (qty) doar către piesele eligibile la momentul consumului
+     *
+     * @return array<int, array<int, array{item_id:int,mode:string,src:string,code:string,name:string,unit:string,qty:float,unit_price:?float}>>
+     */
+    private static function accessoriesByProductForDisplay(array $projectProducts, array $magConsum): array
+    {
+        $meta = self::productMetaForAlloc($projectProducts);
+        $ppIds = array_keys($meta);
+        $valid = array_fill_keys($ppIds, true);
+        $out = [];
+        foreach ($ppIds as $ppId) $out[$ppId] = [];
+
+        foreach ($magConsum as $c) {
+            $qty = isset($c['qty']) ? (float)$c['qty'] : 0.0;
+            if ($qty <= 0) continue;
+            $evtTs = self::dtToTs(isset($c['created_at']) ? (string)$c['created_at'] : null);
+            $unit = (string)($c['unit'] ?? '');
+            $mode = (string)($c['mode'] ?? '');
+            $iid = (int)($c['item_id'] ?? 0);
+            if ($iid <= 0) continue;
+            $code = (string)($c['winmentor_code'] ?? '');
+            $name = (string)($c['item_name'] ?? '');
+            $up = (isset($c['item_unit_price']) && $c['item_unit_price'] !== null && $c['item_unit_price'] !== '' && is_numeric($c['item_unit_price']))
+                ? (float)$c['item_unit_price']
+                : null;
+
+            $ppId = isset($c['project_product_id']) && $c['project_product_id'] !== null && $c['project_product_id'] !== ''
+                ? (int)$c['project_product_id']
+                : 0;
+            if ($ppId > 0 && isset($valid[$ppId])) {
+                $key = $iid . '|' . $mode . '|DIRECT';
+                if (!isset($out[$ppId][$key])) {
+                    $out[$ppId][$key] = ['item_id' => $iid, 'mode' => $mode, 'src' => 'DIRECT', 'code' => $code, 'name' => $name, 'unit' => $unit, 'qty' => 0.0, 'unit_price' => $up];
+                }
+                $out[$ppId][$key]['qty'] += $qty;
+                continue;
+            }
+
+            // nivel proiect -> distribuim către piesele eligibile
+            $eligible = self::eligibleIdsForEvent($meta, $evtTs);
+            if (!$eligible) continue;
+            $weights = self::weightsForIds($meta, $eligible);
+            foreach ($eligible as $pid) {
+                $wgt = (float)($weights[$pid] ?? 0.0);
+                if ($wgt <= 0) continue;
+                $allocQty = $qty * $wgt;
+                if ($allocQty <= 0) continue;
+                $key = $iid . '|' . $mode . '|PROIECT';
+                if (!isset($out[$pid][$key])) {
+                    $out[$pid][$key] = ['item_id' => $iid, 'mode' => $mode, 'src' => 'PROIECT', 'code' => $code, 'name' => $name, 'unit' => $unit, 'qty' => 0.0, 'unit_price' => $up];
+                }
+                $out[$pid][$key]['qty'] += $allocQty;
+            }
+        }
+
+        // normalize arrays
+        $res = [];
+        foreach ($out as $ppId => $rows) {
+            $res[$ppId] = array_values($rows);
+        }
+        return $res;
     }
 
     /**
@@ -993,12 +1119,14 @@ final class ProjectsController
                     try { $projectHplPieces = HplStockPiece::forProject($id); } catch (\Throwable $e) { $projectHplPieces = []; }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
         $hplBy = self::hplCostByProduct($projectProducts);
+                    $accBy = self::accessoriesByProductForDisplay($projectProducts, $magazieConsum);
                     foreach ($projectProducts as $pp) {
                         $ppId = (int)($pp['id'] ?? 0);
                         if ($ppId <= 0) continue;
                         $materialsByProduct[$ppId] = [
                             'mag_cost' => (float)($magBy[$ppId]['mag_cost'] ?? 0.0),
                             'hpl_cost' => (float)($hplBy[$ppId]['hpl_cost'] ?? 0.0),
+                            'acc_rows' => $accBy[$ppId] ?? [],
                         ];
                     }
             $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum);
@@ -1223,6 +1351,23 @@ final class ProjectsController
     {
         $u = Auth::user();
         return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+    }
+
+    public static function canEditProjectProducts(): bool
+    {
+        $u = Auth::user();
+        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+    }
+
+    /** Operator-ul nu mai poate edita după Gata de livrare (inclusiv). */
+    public static function canOperatorEditProjectProduct(array $ppRow): bool
+    {
+        $u = Auth::user();
+        if (!$u) return false;
+        $role = (string)($u['role'] ?? '');
+        if ($role !== Auth::ROLE_OPERATOR) return true;
+        $st = (string)($ppRow['production_status'] ?? 'CREAT');
+        return !self::isFinalProductStatus($st);
     }
 
     public static function canSetProjectProductStatus(): bool
@@ -1597,6 +1742,16 @@ final class ProjectsController
         if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        // Cerință: după Gata de livrare, OPERATOR nu mai poate edita nimic.
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($before['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate edita.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
         }
 
         $name = trim((string)($_POST['name'] ?? ''));
@@ -2708,6 +2863,15 @@ final class ProjectsController
         if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        // Cerință: după Gata de livrare, OPERATOR nu mai poate adăuga/edita consumuri pe piesă.
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($pp['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
         }
 
         $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);

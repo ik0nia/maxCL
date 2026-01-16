@@ -131,11 +131,44 @@ final class ProjectProduct
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('UPDATE project_products SET production_status = :st WHERE id = :id');
-        $st->execute([
-            ':id' => $id,
-            ':st' => $status,
-        ]);
+        $status = trim($status);
+        // finalized_at: setăm când trece la GATA_DE_LIVRARE (sau după), iar dacă revine înapoi înainte de asta, resetăm.
+        $isFinal = in_array($status, ['GATA_DE_LIVRARE','AVIZAT','LIVRAT'], true);
+        $isBeforeFinal = in_array($status, ['CREAT','PROIECTARE','CNC','MONTAJ'], true);
+        try {
+            if ($isFinal) {
+                $st = $pdo->prepare("
+                    UPDATE project_products
+                    SET production_status = :st,
+                        finalized_at = COALESCE(finalized_at, NOW())
+                    WHERE id = :id
+                ");
+            } elseif ($isBeforeFinal) {
+                $st = $pdo->prepare("
+                    UPDATE project_products
+                    SET production_status = :st,
+                        finalized_at = NULL
+                    WHERE id = :id
+                ");
+            } else {
+                $st = $pdo->prepare("
+                    UPDATE project_products
+                    SET production_status = :st
+                    WHERE id = :id
+                ");
+            }
+            $st->execute([
+                ':id' => $id,
+                ':st' => $status,
+            ]);
+        } catch (\Throwable $e) {
+            // Compat: dacă finalized_at nu există încă
+            $st = $pdo->prepare('UPDATE project_products SET production_status = :st WHERE id = :id');
+            $st->execute([
+                ':id' => $id,
+                ':st' => $status,
+            ]);
+        }
     }
 
     public static function delete(int $id): void

@@ -319,6 +319,7 @@ CREATE TABLE IF NOT EXISTS project_products (
   cnc_override_json JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  finalized_at DATETIME NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_proj_prod (project_id, product_id),
   KEY idx_proj_prod_project (project_id),
