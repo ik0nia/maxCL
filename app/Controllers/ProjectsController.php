@@ -1350,7 +1350,7 @@ final class ProjectsController
     public static function canWrite(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     public static function canEditProjectProducts(): bool
