@@ -106,7 +106,8 @@ ob_start();
               $stdW = (int)($r['std_width_mm'] ?? 0);
               $stdH = (int)($r['std_height_mm'] ?? 0);
               $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
-              $eq = $qb > 0 ? $qb : (($area > 0 && $qm2 > 0) ? ($qm2 / $area) : 0.0);
+              // Preferăm mp/aria plăcii, ca să includă și jumătăți (qty_boards e 0 la 1/2).
+              $eq = ($area > 0 && $qm2 > 0) ? ($qm2 / $area) : $qb;
               $eqTxt = '0';
               if ($eq > 0) {
                 if (abs($eq - 0.5) < 0.06) $eqTxt = '0.5';
@@ -163,7 +164,8 @@ ob_start();
               $stdW = (int)($r['std_width_mm'] ?? 0);
               $stdH = (int)($r['std_height_mm'] ?? 0);
               $area = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
-              $eq = $qb > 0 ? $qb : (($area > 0 && $qm2 > 0) ? ($qm2 / $area) : 0.0);
+              // Preferăm mp/aria plăcii, ca să includă și jumătăți (qty_boards e 0 la 1/2).
+              $eq = ($area > 0 && $qm2 > 0) ? ($qm2 / $area) : $qb;
               $eqTxt = '0';
               if ($eq > 0) {
                 if (abs($eq - 0.5) < 0.06) $eqTxt = '0.5';
