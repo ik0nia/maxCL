@@ -531,44 +531,11 @@ ob_start();
           }
         ?>
 
-        <?php if ($canSeePricesRole): ?>
-          <div class="d-flex justify-content-end mt-2">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" role="switch" id="ppTogglePrices">
-              <label class="form-check-label" for="ppTogglePrices">Afișează prețuri</label>
-            </div>
-          </div>
-          <script>
-            document.addEventListener('DOMContentLoaded', function(){
-              const key = 'pp_show_prices_v1';
-              const cb = document.getElementById('ppTogglePrices');
-              if (!cb) return;
-              const apply = (on) => {
-                document.querySelectorAll('.js-price').forEach(function(el){
-                  if (on) el.classList.remove('d-none');
-                  else el.classList.add('d-none');
-                });
-              };
-              try {
-                const saved = localStorage.getItem(key);
-                const on = saved === '1';
-                cb.checked = on;
-                apply(on);
-              } catch (e) {}
-              cb.addEventListener('change', function(){
-                const on = !!cb.checked;
-                apply(on);
-                try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
-              });
-            });
-          </script>
-        <?php endif; ?>
-
         <?php if (!$projectProducts): ?>
           <div class="text-muted mt-2">Nu există produse încă.</div>
         <?php else: ?>
           <div class="row g-3 mt-2">
-            <?php foreach ($projectProducts as $pp): ?>
+            <?php foreach ($projectProducts as $ppIdx => $pp): ?>
               <?php
                 $ppId = (int)($pp['id'] ?? 0);
                 $qty = (float)($pp['qty'] ?? 0);
@@ -771,7 +738,39 @@ ob_start();
                   ?>
 
                   <div class="mt-3">
-                    <div class="fw-semibold">Consum</div>
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                      <div class="fw-semibold">Consum</div>
+                      <?php if ($canSeePricesRole && (int)$ppIdx === 0): ?>
+                        <div class="form-check form-switch m-0">
+                          <input class="form-check-input" type="checkbox" role="switch" id="ppTogglePrices">
+                          <label class="form-check-label text-muted" for="ppTogglePrices">Afișează prețuri</label>
+                        </div>
+                        <script>
+                          document.addEventListener('DOMContentLoaded', function(){
+                            const key = 'pp_show_prices_v1';
+                            const cb = document.getElementById('ppTogglePrices');
+                            if (!cb) return;
+                            const apply = (on) => {
+                              document.querySelectorAll('.js-price').forEach(function(el){
+                                if (on) el.classList.remove('d-none');
+                                else el.classList.add('d-none');
+                              });
+                            };
+                            try {
+                              const saved = localStorage.getItem(key);
+                              const on = saved === '1';
+                              cb.checked = on;
+                              apply(on);
+                            } catch (e) {}
+                            cb.addEventListener('change', function(){
+                              const on = !!cb.checked;
+                              apply(on);
+                              try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+                            });
+                          });
+                        </script>
+                      <?php endif; ?>
+                    </div>
 
                     <div class="mt-2">
                       <div class="text-muted small fw-semibold">Accesorii</div>
