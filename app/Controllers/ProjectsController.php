@@ -482,7 +482,6 @@ final class ProjectsController
                 WHERE board_id = ?
                   AND piece_type = 'FULL'
                   AND status = 'AVAILABLE'
-                  AND (is_accounting = 1 OR is_accounting IS NULL)
             ");
             $st->execute([(int)$boardId]);
             $r = $st->fetch();
@@ -543,7 +542,7 @@ final class ProjectsController
         $fromLocation = $fromLocation !== null ? trim((string)$fromLocation) : null;
         $toLocation = $toLocation !== null ? trim((string)$toLocation) : null;
 
-        // Compat: is_accounting poate lipsi; încercăm filtrat, altfel fără.
+        // Notă: pentru plăcile FULL nu filtrăm după is_accounting (compat cu date vechi).
         $rows = [];
         try {
             $st = $pdo->prepare("
@@ -566,7 +565,6 @@ final class ProjectsController
                               AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
                         )
                   )
-                  AND (is_accounting = 1 OR is_accounting IS NULL)
                 ORDER BY (location = 'Producție') DESC, created_at ASC, id ASC
                 FOR UPDATE
             ");
@@ -2290,7 +2288,7 @@ final class ProjectsController
                               AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
                         )
                   )
-                  AND (is_accounting = 1 OR is_accounting IS NULL)
+                  /* FULL: nu filtrăm după is_accounting (compat) */
                 ORDER BY (location = 'Producție') DESC, created_at ASC, id ASC
                 FOR UPDATE
             ");
@@ -2392,7 +2390,7 @@ final class ProjectsController
                               AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
                         )
                   )
-                  AND (is_accounting = 1 OR is_accounting IS NULL)
+                  /* FULL: nu filtrăm după is_accounting (compat) */
                 ORDER BY (location = 'Producție') DESC, created_at ASC, id ASC
                 FOR UPDATE
             ");
