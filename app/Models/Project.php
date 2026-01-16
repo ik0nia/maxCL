@@ -42,6 +42,8 @@ final class Project
 
         $where = [];
         $params = [];
+        // soft-delete: ascundem proiectele șterse
+        $where[] = 'p.deleted_at IS NULL';
         if ($q !== '') {
             $where[] = '(p.code LIKE :q OR p.name LIKE :q)';
             $params[':q'] = '%' . $q . '%';
@@ -68,7 +70,7 @@ final class Project
             return $st->fetchAll();
         } catch (\Throwable $e) {
             // Compat: instalări vechi fără client_group_id/status extins etc.
-            if (!self::isUnknownColumn($e, 'client_group_id')) {
+            if (!self::isUnknownColumn($e, 'client_group_id') && !self::isUnknownColumn($e, 'deleted_at')) {
                 throw $e;
             }
             $sql2 = "
@@ -80,7 +82,7 @@ final class Project
             ";
             if ($where) {
                 // scoatem filtrul pe status dacă enum-ul diferă? păstrăm simplu.
-                $sql2 .= ' WHERE ' . implode(' AND ', array_filter($where, fn($w) => !str_contains($w, 'p.client_group_id')));
+                $sql2 .= ' WHERE ' . implode(' AND ', array_filter($where, fn($w) => !str_contains($w, 'p.client_group_id') && !str_contains($w, 'p.deleted_at')));
             }
             $sql2 .= ' ORDER BY p.created_at DESC LIMIT ' . (int)$limit;
             $st = $pdo->prepare($sql2);
@@ -94,9 +96,16 @@ final class Project
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('SELECT * FROM projects WHERE client_id = ? ORDER BY created_at DESC');
-        $st->execute([$clientId]);
-        return $st->fetchAll();
+        try {
+            $st = $pdo->prepare('SELECT * FROM projects WHERE client_id = ? AND deleted_at IS NULL ORDER BY created_at DESC');
+            $st->execute([$clientId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'deleted_at')) throw $e;
+            $st = $pdo->prepare('SELECT * FROM projects WHERE client_id = ? ORDER BY created_at DESC');
+            $st->execute([$clientId]);
+            return $st->fetchAll();
+        }
     }
 
     /** @return array<string,mixed>|null */
@@ -104,10 +113,19 @@ final class Project
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('SELECT * FROM projects WHERE code = ? LIMIT 1');
-        $st->execute([trim($code)]);
-        $row = $st->fetch();
-        return $row ?: null;
+        $code = trim($code);
+        try {
+            $st = $pdo->prepare('SELECT * FROM projects WHERE code = ? AND deleted_at IS NULL LIMIT 1');
+            $st->execute([$code]);
+            $row = $st->fetch();
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'deleted_at')) throw $e;
+            $st = $pdo->prepare('SELECT * FROM projects WHERE code = ? LIMIT 1');
+            $st->execute([$code]);
+            $row = $st->fetch();
+            return $row ?: null;
+        }
     }
 
     /**

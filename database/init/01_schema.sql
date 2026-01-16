@@ -254,15 +254,19 @@ CREATE TABLE IF NOT EXISTS projects (
   created_by INT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  deleted_by INT UNSIGNED NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_projects_code (code),
   KEY idx_projects_client (client_id),
   KEY idx_projects_group (client_group_id),
   KEY idx_projects_status (status),
   KEY idx_projects_created (created_at),
+  KEY idx_projects_deleted (deleted_at),
   CONSTRAINT fk_projects_client FOREIGN KEY (client_id) REFERENCES clients(id),
   CONSTRAINT fk_projects_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id),
-  CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id)
+  CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_projects_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Produse (piesele din proiect)

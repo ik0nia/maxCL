@@ -249,6 +249,7 @@ $router->post('/projects/create', fn() => ProjectsController::create(), $project
 $router->get('/projects/{id}', fn($p) => ProjectsController::show($p), $projectsReadMW);
 $router->post('/projects/{id}/edit', fn($p) => ProjectsController::update($p), $projectsWriteMW);
 $router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatus($p), $projectsWriteMW);
+$router->post('/projects/{id}/delete', fn($p) => ProjectsController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/projects/{id}/products/add-existing', fn($p) => ProjectsController::addExistingProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/create', fn($p) => ProjectsController::createProductInProject($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsController::updateProjectProduct($p), $projectsProductEditMW);

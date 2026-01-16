@@ -9,6 +9,7 @@ $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
 $canEditProducts = ProjectsController::canEditProjectProducts();
 $canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$canDelete = ProjectsController::canDelete();
 
 $project = $project ?? [];
 $tab = (string)($tab ?? 'general');
@@ -149,6 +150,17 @@ ob_start();
               </button>
             </div>
           </form>
+          <?php if ($canDelete): ?>
+            <div class="d-flex justify-content-end mt-3">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/delete')) ?>"
+                    onsubmit="return confirm('Ștergi proiectul <?= htmlspecialchars((string)($project['code'] ?? '')) ?> · <?= htmlspecialchars((string)($project['name'] ?? '')) ?>?');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-outline-danger" type="submit">
+                  <i class="bi bi-trash me-1"></i> Șterge proiect
+                </button>
+              </form>
+            </div>
+          <?php endif; ?>
         <?php else: ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
         <?php endif; ?>

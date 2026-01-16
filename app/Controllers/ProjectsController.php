@@ -1124,6 +1124,10 @@ final class ProjectsController
                     Session::flash('toast_error', 'Proiect inexistent.');
                     Response::redirect('/projects');
                 }
+                if (!empty($project['deleted_at'])) {
+                    Session::flash('toast_error', 'Acest proiect a fost șters.');
+                    Response::redirect('/projects');
+                }
 
                 $projectProducts = [];
                 $magazieConsum = [];
@@ -1382,6 +1386,66 @@ final class ProjectsController
     {
         $u = Auth::user();
         return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+    }
+
+    public static function canDelete(): bool
+    {
+        $u = Auth::user();
+        return $u && (string)($u['role'] ?? '') === Auth::ROLE_ADMIN;
+    }
+
+    public static function delete(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $id = (int)($params['id'] ?? 0);
+        if ($id <= 0) {
+            Session::flash('toast_error', 'Proiect invalid.');
+            Response::redirect('/projects');
+        }
+
+        $before = Project::find($id);
+        if (!$before) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        if (!self::canDelete()) {
+            Session::flash('toast_error', 'Nu ai drepturi să ștergi proiecte.');
+            Response::redirect('/projects/' . $id);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $after = $before;
+        $after['deleted_at'] = $now;
+        $after['deleted_by'] = Auth::id();
+
+        try {
+            $pdo = \App\Core\DB::pdo();
+            $pdo->beginTransaction();
+
+            // Soft delete (best-effort compat)
+            try {
+                $st = $pdo->prepare('UPDATE projects SET deleted_at = :dt, deleted_by = :by WHERE id = :id AND (deleted_at IS NULL OR deleted_at = \'\')');
+                $st->execute([':dt' => $now, ':by' => Auth::id(), ':id' => $id]);
+            } catch (\Throwable $e) {
+                // dacă coloanele nu există încă, încercăm migrările și reîncercăm
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                $st = $pdo->prepare('UPDATE projects SET deleted_at = :dt, deleted_by = :by WHERE id = :id');
+                $st->execute([':dt' => $now, ':by' => Auth::id(), ':id' => $id]);
+            }
+
+            Audit::log('PROJECT_DELETE', 'projects', $id, $before, $after, [
+                'message' => 'A șters proiect: ' . (string)($before['code'] ?? '') . ' · ' . (string)($before['name'] ?? ''),
+            ]);
+
+            $pdo->commit();
+            Session::flash('toast_success', 'Proiect șters.');
+        } catch (\Throwable $e) {
+            try { $pdo = \App\Core\DB::pdo(); if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot șterge proiectul: ' . $e->getMessage());
+        }
+
+        Response::redirect('/projects');
     }
 
     public static function canEditProjectProducts(): bool

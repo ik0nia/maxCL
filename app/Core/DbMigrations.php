@@ -971,6 +971,39 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-16_03_projects_soft_delete',
+                'label' => 'ALTER projects ADD deleted_at + deleted_by',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    if (!self::columnExists($pdo, 'projects', 'deleted_at')) {
+                        try {
+                            $pdo->exec("ALTER TABLE projects ADD COLUMN deleted_at DATETIME NULL AFTER updated_at");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                    if (!self::columnExists($pdo, 'projects', 'deleted_by')) {
+                        try {
+                            $pdo->exec("ALTER TABLE projects ADD COLUMN deleted_by INT UNSIGNED NULL AFTER deleted_at");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                    try {
+                        $pdo->exec("ALTER TABLE projects ADD KEY idx_projects_deleted (deleted_at)");
+                    } catch (\Throwable $e) {
+                        // ignore (poate există deja)
+                    }
+                    try {
+                        if (self::tableExists($pdo, 'users')) {
+                            $pdo->exec("ALTER TABLE projects ADD CONSTRAINT fk_projects_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL");
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
         ];
     }
 
