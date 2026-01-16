@@ -1004,6 +1004,43 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-16_04_project_product_hpl_consumptions',
+                'label' => 'CREATE TABLE project_product_hpl_consumptions',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'project_product_hpl_consumptions')) return;
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::tableExists($pdo, 'hpl_boards')) return;
+                    if (!self::tableExists($pdo, 'hpl_stock_pieces')) return;
+                    if (!self::tableExists($pdo, 'users')) return;
+                    $pdo->exec("
+                        CREATE TABLE project_product_hpl_consumptions (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          project_id INT UNSIGNED NOT NULL,
+                          project_product_id BIGINT UNSIGNED NOT NULL,
+                          board_id INT UNSIGNED NOT NULL,
+                          stock_piece_id INT UNSIGNED NULL,
+                          source ENUM('PROJECT','REST') NOT NULL DEFAULT 'PROJECT',
+                          consume_mode ENUM('FULL','HALF') NOT NULL DEFAULT 'FULL',
+                          status ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'RESERVED',
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          consumed_at DATETIME NULL,
+                          PRIMARY KEY (id),
+                          KEY idx_pphc_project (project_id),
+                          KEY idx_pphc_pp (project_product_id),
+                          KEY idx_pphc_piece (stock_piece_id),
+                          KEY idx_pphc_status (status),
+                          CONSTRAINT fk_pphc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_pphc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_pphc_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+                          CONSTRAINT fk_pphc_piece FOREIGN KEY (stock_piece_id) REFERENCES hpl_stock_pieces(id) ON DELETE SET NULL,
+                          CONSTRAINT fk_pphc_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
         ];
     }
 
