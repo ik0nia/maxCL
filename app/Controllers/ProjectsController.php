@@ -1666,6 +1666,7 @@ final class ProjectsController
 
         $ppId = (int)($ppRow['id'] ?? 0);
         $pname = '';
+        $project = null;
         try {
             $prodId = (int)($ppRow['product_id'] ?? 0);
             if ($prodId > 0) {
@@ -1673,6 +1674,11 @@ final class ProjectsController
                 $pname = $p ? (string)($p['name'] ?? '') : '';
             }
         } catch (\Throwable $e) {}
+        try {
+            $project = Project::find($projectId);
+        } catch (\Throwable $e) {}
+        $projCode = $project ? (string)($project['code'] ?? '') : '';
+        $projName = $project ? (string)($project['name'] ?? '') : '';
 
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
@@ -1695,6 +1701,22 @@ final class ProjectsController
                     self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), $projectId);
                 self::insertProjectHplConsumption($pdo, $projectId, $boardId, 1, $fullM2, 'CONSUMED',
                     self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
+                    'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
+                    'board_id' => $boardId,
+                    'project_id' => $projectId,
+                    'project_code' => $projCode !== '' ? $projCode : null,
+                    'project_name' => $projName !== '' ? $projName : null,
+                    'project_product_id' => $ppId,
+                    'product_name' => $pname !== '' ? $pname : null,
+                    'qty_boards' => 1,
+                    'qty_m2' => (float)$fullM2,
+                    'via' => 'auto_consume_cnc_to_montaj',
+                    'url_board' => \App\Core\Url::to('/stock/boards/' . $boardId),
+                    'url_project' => \App\Core\Url::to('/projects/' . $projectId),
+                    'url_project_consum' => \App\Core\Url::to('/projects/' . $projectId . '?tab=consum'),
+                ]);
             } else {
                 // 1/2 placă
                 if (self::takeReservedHalfRemainder($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, $halfM2)) {
@@ -1703,6 +1725,23 @@ final class ProjectsController
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''));
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                    Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
+                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                            ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
+                        'board_id' => $boardId,
+                        'project_id' => $projectId,
+                        'project_code' => $projCode !== '' ? $projCode : null,
+                        'project_name' => $projName !== '' ? $projName : null,
+                        'project_product_id' => $ppId,
+                        'product_name' => $pname !== '' ? $pname : null,
+                        'qty_boards' => 0,
+                        'qty_m2' => (float)$halfM2,
+                        'via' => 'auto_consume_cnc_to_montaj',
+                        'from' => 'half_remainder',
+                        'url_board' => \App\Core\Url::to('/stock/boards/' . $boardId),
+                        'url_project' => \App\Core\Url::to('/projects/' . $projectId),
+                        'url_project_consum' => \App\Core\Url::to('/projects/' . $projectId . '?tab=consum'),
+                    ]);
                 } else {
                     // nu avem jumătate -> luăm 1 placă full rezervată
                     if (!self::takeReservedFullBoard($pdo, $projectId, $boardId, $fullM2)) {
@@ -1730,6 +1769,25 @@ final class ProjectsController
                     }
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         $consNote, Auth::id());
+                    Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
+                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                            ' · rest=' . $ra .
+                            ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
+                        'board_id' => $boardId,
+                        'project_id' => $projectId,
+                        'project_code' => $projCode !== '' ? $projCode : null,
+                        'project_name' => $projName !== '' ? $projName : null,
+                        'project_product_id' => $ppId,
+                        'product_name' => $pname !== '' ? $pname : null,
+                        'qty_boards' => 0,
+                        'qty_m2' => (float)$halfM2,
+                        'via' => 'auto_consume_cnc_to_montaj',
+                        'from' => 'cut_full',
+                        'remainder_action' => $ra,
+                        'url_board' => \App\Core\Url::to('/stock/boards/' . $boardId),
+                        'url_project' => \App\Core\Url::to('/projects/' . $projectId),
+                        'url_project_consum' => \App\Core\Url::to('/projects/' . $projectId . '?tab=consum'),
+                    ]);
                 }
             }
 

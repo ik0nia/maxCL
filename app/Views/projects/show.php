@@ -7,6 +7,7 @@ use App\Core\View;
 
 $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
+$canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
 $project = $project ?? [];
 $tab = (string)($tab ?? 'general');
@@ -1562,17 +1563,24 @@ ob_start();
                     <th class="text-end">Buc</th>
                     <th>Locație</th>
                     <th class="text-end">mp</th>
+                    <?php if ($canMoveHpl): ?><th class="text-end" style="width:260px">Acțiuni</th><?php endif; ?>
                   </tr>
                 </thead>
                 <tbody>
                   <?php foreach ($projectHplPieces as $p): ?>
                     <?php
                       $bid = (int)($p['board_id'] ?? 0);
+                      $pid = (int)($p['id'] ?? 0);
                       $bLabel = trim((string)($p['board_code'] ?? '') . ' · ' . (string)($p['board_name'] ?? ''));
                       $wmm = (int)($p['width_mm'] ?? 0);
                       $hmm = (int)($p['height_mm'] ?? 0);
                       $qty = (int)($p['qty'] ?? 0);
                       $mp = isset($p['area_total_m2']) ? (float)$p['area_total_m2'] : 0.0;
+                      $ptype = (string)($p['piece_type'] ?? '');
+                      $pstatus = (string)($p['status'] ?? '');
+                      $ploc = (string)($p['location'] ?? '');
+                      $isReturnable = ($ptype === 'FULL' && $pstatus === 'RESERVED');
+                      $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
                     ?>
                     <tr>
                       <td class="fw-semibold">
@@ -1590,6 +1598,27 @@ ob_start();
                       <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
                       <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
+                      <?php if ($canMoveHpl): ?>
+                        <td class="text-end">
+                          <?php if ($isReturnable && $bid > 0 && $pid > 0 && $qty > 0): ?>
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
+                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
+                              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
+                              <input type="hidden" name="to_location" value="Depozit">
+                              <input type="hidden" name="to_status" value="AVAILABLE">
+                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . (int)($project['id'] ?? 0)))) ?>">
+                              <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
+                                     name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
+                              <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
+                              </button>
+                            </form>
+                          <?php else: ?>
+                            <span class="text-muted">—</span>
+                          <?php endif; ?>
+                        </td>
+                      <?php endif; ?>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
