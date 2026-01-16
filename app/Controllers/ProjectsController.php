@@ -540,11 +540,23 @@ final class ProjectsController
                 WHERE board_id = ?
                   AND piece_type = 'FULL'
                   AND status = ?
+                  AND (
+                        ? IS NULL
+                        OR ? = 0
+                        OR status = 'AVAILABLE'
+                        OR project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                   AND (is_accounting = 1 OR is_accounting IS NULL)
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, $fromStatus]);
+            $st->execute([(int)$boardId, $fromStatus, $projectId, $projectId, $projectId, $projectId, $projectId]);
             $rows = $st->fetchAll();
         } catch (\Throwable $e) {
             $st = $pdo->prepare("
@@ -553,10 +565,22 @@ final class ProjectsController
                 WHERE board_id = ?
                   AND piece_type = 'FULL'
                   AND status = ?
+                  AND (
+                        ? IS NULL
+                        OR ? = 0
+                        OR status = 'AVAILABLE'
+                        OR project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, $fromStatus]);
+            $st->execute([(int)$boardId, $fromStatus, $projectId, $projectId, $projectId, $projectId, $projectId]);
             $rows = $st->fetchAll();
         }
 
@@ -1779,15 +1803,23 @@ final class ProjectsController
                 SELECT id
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
-                  AND project_id = ?
                   AND piece_type = 'FULL'
                   AND status = 'RESERVED'
                   AND qty > 0
+                  AND (
+                        project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                 ORDER BY created_at ASC, id ASC
                 LIMIT 1
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$projectId]);
+            $st->execute([(int)$boardId, (int)$projectId, (int)$projectId]);
             $ok = (bool)$st->fetch();
         } catch (\Throwable $e) {
             $ok = false;
@@ -1840,17 +1872,25 @@ final class ProjectsController
                 SELECT id
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
-                  AND project_id = ?
                   AND piece_type = 'OFFCUT'
                   AND status = 'RESERVED'
                   AND width_mm = ?
                   AND height_mm = ?
                   AND qty > 0
+                  AND (
+                        project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                 ORDER BY created_at ASC, id ASC
                 LIMIT 1
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$projectId, (int)$widthMm, (int)$halfHeightMm]);
+            $st->execute([(int)$boardId, (int)$widthMm, (int)$halfHeightMm, (int)$projectId, (int)$projectId]);
             $ok = (bool)$st->fetch();
         } catch (\Throwable $e) {
             $ok = false;
@@ -1903,31 +1943,47 @@ final class ProjectsController
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
-                  AND project_id = ?
                   AND piece_type = 'OFFCUT'
                   AND status = 'RESERVED'
                   AND width_mm = ?
                   AND height_mm = ?
+                  AND (
+                        project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                   AND (is_accounting = 1 OR is_accounting IS NULL)
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$projectId, (int)$widthMm, (int)$halfHeightMm]);
+            $st->execute([(int)$boardId, (int)$widthMm, (int)$halfHeightMm, (int)$projectId, (int)$projectId]);
             $rows = $st->fetchAll();
         } catch (\Throwable $e) {
             $st = $pdo->prepare("
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
-                  AND project_id = ?
                   AND piece_type = 'OFFCUT'
                   AND status = 'RESERVED'
                   AND width_mm = ?
                   AND height_mm = ?
+                  AND (
+                        project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$projectId, (int)$widthMm, (int)$halfHeightMm]);
+            $st->execute([(int)$boardId, (int)$widthMm, (int)$halfHeightMm, (int)$projectId, (int)$projectId]);
             $rows = $st->fetchAll();
         }
         if (!$rows) return;
@@ -1986,27 +2042,43 @@ final class ProjectsController
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
-                  AND project_id = ?
                   AND piece_type = 'FULL'
                   AND status = 'RESERVED'
+                  AND (
+                        project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                   AND (is_accounting = 1 OR is_accounting IS NULL)
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$projectId]);
+            $st->execute([(int)$boardId, (int)$projectId, (int)$projectId]);
             $rows = $st->fetchAll();
         } catch (\Throwable $e) {
             $st = $pdo->prepare("
                 SELECT *
                 FROM hpl_stock_pieces
                 WHERE board_id = ?
-                  AND project_id = ?
                   AND piece_type = 'FULL'
                   AND status = 'RESERVED'
+                  AND (
+                        project_id = ?
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE
             ");
-            $st->execute([(int)$boardId, (int)$projectId]);
+            $st->execute([(int)$boardId, (int)$projectId, (int)$projectId]);
             $rows = $st->fetchAll();
         }
         if (!$rows) return false;
