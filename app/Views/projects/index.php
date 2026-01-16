@@ -59,7 +59,7 @@ ob_start();
   <table class="table table-hover align-middle mb-0" id="projectsTable">
     <thead>
       <tr>
-        <th style="width:160px">Cod</th>
+        <th style="width:170px">Data creare</th>
         <th>Nume</th>
         <th style="width:160px">Client/Grup</th>
         <th style="width:160px">Status</th>
@@ -71,7 +71,7 @@ ob_start();
     <tbody>
       <?php foreach ($rows as $r): ?>
         <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/projects/' . (int)$r['id'])) ?>" role="button" tabindex="0">
-          <td class="fw-semibold"><?= htmlspecialchars((string)($r['code'] ?? '')) ?></td>
+          <td class="text-muted fw-semibold"><?= htmlspecialchars((string)($r['created_at'] ?? '')) ?></td>
           <td><?= htmlspecialchars((string)($r['name'] ?? '')) ?></td>
           <td class="text-muted">
             <?php if (!empty($r['client_name'])): ?>
@@ -103,6 +103,8 @@ ob_start();
       window.__projectsDT = new DataTable(el, {
         pageLength: 50,
         lengthMenu: [[25, 50, 100], [25, 50, 100]],
+        // implicit: cele mai noi proiecte primele (data creare desc)
+        order: [[0, 'desc']],
         language: {
           search: 'Caută:',
           searchPlaceholder: 'Caută în tabel…',
