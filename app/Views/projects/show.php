@@ -534,6 +534,13 @@ ob_start();
         <?php if (!$projectProducts): ?>
           <div class="text-muted mt-2">Nu există produse încă.</div>
         <?php else: ?>
+          <?php
+            // Total bucăți (pentru împărțirea consumurilor la nivel de proiect)
+            $ppTotalQty = 0.0;
+            foreach ($projectProducts as $pp0) {
+              $ppTotalQty += max(0.0, (float)($pp0['qty'] ?? 0));
+            }
+          ?>
           <div class="row g-3 mt-2">
             <?php foreach ($projectProducts as $ppIdx => $pp): ?>
               <?php
@@ -717,14 +724,27 @@ ob_start();
                     $accRows = [];
                     if (is_array($magazieConsum ?? null)) {
                       foreach ($magazieConsum as $mc) {
-                        if ((int)($mc['project_product_id'] ?? 0) !== $ppId) continue;
+                        $mcPpId = (int)($mc['project_product_id'] ?? 0);
+                        $isProjectLevel = $mcPpId <= 0;
+                        if (!$isProjectLevel && $mcPpId !== $ppId) continue;
+
+                        // Dacă e la nivel de proiect, alocăm proporțional cu qty (buc) pe produs
+                        $allocQty = (float)($mc['qty'] ?? 0);
+                        $allocTag = null;
+                        if ($isProjectLevel) {
+                          $w = ($ppTotalQty > 0.0) ? (max(0.0, $qty) / $ppTotalQty) : 0.0;
+                          $allocQty = $allocQty * $w;
+                          $allocTag = 'PROIECT';
+                          if ($allocQty <= 0) continue;
+                        }
                         $iid = (int)($mc['item_id'] ?? 0);
                         $mode = (string)($mc['mode'] ?? '');
-                        $key = $iid . '|' . $mode;
+                        $key = $iid . '|' . $mode . '|' . ($allocTag ?? 'DIRECT');
                         if (!isset($accRows[$key])) {
                           $accRows[$key] = [
                             'item_id' => $iid,
                             'mode' => $mode,
+                            'src' => $allocTag,
                             'code' => (string)($mc['winmentor_code'] ?? ''),
                             'name' => (string)($mc['item_name'] ?? ''),
                             'unit' => (string)($mc['unit'] ?? ''),
@@ -732,7 +752,7 @@ ob_start();
                             'unit_price' => (isset($mc['item_unit_price']) && $mc['item_unit_price'] !== null && $mc['item_unit_price'] !== '' && is_numeric($mc['item_unit_price'])) ? (float)$mc['item_unit_price'] : null,
                           ];
                         }
-                        $accRows[$key]['qty'] += (float)($mc['qty'] ?? 0);
+                        $accRows[$key]['qty'] += (float)$allocQty;
                       }
                     }
                   ?>
@@ -795,6 +815,7 @@ ob_start();
                                   if ($aq <= 0) continue;
                                   $unit = (string)($ar['unit'] ?? '');
                                   $mode = (string)($ar['mode'] ?? '');
+                                  $srcTag = (string)($ar['src'] ?? '');
                                   $up = $ar['unit_price'];
                                   $val = ($up !== null) ? ($up * $aq) : null;
                                   $badgeCls = ($mode === 'CONSUMED') ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis';
@@ -802,6 +823,9 @@ ob_start();
                                 <tr>
                                   <td class="fw-semibold">
                                     <?= htmlspecialchars(trim((string)($ar['code'] ?? '') . ' · ' . (string)($ar['name'] ?? ''))) ?>
+                                    <?php if ($srcTag !== ''): ?>
+                                      <span class="badge rounded-pill bg-light text-secondary-emphasis ms-1"><?= htmlspecialchars($srcTag) ?></span>
+                                    <?php endif; ?>
                                     <?php if ($mode !== ''): ?>
                                       <span class="badge rounded-pill <?= $badgeCls ?> ms-1"><?= htmlspecialchars($mode) ?></span>
                                     <?php endif; ?>
