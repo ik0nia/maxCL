@@ -996,10 +996,16 @@ final class ProjectsController
 
     public static function createForm(): void
     {
+        $nextCode = '';
+        try { $nextCode = Project::nextAutoCode(1000, false); } catch (\Throwable $e) { $nextCode = ''; }
+        $labelsAll = [];
+        try { $labelsAll = Label::all(); } catch (\Throwable $e) { $labelsAll = []; }
+
         echo View::render('projects/form', [
             'title' => 'Proiect nou',
             'mode' => 'create',
             'row' => [
+                'code' => $nextCode,
                 'status' => 'DRAFT',
                 'priority' => 0,
             ],
@@ -1007,6 +1013,8 @@ final class ProjectsController
             'statuses' => self::statuses(),
             'clients' => Client::allWithProjects(), // reuse list (name/type)
             'groups' => ClientGroup::forSelect(),
+            'labelsAll' => $labelsAll,
+            'labelsSelected' => [],
         ]);
     }
 
@@ -1015,7 +1023,6 @@ final class ProjectsController
         Csrf::verify($_POST['_csrf'] ?? null);
 
         $check = Validator::required($_POST, [
-            'code' => 'Cod',
             'name' => 'Nume',
         ]);
         $errors = $check['errors'];
@@ -1037,43 +1044,68 @@ final class ProjectsController
         if ($status !== '' && !in_array($status, $allowedStatuses, true)) $errors['status'] = 'Status invalid.';
 
         if ($errors) {
+            $nextCode = '';
+            try { $nextCode = Project::nextAutoCode(1000, false); } catch (\Throwable $e) { $nextCode = ''; }
+            $labelsAll = [];
+            try { $labelsAll = Label::all(); } catch (\Throwable $e) { $labelsAll = []; }
+
             echo View::render('projects/form', [
                 'title' => 'Proiect nou',
                 'mode' => 'create',
-                'row' => $_POST,
+                'row' => array_merge($_POST, ['code' => $nextCode]),
                 'errors' => $errors,
                 'statuses' => self::statuses(),
                 'clients' => Client::allWithProjects(),
                 'groups' => ClientGroup::forSelect(),
+                'labelsAll' => $labelsAll,
+                'labelsSelected' => [],
             ]);
             return;
         }
 
         $data = [
-            'code' => trim((string)$_POST['code']),
             'name' => trim((string)$_POST['name']),
             'description' => trim((string)($_POST['description'] ?? '')) ?: null,
             'category' => trim((string)($_POST['category'] ?? '')) ?: null,
             'status' => $status ?: 'DRAFT',
             'priority' => $priority,
-            'start_date' => trim((string)($_POST['start_date'] ?? '')) ?: null,
             'due_date' => trim((string)($_POST['due_date'] ?? '')) ?: null,
             'notes' => trim((string)($_POST['notes'] ?? '')) ?: null,
             'technical_notes' => trim((string)($_POST['technical_notes'] ?? '')) ?: null,
-            'tags' => trim((string)($_POST['tags'] ?? '')) ?: null,
+            'tags' => null,
             'client_id' => $clientId,
             'client_group_id' => $groupId,
             'created_by' => Auth::id(),
         ];
 
         try {
+            /** @var \PDO $pdo */
+            $pdo = \App\Core\DB::pdo();
+            $pdo->beginTransaction();
+
+            // Cod incremental (numeric), începând de la 1000
+            $data['code'] = Project::nextAutoCode(1000, true);
             $id = Project::create($data);
+
+            // Etichete (labels) la creare
+            $labelsRaw = trim((string)($_POST['labels'] ?? ''));
+            $labelNames = array_values(array_unique(array_filter(array_map(fn($s) => trim((string)$s), preg_split('/[,\n]+/', $labelsRaw) ?: []), fn($s) => $s !== '')));
+            foreach ($labelNames as $ln) {
+                $lid = Label::upsert($ln);
+                if ($lid > 0) {
+                    EntityLabel::attach('projects', $id, $lid, 'DIRECT', Auth::id());
+                }
+            }
+
             Audit::log('PROJECT_CREATE', 'projects', $id, null, $data, [
                 'message' => 'A creat proiect: ' . $data['code'] . ' · ' . $data['name'],
+                'labels' => $labelNames ? implode(', ', $labelNames) : null,
             ]);
+            $pdo->commit();
             Session::flash('toast_success', 'Proiect creat.');
             Response::redirect('/projects/' . $id);
         } catch (\Throwable $e) {
+            try { /** @var \PDO $pdo */ $pdo = \App\Core\DB::pdo(); if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot crea proiectul: ' . $e->getMessage());
             Response::redirect('/projects/create');
         }
@@ -1242,7 +1274,6 @@ final class ProjectsController
         }
 
         $check = Validator::required($_POST, [
-            'code' => 'Cod',
             'name' => 'Nume',
         ]);
         $errors = $check['errors'];
@@ -1269,19 +1300,19 @@ final class ProjectsController
         }
 
         $after = [
-            'code' => trim((string)$_POST['code']),
+            // cod auto - nu se editează manual
+            'code' => (string)($before['code'] ?? ''),
             'name' => trim((string)$_POST['name']),
             'description' => trim((string)($_POST['description'] ?? '')) ?: null,
             'category' => trim((string)($_POST['category'] ?? '')) ?: null,
             'status' => $status ?: 'DRAFT',
             'priority' => $priority,
-            'start_date' => trim((string)($_POST['start_date'] ?? '')) ?: null,
             'due_date' => trim((string)($_POST['due_date'] ?? '')) ?: null,
             'completed_at' => $before['completed_at'] ?? null,
             'cancelled_at' => $before['cancelled_at'] ?? null,
             'notes' => trim((string)($_POST['notes'] ?? '')) ?: null,
             'technical_notes' => trim((string)($_POST['technical_notes'] ?? '')) ?: null,
-            'tags' => trim((string)($_POST['tags'] ?? '')) ?: null,
+            'tags' => $before['tags'] ?? null,
             'client_id' => $clientId,
             'client_group_id' => $groupId,
         ];
