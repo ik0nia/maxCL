@@ -488,6 +488,8 @@ ob_start();
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
 
         <?php
+          $canSeePricesRole = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+
           $ppStatusesAll = ProjectsController::projectProductStatuses();
           $ppStatusLabel = [];
           foreach ($ppStatusesAll as $s) $ppStatusLabel[(string)$s['value']] = (string)$s['label'];
@@ -528,6 +530,39 @@ ob_start();
             if ($ha > 0) $reservedHalvesByBoard[$bid] = (int)floor(($qm / $ha) + 1e-9);
           }
         ?>
+
+        <?php if ($canSeePricesRole): ?>
+          <div class="d-flex justify-content-end mt-2">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="ppTogglePrices">
+              <label class="form-check-label" for="ppTogglePrices">Afișează prețuri</label>
+            </div>
+          </div>
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              const key = 'pp_show_prices_v1';
+              const cb = document.getElementById('ppTogglePrices');
+              if (!cb) return;
+              const apply = (on) => {
+                document.querySelectorAll('.js-price').forEach(function(el){
+                  if (on) el.classList.remove('d-none');
+                  else el.classList.add('d-none');
+                });
+              };
+              try {
+                const saved = localStorage.getItem(key);
+                const on = saved === '1';
+                cb.checked = on;
+                apply(on);
+              } catch (e) {}
+              cb.addEventListener('change', function(){
+                const on = !!cb.checked;
+                apply(on);
+                try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+              });
+            });
+          </script>
+        <?php endif; ?>
 
         <?php if (!$projectProducts): ?>
           <div class="text-muted mt-2">Nu există produse încă.</div>
@@ -708,40 +743,119 @@ ob_start();
                     $hbCode = trim((string)($pp['hpl_board_code'] ?? ''));
                     $hbName = trim((string)($pp['hpl_board_name'] ?? ''));
                   ?>
-                  <?php if ($hbCode !== '' || $hbName !== ''): ?>
-                    <div class="text-muted small mt-2">
-                      <strong>HPL:</strong> <?= htmlspecialchars(trim($hbCode . ($hbName !== '' ? (' · ' . $hbName) : ''))) ?>
-                    </div>
-                  <?php endif; ?>
+                  <?php // HPL se afișează în secțiunea "Consum" de mai jos. ?>
 
-                  <div class="mt-3 text-muted small">
-                    <?php if ($showPerUnit): ?>
-                      <div><strong>Estimare/buc</strong></div>
-                      <div>
-                        CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncHUnit, 2, '.', '') ?>h = <?= number_format($cncCUnit, 2, '.', '') ?> lei ·
-                        Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atHUnit, 2, '.', '') ?>h = <?= number_format($atCUnit, 2, '.', '') ?> lei ·
-                        <span class="fw-semibold">Manoperă <?= number_format($manUnit, 2, '.', '') ?> lei</span>
-                      </div>
-                      <div>
-                        Materiale: Magazie <?= number_format($magUnit, 2, '.', '') ?> lei · HPL <?= number_format($hplUnit, 2, '.', '') ?> lei ·
-                        <span class="fw-semibold">Total <?= number_format($matUnit, 2, '.', '') ?> lei</span>
-                      </div>
-                      <div class="fw-semibold">Total estimat/buc: <?= number_format($totUnit, 2, '.', '') ?> lei</div>
-                      <hr class="my-2">
-                      <div><strong>Total (<?= number_format($qtyUnits, 2, '.', '') ?> buc)</strong></div>
-                    <?php else: ?>
-                      <div><strong>Estimare</strong></div>
-                    <?php endif; ?>
-                    <div>
-                      CNC <?= number_format($cncR, 2, '.', '') ?> × <?= number_format($cncH, 2, '.', '') ?>h = <?= number_format($cncC, 2, '.', '') ?> lei ·
-                      Atelier <?= number_format($atR, 2, '.', '') ?> × <?= number_format($atH, 2, '.', '') ?>h = <?= number_format($atC, 2, '.', '') ?> lei ·
-                      <span class="fw-semibold">Manoperă <?= number_format($manCost, 2, '.', '') ?> lei</span>
+                  <?php
+                    // Accesorii pe piesă (din consumuri proiect Magazie)
+                    $accRows = [];
+                    if (is_array($magazieConsum ?? null)) {
+                      foreach ($magazieConsum as $mc) {
+                        if ((int)($mc['project_product_id'] ?? 0) !== $ppId) continue;
+                        $iid = (int)($mc['item_id'] ?? 0);
+                        $mode = (string)($mc['mode'] ?? '');
+                        $key = $iid . '|' . $mode;
+                        if (!isset($accRows[$key])) {
+                          $accRows[$key] = [
+                            'item_id' => $iid,
+                            'mode' => $mode,
+                            'code' => (string)($mc['winmentor_code'] ?? ''),
+                            'name' => (string)($mc['item_name'] ?? ''),
+                            'unit' => (string)($mc['unit'] ?? ''),
+                            'qty' => 0.0,
+                            'unit_price' => (isset($mc['item_unit_price']) && $mc['item_unit_price'] !== null && $mc['item_unit_price'] !== '' && is_numeric($mc['item_unit_price'])) ? (float)$mc['item_unit_price'] : null,
+                          ];
+                        }
+                        $accRows[$key]['qty'] += (float)($mc['qty'] ?? 0);
+                      }
+                    }
+                  ?>
+
+                  <div class="mt-3">
+                    <div class="fw-semibold">Consum</div>
+
+                    <div class="mt-2">
+                      <div class="text-muted small fw-semibold">Accesorii</div>
+                      <?php if (!$accRows): ?>
+                        <div class="text-muted small">—</div>
+                      <?php else: ?>
+                        <div class="table-responsive mt-1">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr class="text-muted small">
+                                <th>Accesoriu</th>
+                                <th style="width:110px" class="text-end">Buc</th>
+                                <?php if ($canSeePricesRole): ?>
+                                  <th style="width:140px" class="text-end js-price d-none">Preț</th>
+                                <?php endif; ?>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <?php foreach ($accRows as $ar): ?>
+                                <?php
+                                  $aq = (float)($ar['qty'] ?? 0);
+                                  if ($aq <= 0) continue;
+                                  $unit = (string)($ar['unit'] ?? '');
+                                  $mode = (string)($ar['mode'] ?? '');
+                                  $up = $ar['unit_price'];
+                                  $val = ($up !== null) ? ($up * $aq) : null;
+                                  $badgeCls = ($mode === 'CONSUMED') ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis';
+                                ?>
+                                <tr>
+                                  <td class="fw-semibold">
+                                    <?= htmlspecialchars(trim((string)($ar['code'] ?? '') . ' · ' . (string)($ar['name'] ?? ''))) ?>
+                                    <?php if ($mode !== ''): ?>
+                                      <span class="badge rounded-pill <?= $badgeCls ?> ms-1"><?= htmlspecialchars($mode) ?></span>
+                                    <?php endif; ?>
+                                  </td>
+                                  <td class="text-end fw-semibold"><?= number_format($aq, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+                                  <?php if ($canSeePricesRole): ?>
+                                    <td class="text-end js-price d-none">
+                                      <?php if ($up !== null): ?>
+                                        <?= number_format((float)$up, 2, '.', '') ?> × <?= number_format((float)$aq, 3, '.', '') ?>
+                                        = <span class="fw-semibold"><?= number_format((float)$val, 2, '.', '') ?> lei</span>
+                                      <?php else: ?>
+                                        <span class="text-muted">—</span>
+                                      <?php endif; ?>
+                                    </td>
+                                  <?php endif; ?>
+                                </tr>
+                              <?php endforeach; ?>
+                            </tbody>
+                          </table>
+                        </div>
+                      <?php endif; ?>
                     </div>
-                    <div>
-                      Materiale: Magazie <?= number_format($magCost, 2, '.', '') ?> lei · HPL <?= number_format($hplCost, 2, '.', '') ?> lei ·
-                      <span class="fw-semibold">Total <?= number_format($matCost, 2, '.', '') ?> lei</span>
+
+                    <div class="mt-2">
+                      <div class="text-muted small fw-semibold">HPL</div>
+                      <?php if ($hbCode === '' && $hbName === ''): ?>
+                        <div class="text-muted small">—</div>
+                      <?php else: ?>
+                        <div class="text-muted small">
+                          <span class="fw-semibold"><?= htmlspecialchars($hbCode) ?></span><?= $hbName !== '' ? (' · ' . htmlspecialchars($hbName)) : '' ?>
+                          · <span class="fw-semibold"><?= htmlspecialchars($perTxt) ?></span>
+                          · total <span class="fw-semibold"><?= htmlspecialchars($totTxt) ?></span>
+                          <?php if ($canSeePricesRole): ?>
+                            <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$hplCost, 2, '.', '') ?> lei</span></span>
+                          <?php endif; ?>
+                        </div>
+                      <?php endif; ?>
                     </div>
-                    <div class="fw-semibold">Total estimat: <?= number_format($totalEst, 2, '.', '') ?> lei</div>
+
+                    <div class="mt-2">
+                      <div class="text-muted small fw-semibold">Manopere</div>
+                      <div class="text-muted small">
+                        CNC: <span class="fw-semibold"><?= number_format((float)$cncH, 2, '.', '') ?>h</span>
+                        <?php if ($canSeePricesRole): ?>
+                          <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$cncC, 2, '.', '') ?> lei</span></span>
+                        <?php endif; ?>
+                        <span class="text-muted"> · </span>
+                        Atelier: <span class="fw-semibold"><?= number_format((float)$atH, 2, '.', '') ?>h</span>
+                        <?php if ($canSeePricesRole): ?>
+                          <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$atC, 2, '.', '') ?> lei</span></span>
+                        <?php endif; ?>
+                      </div>
+                    </div>
                   </div>
 
                   <?php if ($canWrite): ?>
