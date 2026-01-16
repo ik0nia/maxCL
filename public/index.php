@@ -32,6 +32,7 @@ use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
 use App\Controllers\System\CostSettingsController;
 use App\Controllers\System\DbUpdateController;
+use App\Controllers\System\MaterialConsumptionsController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -233,6 +234,9 @@ $router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW
 
 $router->get('/system/costuri', fn() => CostSettingsController::index(), $usersMW);
 $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersMW);
+
+$systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
 
 $projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
