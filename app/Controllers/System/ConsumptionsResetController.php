@@ -60,6 +60,11 @@ final class ConsumptionsResetController
             if (self::tableExists($pdo, 'project_magazie_consumptions')) {
                 $counts['project_magazie_consumptions'] = (int)$pdo->exec('DELETE FROM project_magazie_consumptions');
             }
+            if (self::tableExists($pdo, 'hpl_stock_pieces')) {
+                $st = $pdo->prepare("DELETE FROM hpl_stock_pieces WHERE status = 'CONSUMED'");
+                $st->execute();
+                $counts['hpl_stock_pieces_consumed'] = (int)$st->rowCount();
+            }
             if (self::tableExists($pdo, 'magazie_movements')) {
                 $st = $pdo->prepare("
                     DELETE FROM magazie_movements
