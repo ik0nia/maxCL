@@ -3207,6 +3207,10 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
+        $src = strtoupper(trim((string)($_POST['src'] ?? 'DIRECT')));
+        $qtyReq = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        if ($qtyReq !== null && $qtyReq < 0) $qtyReq = null;
+
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
         $pdo->beginTransaction();
@@ -3221,24 +3225,62 @@ final class ProjectsController
             ");
             $stSel->execute([$projectId, $ppId, $itemId]);
             $rows = $stSel->fetchAll();
-            if (!$rows) {
-                throw new \RuntimeException('Nu există rezervări de anulat.');
-            }
             $sumQty = 0.0;
             $unit = '';
-            foreach ($rows as $r) {
-                $sumQty += (float)($r['qty'] ?? 0);
-                $unit = (string)($r['unit'] ?? $unit);
-            }
+            if ($rows) {
+                // DIRECT: ștergem rezervările de pe piesă (nu afectează stocul)
+                foreach ($rows as $r) {
+                    $sumQty += (float)($r['qty'] ?? 0);
+                    $unit = (string)($r['unit'] ?? $unit);
+                }
+                $stDel = $pdo->prepare("
+                    DELETE FROM project_magazie_consumptions
+                    WHERE project_id = ?
+                      AND project_product_id = ?
+                      AND item_id = ?
+                      AND mode = 'RESERVED'
+                ");
+                $stDel->execute([$projectId, $ppId, $itemId]);
+            } else {
+                // PROIECT: anulăm (scădem) din rezervarea la nivel de proiect cu cantitatea alocată acestei piese în UI.
+                if ($src !== 'PROIECT') throw new \RuntimeException('Nu există rezervări directe de anulat.');
+                if ($qtyReq === null || $qtyReq <= 0) throw new \RuntimeException('Cantitate invalidă pentru renunțare.');
 
-            $stDel = $pdo->prepare("
-                DELETE FROM project_magazie_consumptions
-                WHERE project_id = ?
-                  AND project_product_id = ?
-                  AND item_id = ?
-                  AND mode = 'RESERVED'
-            ");
-            $stDel->execute([$projectId, $ppId, $itemId]);
+                $stProj = $pdo->prepare("
+                    SELECT id, qty, unit
+                    FROM project_magazie_consumptions
+                    WHERE project_id = ?
+                      AND (project_product_id IS NULL OR project_product_id = 0)
+                      AND item_id = ?
+                      AND mode = 'RESERVED'
+                    ORDER BY created_at ASC, id ASC
+                    FOR UPDATE
+                ");
+                $stProj->execute([$projectId, $itemId]);
+                $projRows = $stProj->fetchAll();
+                if (!$projRows) throw new \RuntimeException('Nu există rezervări de proiect pentru acest accesoriu.');
+
+                $need = (float)$qtyReq;
+                $unit = (string)($projRows[0]['unit'] ?? '');
+                foreach ($projRows as $r) {
+                    if ($need <= 1e-9) break;
+                    $rid = (int)($r['id'] ?? 0);
+                    $q = (float)($r['qty'] ?? 0);
+                    if ($rid <= 0 || $q <= 0) continue;
+                    $take = min($q, $need);
+                    $newQ = $q - $take;
+                    if ($newQ <= 1e-9) {
+                        $pdo->prepare("DELETE FROM project_magazie_consumptions WHERE id = ?")->execute([$rid]);
+                    } else {
+                        $pdo->prepare("UPDATE project_magazie_consumptions SET qty = ? WHERE id = ?")->execute([$newQ, $rid]);
+                    }
+                    $sumQty += $take;
+                    $need -= $take;
+                }
+                if ($need > 1e-6) {
+                    throw new \RuntimeException('Rezervarea de proiect este insuficientă pentru cantitatea cerută.');
+                }
+            }
 
             $pdo->commit();
             Audit::log('PROJECT_PRODUCT_MAGAZIE_UNALLOCATE', 'project_magazie_consumptions', 0, null, null, [
@@ -3248,6 +3290,7 @@ final class ProjectsController
                 'item_id' => $itemId,
                 'qty' => $sumQty,
                 'unit' => $unit,
+                'src' => $rows ? 'DIRECT' : 'PROIECT',
             ]);
             Session::flash('toast_success', 'Rezervarea de accesoriu a fost anulată.');
         } catch (\Throwable $e) {
