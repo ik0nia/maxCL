@@ -24,6 +24,8 @@ final class MaterialConsumptionsController
         $dateTo = self::normalizeDate($dt);
 
         $hplRows = [];
+        $hplRowsProject = [];
+        $hplRowsProduct = [];
         $magRows = [];
         $hplAgg = [];
         $magAgg = [];
@@ -62,7 +64,74 @@ final class MaterialConsumptionsController
             $sql .= ' ORDER BY c.created_at DESC, c.id DESC LIMIT 5000';
             $st = $pdo->prepare($sql);
             $st->execute($params);
-            $hplRows = $st->fetchAll();
+            $hplRowsProject = $st->fetchAll();
+            $hplRows = $hplRowsProject;
+
+            // HPL consumptions from project products (pieces)
+            try {
+                $where = [];
+                $params = [];
+                if ($mode !== 'ALL') {
+                    $where[] = 'c.status = :mode';
+                    $params[':mode'] = $mode;
+                }
+                if ($dateFrom !== null) {
+                    $where[] = 'COALESCE(c.consumed_at, c.created_at) >= :df';
+                    $params[':df'] = $dateFrom . ' 00:00:00';
+                }
+                if ($dateTo !== null) {
+                    $where[] = 'COALESCE(c.consumed_at, c.created_at) <= :dt';
+                    $params[':dt'] = $dateTo . ' 23:59:59';
+                }
+                $sql = "
+                    SELECT
+                      c.id,
+                      COALESCE(c.consumed_at, c.created_at) AS created_at,
+                      c.status AS mode,
+                      CASE WHEN c.consume_mode = 'FULL' THEN 1 ELSE 0 END AS qty_boards,
+                      CASE
+                        WHEN sp.id IS NOT NULL AND sp.width_mm > 0 AND sp.height_mm > 0 THEN ((sp.width_mm * sp.height_mm) / 1000000.0)
+                        WHEN b.std_width_mm > 0 AND b.std_height_mm > 0 THEN
+                          ((b.std_width_mm * b.std_height_mm) / 1000000.0) * (CASE WHEN c.consume_mode = 'HALF' THEN 0.5 ELSE 1 END)
+                        ELSE 0
+                      END AS qty_m2,
+                      sp.notes AS note,
+                      b.id AS board_id, b.code AS board_code, b.name AS board_name, b.thickness_mm, b.std_width_mm, b.std_height_mm,
+                      pr.id AS project_id, pr.code AS project_code, pr.name AS project_name,
+                      c.project_product_id AS project_product_id,
+                      p.name AS product_name,
+                      u.name AS user_name, u.email AS user_email,
+                      'PIESA' AS source
+                    FROM project_product_hpl_consumptions c
+                    INNER JOIN projects pr ON pr.id = c.project_id
+                    INNER JOIN hpl_boards b ON b.id = c.board_id
+                    LEFT JOIN project_products pp ON pp.id = c.project_product_id
+                    LEFT JOIN products p ON p.id = pp.product_id
+                    LEFT JOIN hpl_stock_pieces sp
+                      ON sp.id = (CASE WHEN c.status = 'CONSUMED' AND c.consumed_piece_id IS NOT NULL THEN c.consumed_piece_id ELSE c.stock_piece_id END)
+                    LEFT JOIN users u ON u.id = c.created_by
+                ";
+                if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
+                $sql .= ' ORDER BY created_at DESC, c.id DESC LIMIT 5000';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+                $hplRowsProduct = $st->fetchAll();
+            } catch (\Throwable $e) {
+                $hplRowsProduct = [];
+            }
+
+            foreach ($hplRowsProject as &$r) {
+                if (!isset($r['project_product_id'])) $r['project_product_id'] = null;
+                if (!isset($r['product_name'])) $r['product_name'] = null;
+                $r['source'] = 'PROIECT';
+            }
+            unset($r);
+            if ($hplRowsProduct) {
+                $hplRows = array_merge($hplRowsProject, $hplRowsProduct);
+            }
+            usort($hplRows, function (array $a, array $b): int {
+                return strcmp((string)($b['created_at'] ?? ''), (string)($a['created_at'] ?? ''));
+            });
 
             // Magazie consumptions
             $where = [];

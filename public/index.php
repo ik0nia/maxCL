@@ -32,6 +32,7 @@ use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\Api\HplPiecesController as ApiHplPiecesController;
 use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
 use App\Controllers\System\CostSettingsController;
+use App\Controllers\System\ConsumptionsResetController;
 use App\Controllers\System\DbUpdateController;
 use App\Controllers\System\MaterialConsumptionsController;
 
@@ -238,6 +239,7 @@ $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersM
 
 $systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
+$router->get('/system/consumuri/reset', fn() => ConsumptionsResetController::run(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 
 $projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
