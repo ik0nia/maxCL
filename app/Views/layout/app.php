@@ -125,6 +125,9 @@ $toastError = Session::flash('toast_error');
           <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
             <i class="bi bi-cash-coin me-2"></i> Setări costuri
           </a>
+          <a class="app-nav-link <?= str_starts_with($p, '/system/admin-settings') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/admin-settings')) ?>">
+            <i class="bi bi-shield-lock me-2"></i> Setări admin
+          </a>
         <?php endif; ?>
         <?php if ($user && strtolower((string)($user['email'] ?? '')) === 'sacodrut@ikonia.ro'): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/system/db-update') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/db-update')) ?>">
