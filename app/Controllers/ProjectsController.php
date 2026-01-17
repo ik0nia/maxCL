@@ -3316,6 +3316,10 @@ final class ProjectsController
         $prodLabel = self::productLabelFromProjectProduct($pp);
         $projNote = 'Proiect: ' . $projLabel;
         $prodNote = 'Produs: ' . $prodLabel;
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
         // Cerință: după Gata de livrare, OPERATOR nu mai poate adăuga/edita consumuri pe piesă.
         $u = Auth::user();
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
@@ -3465,10 +3469,6 @@ final class ProjectsController
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
-        $projLabel = self::projectLabel($project);
-        $prodLabel = self::productLabelFromProjectProduct($pp);
-        $projNote = 'Proiect: ' . $projLabel;
-        $prodNote = 'Produs: ' . $prodLabel;
 
         // OPERATOR lock after final status
         $u = Auth::user();
@@ -3605,6 +3605,10 @@ final class ProjectsController
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
         // lock OPERATOR after final status
         $u = Auth::user();
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
