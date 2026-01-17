@@ -1158,7 +1158,13 @@ final class ProjectsController
                     foreach ($projectProducts as $ppRow) {
                         $ppId = (int)($ppRow['id'] ?? 0);
                         if ($ppId <= 0) continue;
-                        try { $ppHplByProduct[$ppId] = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e) { $ppHplByProduct[$ppId] = []; }
+                        try {
+                            $ppHplByProduct[$ppId] = ProjectProductHplConsumption::forProjectProduct($ppId);
+                        } catch (\Throwable $e) {
+                            // dacă tabela nu există încă (deploy vechi), încercăm migrările și reîncercăm o singură dată.
+                            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                            try { $ppHplByProduct[$ppId] = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $ppHplByProduct[$ppId] = []; }
+                        }
                     }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
         $hplBy = self::hplCostByProduct($projectProducts);
@@ -3213,6 +3219,9 @@ final class ProjectsController
                         throw new \RuntimeException('Piesa selectată nu aparține acestui proiect.');
                     }
                 }
+                // Asigurăm legătura vizibilă în "stoc proiect"
+                try { HplStockPiece::updateFields((int)$pieceId, ['project_id' => $projectId, 'status' => 'RESERVED']); } catch (\Throwable $e) {}
+                try { HplStockPiece::appendNote((int)$pieceId, 'Rezervat pe piesă #' . $ppId . ' (' . $consumeMode . ')'); } catch (\Throwable $e) {}
             } else {
                 // REST: trebuie să fie FULL, AVAILABLE, is_accounting=0
                 if ($isAcc !== 0) throw new \RuntimeException('Piesa REST trebuie să fie „nestocată”.');
@@ -3224,16 +3233,31 @@ final class ProjectsController
                 } catch (\Throwable $e) {}
             }
 
-            $cid = ProjectProductHplConsumption::create([
-                'project_id' => $projectId,
-                'project_product_id' => $ppId,
-                'board_id' => $boardId,
-                'stock_piece_id' => (int)$pieceId,
-                'source' => $source,
-                'consume_mode' => $consumeMode,
-                'status' => 'RESERVED',
-                'created_by' => Auth::id(),
-            ]);
+            // Compat: dacă tabela nu există încă, încercăm auto-migrate și reîncercăm.
+            try {
+                $cid = ProjectProductHplConsumption::create([
+                    'project_id' => $projectId,
+                    'project_product_id' => $ppId,
+                    'board_id' => $boardId,
+                    'stock_piece_id' => (int)$pieceId,
+                    'source' => $source,
+                    'consume_mode' => $consumeMode,
+                    'status' => 'RESERVED',
+                    'created_by' => Auth::id(),
+                ]);
+            } catch (\Throwable $e) {
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                $cid = ProjectProductHplConsumption::create([
+                    'project_id' => $projectId,
+                    'project_product_id' => $ppId,
+                    'board_id' => $boardId,
+                    'stock_piece_id' => (int)$pieceId,
+                    'source' => $source,
+                    'consume_mode' => $consumeMode,
+                    'status' => 'RESERVED',
+                    'created_by' => Auth::id(),
+                ]);
+            }
             Audit::log('PROJECT_PRODUCT_HPL_RESERVE', 'project_product_hpl_consumptions', $cid, null, null, [
                 'message' => 'HPL rezervat pe piesă (' . $source . ', ' . $consumeMode . ')',
                 'project_id' => $projectId,

@@ -1678,6 +1678,7 @@ ob_start();
                     <th>Dimensiuni</th>
                     <th class="text-end">Buc</th>
                     <th>Locație</th>
+                    <th>Notă</th>
                     <th class="text-end">mp</th>
                     <?php if ($canMoveHpl): ?><th class="text-end" style="width:260px">Acțiuni</th><?php endif; ?>
                   </tr>
@@ -1695,6 +1696,9 @@ ob_start();
                       $ptype = (string)($p['piece_type'] ?? '');
                       $pstatus = (string)($p['status'] ?? '');
                       $ploc = (string)($p['location'] ?? '');
+                      $note = trim((string)($p['notes'] ?? ''));
+                      $noteShort = $note;
+                      if ($noteShort !== '' && mb_strlen($noteShort) > 140) $noteShort = mb_substr($noteShort, 0, 140) . '…';
                       $isReturnable = ($ptype === 'FULL' && $pstatus === 'RESERVED');
                       $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
                     ?>
@@ -1713,6 +1717,7 @@ ob_start();
                       <td class="text-muted"><?= $hmm > 0 && $wmm > 0 ? (htmlspecialchars($hmm . ' × ' . $wmm . ' mm')) : '—' ?></td>
                       <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
+                      <td class="text-muted small" style="max-width:420px;white-space:pre-line"><?= htmlspecialchars($noteShort) ?></td>
                       <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
                       <?php if ($canMoveHpl): ?>
                         <td class="text-end">
