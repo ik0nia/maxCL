@@ -1957,7 +1957,35 @@ final class ProjectsController
                     try { $reserved = ProjectProductHplConsumption::reservedForProjectProduct($projectId, $ppId); } catch (\Throwable $e3) { $reserved = []; }
                 }
                 if ($reserved) {
-                    Session::flash('toast_error', 'Nu poți trece la Montaj până nu debitezi toate plăcile/piesele HPL alocate pe această piesă.');
+                    // mesaj explicit: arătăm ce anume blochează
+                    $detailRows = [];
+                    try {
+                        $detailRows = ProjectProductHplConsumption::forProjectProduct($ppId);
+                    } catch (\Throwable $e) {
+                        try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                        try { $detailRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $detailRows = []; }
+                    }
+                    $items = [];
+                    foreach ($detailRows as $r) {
+                        if ((string)($r['status'] ?? '') !== 'RESERVED') continue;
+                        $b = trim((string)($r['board_code'] ?? '') . ' · ' . (string)($r['board_name'] ?? ''));
+                        if ($b === '·' || $b === '· ') $b = trim((string)($r['board_code'] ?? ''));
+                        $pt = (string)($r['piece_type'] ?? '');
+                        $ph = (int)($r['piece_height_mm'] ?? 0);
+                        $pw = (int)($r['piece_width_mm'] ?? 0);
+                        $dim = ($ph > 0 && $pw > 0) ? ($ph . '×' . $pw . 'mm') : '';
+                        $cm = (string)($r['consume_mode'] ?? '');
+                        $src = (string)($r['source'] ?? '');
+                        $txt = trim(($b !== '' ? $b : 'HPL') . ($pt !== '' ? (' · ' . $pt) : '') . ($dim !== '' ? (' · ' . $dim) : '') . ($cm !== '' ? (' · ' . $cm) : '') . ($src !== '' ? (' · ' . $src) : ''));
+                        if ($txt !== '') $items[] = $txt;
+                    }
+                    $items = array_values(array_unique($items));
+                    $more = count($items) > 4;
+                    $items = array_slice($items, 0, 4);
+                    $msg = 'Nu poți trece la Montaj: mai ai ' . count($reserved) . ' alocări HPL ne-debitate pe această piesă. '
+                         . 'Debitează (sau Renunță) din tabelul HPL.'
+                         . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
+                    Session::flash('toast_error', $msg);
                     Response::redirect('/projects/' . $projectId . '?tab=products');
                 }
             }

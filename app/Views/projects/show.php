@@ -239,7 +239,7 @@ ob_start();
   </div>
 <?php elseif ($tab === 'products'): ?>
   <div class="row g-3">
-    <div class="col-12 col-lg-7">
+    <div class="col-12">
       <div class="card app-card p-3 mb-3">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
@@ -1172,7 +1172,7 @@ ob_start();
       </div>
     </div>
 
-    <div class="col-12 col-lg-5">
+    <div class="col-12">
       <div class="card app-card p-3 mb-3">
         <div class="h5 m-0">Sumar costuri proiect</div>
         <div class="text-muted">Manoperă + materiale + HPL rezervat (neconsumat)</div>
