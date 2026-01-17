@@ -1994,12 +1994,50 @@ final class ProjectsController
                 }
             }
 
-            // Montaj -> Gata de livrare: consumăm automat accesoriile rezervate pe piesă (Magazie)
+            // Gata de livrare: blocăm dacă există accesorii rezervate neconsumate pe piesă.
             if ($next === 'GATA_DE_LIVRARE') {
+                $magReserved = [];
                 try {
-                    self::autoConsumeMagazieOnReadyToDeliver($projectId, $ppId);
+                    $magReserved = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId);
                 } catch (\Throwable $e) {
-                    Session::flash('toast_error', $e->getMessage());
+                    try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                    try { $magReserved = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId); } catch (\Throwable $e3) { $magReserved = []; }
+                }
+                if ($magReserved) {
+                    $agg = [];
+                    foreach ($magReserved as $r) {
+                        $iid = (int)($r['item_id'] ?? 0);
+                        if ($iid <= 0) continue;
+                        $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+                        if ($qty <= 0) continue;
+                        $unit = (string)($r['unit'] ?? $r['item_unit'] ?? '');
+                        $code = trim((string)($r['winmentor_code'] ?? ''));
+                        $name = trim((string)($r['item_name'] ?? ''));
+                        $label = trim($code . ' · ' . $name);
+                        if ($label === '·' || $label === '· ') $label = $name !== '' ? $name : ($code !== '' ? $code : 'Accesoriu');
+                        if (!isset($agg[$iid])) {
+                            $agg[$iid] = ['label' => $label !== '' ? $label : 'Accesoriu', 'qty' => 0.0, 'unit' => $unit];
+                        }
+                        $agg[$iid]['qty'] += $qty;
+                        if ($agg[$iid]['unit'] === '' && $unit !== '') $agg[$iid]['unit'] = $unit;
+                    }
+                    $items = [];
+                    foreach ($agg as $a) {
+                        $qtyTxt = number_format((float)($a['qty'] ?? 0), 3, '.', '');
+                        $unit = (string)($a['unit'] ?? '');
+                        $items[] = trim((string)($a['label'] ?? 'Accesoriu') . ' · ' . $qtyTxt . ($unit !== '' ? (' ' . $unit) : ''));
+                    }
+                    $more = count($items) > 4;
+                    $items = array_slice($items, 0, 4);
+                    $cnt = count($agg) > 0 ? count($agg) : count($magReserved);
+                    $msg = 'Nu poți trece la Gata de livrare: mai ai ' . $cnt . ' accesorii rezervate neconsumate pe această piesă. '
+                         . 'Dă în consum accesoriile din secțiunea Accesorii.'
+                         . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products');
                 }
             }
@@ -2091,11 +2129,11 @@ final class ProjectsController
     }
 
     /**
-     * Automat: când piesa trece la "Gata de livrare", consumăm accesoriile rezervate pe ea.
+     * Consumă accesoriile rezervate pe piesă (manual, din buton).
      * - reserved (fără scădere stoc) -> consumed (OUT din stoc + mișcare)
      * - fără notă (cerință)
      */
-    private static function autoConsumeMagazieOnReadyToDeliver(int $projectId, int $projectProductId): void
+    private static function consumeReservedMagazieForProjectProduct(int $projectId, int $projectProductId): void
     {
         if ($projectId <= 0 || $projectProductId <= 0) return;
         $project = Project::find($projectId);
@@ -2184,7 +2222,7 @@ final class ProjectsController
                 $afterRow['mode'] = 'CONSUMED';
                 $afterRow['note'] = null;
                 Audit::log('PROJECT_CONSUMPTION_UPDATE', 'project_magazie_consumptions', $cid, $beforeRow, $afterRow, [
-                    'message' => 'Consum Magazie auto (Gata de livrare).',
+                    'message' => 'Consum Magazie manual (buton).',
                     'project_id' => $projectId,
                     'project_product_id' => $projectProductId,
                     'item_id' => $iid,
@@ -3164,6 +3202,59 @@ final class ProjectsController
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva accesoriul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
+     * Consumă accesoriile rezervate pe piesă (manual, din buton).
+     */
+    public static function consumeMagazieForProjectProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        if ($projectId <= 0 || $ppId <= 0) {
+            Session::flash('toast_error', 'Parametri invalizi.');
+            Response::redirect('/projects');
+        }
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        // OPERATOR lock after final status
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($pp['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        $rows = [];
+        try {
+            $rows = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            try { $rows = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId); } catch (\Throwable $e3) { $rows = []; }
+        }
+        if (!$rows) {
+            Session::flash('toast_error', 'Nu există accesorii rezervate pentru consum.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        try {
+            self::consumeReservedMagazieForProjectProduct($projectId, $ppId);
+            Session::flash('toast_success', 'Accesoriile au fost date în consum.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot da în consum accesoriile: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
     }

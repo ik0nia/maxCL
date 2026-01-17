@@ -777,6 +777,13 @@ ob_start();
                     }
                     // drepturi pentru acțiuni pe această piesă (folosit și în tabelul HPL pentru butonul "Debitat")
                     $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
+                    $hasReservedAcc = false;
+                    foreach ($accRows as $ar) {
+                      if ((string)($ar['mode'] ?? '') === 'RESERVED' && (string)($ar['src'] ?? '') === 'DIRECT') {
+                        $hasReservedAcc = true;
+                        break;
+                      }
+                    }
                   ?>
 
                   <div class="mt-3">
@@ -815,7 +822,16 @@ ob_start();
                     </div>
 
                     <div class="mt-2">
-                      <div class="text-muted small fw-semibold">Accesorii</div>
+                      <div class="d-flex justify-content-between align-items-center gap-2">
+                        <div class="text-muted small fw-semibold">Accesorii</div>
+                        <?php if ($canEditThis && $hasReservedAcc): ?>
+                          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/consume')) ?>" class="m-0"
+                                onsubmit="return confirm('Dai în consum accesoriile rezervate pe această piesă?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <button class="btn btn-outline-success btn-sm" type="submit">Dat în consum</button>
+                          </form>
+                        <?php endif; ?>
+                      </div>
                       <?php if (!$accRows): ?>
                         <div class="text-muted small">—</div>
                       <?php else: ?>
