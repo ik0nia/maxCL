@@ -21,21 +21,46 @@ final class ProjectProductHplConsumption
               b.thickness_mm AS board_thickness_mm,
               b.std_width_mm AS board_std_width_mm,
               b.std_height_mm AS board_std_height_mm,
+              u.name AS user_name,
               sp.piece_type AS piece_type,
               sp.status AS piece_status,
               sp.width_mm AS piece_width_mm,
               sp.height_mm AS piece_height_mm,
               sp.qty AS piece_qty,
               sp.location AS piece_location,
-              sp.is_accounting AS piece_is_accounting
+              sp.notes AS piece_notes,
+              sp.area_total_m2 AS piece_area_total_m2,
+              sp.is_accounting AS piece_is_accounting,
+              sp2.piece_type AS consumed_piece_type,
+              sp2.status AS consumed_piece_status,
+              sp2.width_mm AS consumed_piece_width_mm,
+              sp2.height_mm AS consumed_piece_height_mm,
+              sp2.qty AS consumed_piece_qty,
+              sp2.location AS consumed_piece_location,
+              sp2.notes AS consumed_piece_notes,
+              sp2.area_total_m2 AS consumed_piece_area_total_m2
             FROM project_product_hpl_consumptions x
             INNER JOIN hpl_boards b ON b.id = x.board_id
+            LEFT JOIN users u ON u.id = x.created_by
             LEFT JOIN hpl_stock_pieces sp ON sp.id = x.stock_piece_id
+            LEFT JOIN hpl_stock_pieces sp2 ON sp2.id = x.consumed_piece_id
             WHERE x.project_product_id = ?
             ORDER BY x.created_at DESC, x.id DESC
         ");
         $st->execute([(int)$projectProductId]);
-        return $st->fetchAll();
+        $rows = $st->fetchAll();
+        // De-dup pentru UI: păstrăm doar ultima înregistrare pentru aceeași piesă + status (evită dubluri istorice).
+        $seen = [];
+        $out = [];
+        foreach ($rows as $r) {
+            $sid = (int)($r['stock_piece_id'] ?? 0);
+            $stt = (string)($r['status'] ?? '');
+            $key = $stt . ':' . $sid;
+            if ($sid > 0 && isset($seen[$key])) continue;
+            if ($sid > 0) $seen[$key] = true;
+            $out[] = $r;
+        }
+        return $out;
     }
 
     /** @return array<int, array<string,mixed>> */
@@ -85,6 +110,18 @@ final class ProjectProductHplConsumption
         $pdo = DB::pdo();
         $st = $pdo->prepare("UPDATE project_product_hpl_consumptions SET status='CONSUMED', consumed_at=NOW() WHERE id = ?");
         $st->execute([(int)$id]);
+    }
+
+    public static function setConsumedPiece(int $id, int $pieceId): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        try {
+            $st = $pdo->prepare("UPDATE project_product_hpl_consumptions SET consumed_piece_id = ? WHERE id = ?");
+            $st->execute([(int)$pieceId, (int)$id]);
+        } catch (\Throwable $e) {
+            // compat: coloana poate lipsi
+        }
     }
 }
 

@@ -897,10 +897,16 @@ ob_start();
                             <thead>
                               <tr class="text-muted small">
                                 <th>Placă</th>
-                                <th style="width:160px">Piesă</th>
-                                <th style="width:110px">Mod</th>
-                                <th style="width:110px">Sursă</th>
-                                <th style="width:120px">Status</th>
+                                <th style="width:90px">Tip</th>
+                                <th style="width:110px">Status</th>
+                                <th style="width:160px">Dimensiuni</th>
+                                <th class="text-end" style="width:80px">Buc</th>
+                                <th style="width:120px">Locație</th>
+                                <th>Notă</th>
+                                <th class="text-end" style="width:90px">mp</th>
+                                <th style="width:80px">Mod</th>
+                                <th style="width:80px">Sursă</th>
+                                <th style="width:150px">Dată</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -908,21 +914,44 @@ ob_start();
                                 <?php
                                   $bcode2 = (string)($hr['board_code'] ?? '');
                                   $bname2 = (string)($hr['board_name'] ?? '');
-                                  $pt2 = (string)($hr['piece_type'] ?? '');
-                                  $pw2 = (int)($hr['piece_width_mm'] ?? 0);
-                                  $ph2 = (int)($hr['piece_height_mm'] ?? 0);
+                                  // preferăm piesa consumată dacă există, altfel piesa rezervată
+                                  $pt2 = (string)($hr['consumed_piece_type'] ?? '');
+                                  $pw2 = (int)($hr['consumed_piece_width_mm'] ?? 0);
+                                  $ph2 = (int)($hr['consumed_piece_height_mm'] ?? 0);
+                                  $pq2 = (int)($hr['consumed_piece_qty'] ?? 0);
+                                  $pl2 = (string)($hr['consumed_piece_location'] ?? '');
+                                  $pn2 = (string)($hr['consumed_piece_notes'] ?? '');
+                                  $pm2 = isset($hr['consumed_piece_area_total_m2']) ? (float)($hr['consumed_piece_area_total_m2'] ?? 0) : 0.0;
+                                  if ($pt2 === '' && $pw2 === 0 && $ph2 === 0) {
+                                    $pt2 = (string)($hr['piece_type'] ?? '');
+                                    $pw2 = (int)($hr['piece_width_mm'] ?? 0);
+                                    $ph2 = (int)($hr['piece_height_mm'] ?? 0);
+                                    $pq2 = (int)($hr['piece_qty'] ?? 0);
+                                    $pl2 = (string)($hr['piece_location'] ?? '');
+                                    $pn2 = (string)($hr['piece_notes'] ?? '');
+                                    $pm2 = isset($hr['piece_area_total_m2']) ? (float)($hr['piece_area_total_m2'] ?? 0) : 0.0;
+                                  }
                                   $cm2 = (string)($hr['consume_mode'] ?? '');
                                   $src2 = (string)($hr['source'] ?? '');
                                   $st2 = (string)($hr['status'] ?? '');
-                                  $pieceTxt = trim($pt2 . ' ' . (($ph2 > 0 && $pw2 > 0) ? ($ph2 . '×' . $pw2 . 'mm') : ''));
                                   $boardTxt = trim($bcode2 . ' · ' . $bname2);
+                                  $dimTxt = ($ph2 > 0 && $pw2 > 0) ? ($ph2 . ' × ' . $pw2 . ' mm') : '—';
+                                  $noteTxt = trim($pn2);
+                                  if ($noteTxt !== '' && mb_strlen($noteTxt) > 110) $noteTxt = mb_substr($noteTxt, 0, 110) . '…';
+                                  $createdAt = (string)($hr['created_at'] ?? '');
                                 ?>
                                 <tr>
                                   <td class="fw-semibold"><?= htmlspecialchars($boardTxt !== '' ? $boardTxt : '—') ?></td>
-                                  <td class="text-muted"><?= htmlspecialchars($pieceTxt !== '' ? $pieceTxt : '—') ?></td>
+                                  <td class="fw-semibold"><?= htmlspecialchars($pt2 !== '' ? $pt2 : '—') ?></td>
+                                  <td><span class="badge app-badge"><?= htmlspecialchars($st2) ?></span></td>
+                                  <td class="text-muted"><?= htmlspecialchars($dimTxt) ?></td>
+                                  <td class="text-end fw-semibold"><?= $pq2 > 0 ? (int)$pq2 : '—' ?></td>
+                                  <td class="text-muted"><?= htmlspecialchars($pl2) ?></td>
+                                  <td class="text-muted small" style="max-width:420px;white-space:pre-line"><?= htmlspecialchars($noteTxt) ?></td>
+                                  <td class="text-end fw-semibold"><?= $pm2 > 0 ? number_format((float)$pm2, 2, '.', '') : '—' ?></td>
                                   <td><?= htmlspecialchars($cm2) ?></td>
                                   <td><?= htmlspecialchars($src2) ?></td>
-                                  <td><span class="badge app-badge"><?= htmlspecialchars($st2) ?></span></td>
+                                  <td class="text-muted small"><?= htmlspecialchars($createdAt) ?></td>
                                 </tr>
                               <?php endforeach; ?>
                             </tbody>

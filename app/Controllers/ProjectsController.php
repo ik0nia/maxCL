@@ -2849,10 +2849,15 @@ final class ProjectsController
                 $mode = (string)($r['consume_mode'] ?? 'FULL');
                 if ($cid <= 0 || $pieceId <= 0 || $boardId <= 0) continue;
 
-                $err = self::consumeHplPieceForProduct($pdo, $projectId, $ppId, $pieceId, $boardId, $src, $mode);
+                $res = self::consumeHplPieceForProduct($pdo, $projectId, $ppId, $pieceId, $boardId, $src, $mode);
+                $err = $res['error'] ?? null;
+                $consumedPieceId = isset($res['consumed_piece_id']) ? (int)($res['consumed_piece_id'] ?? 0) : 0;
                 if ($err !== null) {
                     $pdo->rollBack();
                     return $err;
+                }
+                if ($consumedPieceId > 0) {
+                    try { ProjectProductHplConsumption::setConsumedPiece($cid, $consumedPieceId); } catch (\Throwable $e) {}
                 }
                 ProjectProductHplConsumption::markConsumed($cid);
             }
@@ -2872,9 +2877,9 @@ final class ProjectsController
         int $boardId,
         string $source,
         string $consumeMode
-    ): ?string {
+    ): array {
         $pieceId = (int)$pieceId;
-        if ($pieceId <= 0) return 'Piesă HPL invalidă.';
+        if ($pieceId <= 0) return ['error' => 'Piesă HPL invalidă.', 'consumed_piece_id' => null];
         $consumeMode = strtoupper(trim($consumeMode));
         if ($consumeMode !== 'FULL' && $consumeMode !== 'HALF') $consumeMode = 'FULL';
         $source = strtoupper(trim($source));
@@ -2884,10 +2889,10 @@ final class ProjectsController
         $st = $pdo->prepare("SELECT * FROM hpl_stock_pieces WHERE id = ? FOR UPDATE");
         $st->execute([$pieceId]);
         $p = $st->fetch();
-        if (!$p) return 'Piesă HPL inexistentă.';
+        if (!$p) return ['error' => 'Piesă HPL inexistentă.', 'consumed_piece_id' => null];
 
         $qty = (int)($p['qty'] ?? 0);
-        if ($qty <= 0) return 'Stoc insuficient.';
+        if ($qty <= 0) return ['error' => 'Stoc insuficient.', 'consumed_piece_id' => null];
         $pt = (string)($p['piece_type'] ?? '');
         $status = (string)($p['status'] ?? '');
         $loc = (string)($p['location'] ?? '');
@@ -2902,10 +2907,10 @@ final class ProjectsController
         }
 
         if ($consumeMode === 'HALF' && $pt === 'FULL') {
-            if ($status !== 'RESERVED') return 'Placa FULL trebuie să fie rezervată înainte de consum.';
-            if ($w <= 0 || $h <= 0) return 'Dimensiuni invalide.';
+            if ($status !== 'RESERVED') return ['error' => 'Placa FULL trebuie să fie rezervată înainte de consum.', 'consumed_piece_id' => null];
+            if ($w <= 0 || $h <= 0) return ['error' => 'Dimensiuni invalide.', 'consumed_piece_id' => null];
             $halfH = (int)floor($h / 2);
-            if ($halfH <= 0) return 'Nu pot calcula jumătate de placă.';
+            if ($halfH <= 0) return ['error' => 'Nu pot calcula jumătate de placă.', 'consumed_piece_id' => null];
 
             // scoatem 1 placă FULL
             if ($qty === 1) HplStockPiece::delete($pieceId);
@@ -2915,7 +2920,7 @@ final class ProjectsController
             if ($source === 'REST') $noteBase = 'Consum HPL REST 1/2 · piesă #' . $projectProductId . ' · proiect #' . $projectId;
 
             // jumătatea consumată
-            HplStockPiece::create([
+            $consumedId = HplStockPiece::create([
                 'board_id' => $boardId,
                 'project_id' => $projectId,
                 'is_accounting' => $isAcc,
@@ -2947,12 +2952,12 @@ final class ProjectsController
                 'consume_mode' => 'HALF',
                 'source' => $source,
             ]);
-            return null;
+            return ['error' => null, 'consumed_piece_id' => (int)$consumedId];
         }
 
         // FULL (sau OFFCUT)
         $take = 1;
-        if ($take > $qty) return 'Stoc insuficient (buc).';
+        if ($take > $qty) return ['error' => 'Stoc insuficient (buc).', 'consumed_piece_id' => null];
 
         $note = 'Consum HPL · piesă #' . $projectProductId . ' · proiect #' . $projectId;
         if ($source === 'REST') $note = 'Consum HPL REST · piesă #' . $projectProductId . ' · proiect #' . $projectId;
@@ -2960,9 +2965,10 @@ final class ProjectsController
         if ($qty === $take) {
             HplStockPiece::updateFields($pieceId, ['status' => 'CONSUMED', 'project_id' => $projectId, 'location' => $loc]);
             try { HplStockPiece::appendNote($pieceId, $note); } catch (\Throwable $e) {}
+            $consumedId = $pieceId;
         } else {
             HplStockPiece::updateQty($pieceId, $qty - $take);
-            HplStockPiece::create([
+            $consumedId = HplStockPiece::create([
                 'board_id' => $boardId,
                 'project_id' => $projectId,
                 'is_accounting' => $isAcc,
@@ -2983,7 +2989,7 @@ final class ProjectsController
             'consume_mode' => 'FULL',
             'source' => $source,
         ]);
-        return null;
+        return ['error' => null, 'consumed_piece_id' => isset($consumedId) ? (int)$consumedId : null];
     }
 
     public static function addMagazieConsumption(array $params): void
@@ -3198,6 +3204,27 @@ final class ProjectsController
         $pdo = \App\Core\DB::pdo();
         try {
             $pdo->beginTransaction();
+            // Evităm dublurile: aceeași piesă HPL rezervată de mai multe ori pe aceeași piesă de proiect.
+            try {
+                $stDup = $pdo->prepare("
+                    SELECT id
+                    FROM project_product_hpl_consumptions
+                    WHERE project_id = ?
+                      AND project_product_id = ?
+                      AND stock_piece_id = ?
+                      AND status = 'RESERVED'
+                    LIMIT 1
+                ");
+                $stDup->execute([(int)$projectId, (int)$ppId, (int)$pieceId]);
+                $dup = $stDup->fetch();
+                if ($dup) {
+                    $pdo->rollBack();
+                    Session::flash('toast_error', 'Această piesă HPL este deja rezervată pe această piesă.');
+                    Response::redirect('/projects/' . $projectId . '?tab=products');
+                }
+            } catch (\Throwable $e) {
+                // compat: dacă tabela nu există, continuăm (se va crea mai jos)
+            }
             $st = $pdo->prepare("SELECT sp.*, b.id AS board_id FROM hpl_stock_pieces sp INNER JOIN hpl_boards b ON b.id = sp.board_id WHERE sp.id = ? FOR UPDATE");
             $st->execute([(int)$pieceId]);
             $piece = $st->fetch();

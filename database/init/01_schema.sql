@@ -405,6 +405,7 @@ CREATE TABLE IF NOT EXISTS project_product_hpl_consumptions (
   project_product_id BIGINT UNSIGNED NOT NULL,
   board_id INT UNSIGNED NOT NULL,
   stock_piece_id INT UNSIGNED NULL,
+  consumed_piece_id INT UNSIGNED NULL,
   source ENUM('PROJECT','REST') NOT NULL DEFAULT 'PROJECT',
   consume_mode ENUM('FULL','HALF') NOT NULL DEFAULT 'FULL',
   status ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'RESERVED',
@@ -415,11 +416,13 @@ CREATE TABLE IF NOT EXISTS project_product_hpl_consumptions (
   KEY idx_pphc_project (project_id),
   KEY idx_pphc_pp (project_product_id),
   KEY idx_pphc_piece (stock_piece_id),
+  KEY idx_pphc_consumed_piece (consumed_piece_id),
   KEY idx_pphc_status (status),
   CONSTRAINT fk_pphc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_pphc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE,
   CONSTRAINT fk_pphc_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
   CONSTRAINT fk_pphc_piece FOREIGN KEY (stock_piece_id) REFERENCES hpl_stock_pieces(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pphc_consumed_piece FOREIGN KEY (consumed_piece_id) REFERENCES hpl_stock_pieces(id) ON DELETE SET NULL,
   CONSTRAINT fk_pphc_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -1041,6 +1041,31 @@ final class DbMigrations
                     ");
                 },
             ],
+            [
+                'id' => '2026-01-16_05_pp_hpl_consumptions_consumed_piece',
+                'label' => 'ALTER project_product_hpl_consumptions ADD consumed_piece_id',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_product_hpl_consumptions')) return;
+                    if (self::columnExists($pdo, 'project_product_hpl_consumptions', 'consumed_piece_id')) return;
+                    try {
+                        $pdo->exec("ALTER TABLE project_product_hpl_consumptions ADD COLUMN consumed_piece_id INT UNSIGNED NULL AFTER stock_piece_id");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try {
+                        $pdo->exec("ALTER TABLE project_product_hpl_consumptions ADD KEY idx_pphc_consumed_piece (consumed_piece_id)");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try {
+                        if (self::tableExists($pdo, 'hpl_stock_pieces')) {
+                            $pdo->exec("ALTER TABLE project_product_hpl_consumptions ADD CONSTRAINT fk_pphc_consumed_piece FOREIGN KEY (consumed_piece_id) REFERENCES hpl_stock_pieces(id) ON DELETE SET NULL");
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
         ];
     }
 
