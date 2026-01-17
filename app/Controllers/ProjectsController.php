@@ -1585,7 +1585,6 @@ final class ProjectsController
         $check = Validator::required($_POST, [
             'name' => 'Denumire',
             'qty' => 'Cantitate',
-            'surface_mode' => 'Suprafață',
         ]);
         $errors = $check['errors'];
         $name = trim((string)($_POST['name'] ?? ''));
@@ -1595,36 +1594,10 @@ final class ProjectsController
         $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         $hplBoardId = null; // HPL se gestionează prin "Consum HPL"
-        $surfaceMode = trim((string)($_POST['surface_mode'] ?? ''));
-        $surfaceM2 = Validator::dec(trim((string)($_POST['surface_m2'] ?? ''))) ?? null;
-        if ($surfaceM2 !== null && $surfaceM2 < 0) $surfaceM2 = null;
-
-        // Suprafață:
-        // - 1 placă => value=1 (plăci/buc)
-        // - 1/2 placă => value=0.5 (plăci/buc)
-        // - mp => value=surface_m2 (mp/buc, salvat cu 2 zecimale)
+        // Suprafață nu mai este obligatorie la creare (se poate completa ulterior din edit).
         $surfaceType = null;
         $surfaceValue = null;
-        $m2 = null; // m2_per_unit pentru calcule
-        if ($surfaceMode === '1' || $surfaceMode === '0.5') {
-            $surfaceType = 'BOARD';
-            $surfaceValue = (float)$surfaceMode; // 1 sau 0.5
-            [$hmm, $wmm] = self::defaultBoardDimsMmForProject($projectId);
-            if ($hmm <= 0 || $wmm <= 0) { $hmm = 2800; $wmm = 2070; } // fallback
-            // Regulă: 1/2 placă = jumătate din lungime (h/2), lățime constantă (w).
-            $effH = ($surfaceValue < 0.999) ? ($hmm / 2.0) : (float)$hmm;
-            $m2 = ($effH * (float)$wmm) / 1000000.0;
-        } elseif ($surfaceMode === 'M2') {
-            $surfaceType = 'M2';
-            $surfaceValue = $surfaceM2 !== null ? round((float)$surfaceM2, 2) : null;
-            $m2 = $surfaceValue !== null ? (float)$surfaceValue : null;
-        }
-        if ($surfaceType === null || $surfaceValue === null || (float)$surfaceValue <= 0 || $m2 === null || $m2 <= 0) {
-            $errors['surface_mode'] = 'Suprafață invalidă.';
-        }
-        if ($surfaceMode === 'M2' && ($surfaceValue === null || (float)$surfaceValue <= 0)) {
-            $errors['surface_m2'] = 'Introdu suprafața (mp) per bucată.';
-        }
+        $m2 = null;
 
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
         if ($salePriceRaw !== '' && ($salePrice === null || $salePrice < 0)) {

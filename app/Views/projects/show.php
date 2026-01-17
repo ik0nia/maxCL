@@ -278,27 +278,7 @@ ob_start();
                 <label class="form-label fw-semibold">Preț vânzare (lei)</label>
                 <input class="form-control" type="number" step="0.01" min="0" name="sale_price" placeholder="opțional">
               </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">Suprafață</label>
-                <div class="d-flex flex-wrap gap-3">
-                  <label class="form-check form-check-inline m-0">
-                    <input class="form-check-input" type="radio" name="surface_mode" value="0.5" required>
-                    <span class="form-check-label">1/2 placă</span>
-                  </label>
-                  <label class="form-check form-check-inline m-0">
-                    <input class="form-check-input" type="radio" name="surface_mode" value="1" required checked>
-                    <span class="form-check-label">1 placă</span>
-                  </label>
-                  <label class="form-check form-check-inline m-0">
-                    <input class="form-check-input" type="radio" name="surface_mode" value="M2" required>
-                    <span class="form-check-label">mp</span>
-                  </label>
-                </div>
-                <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="surface_m2" placeholder="ex: 0.60">
-                  <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
-                </div>
-              </div>
+              <?php /* Suprafața nu mai este obligatorie la creare. Se poate seta ulterior din edit. */ ?>
               <?php /* HPL-ul pe piesă se adaugă din butonul "Consum HPL" (pe cardul piesei). */ ?>
               <div class="col-12 d-flex justify-content-end">
                 <button class="btn btn-primary" type="submit">
@@ -307,22 +287,6 @@ ob_start();
               </div>
             </form>
           </div>
-
-          <script>
-            document.addEventListener('DOMContentLoaded', function () {
-              const modeRadios = document.querySelectorAll('input[name="surface_mode"]');
-              const wrap = document.getElementById('ppSurfaceM2Wrap');
-              if (!wrap || !modeRadios || !modeRadios.length) return;
-              function sync() {
-                let v = '';
-                modeRadios.forEach(function(r){ if (r.checked) v = String(r.value || ''); });
-                if (v === 'M2') wrap.classList.remove('d-none');
-                else wrap.classList.add('d-none');
-              }
-              modeRadios.forEach(function (r) { r.addEventListener('change', sync); });
-              sync();
-            });
-          </script>
 
           <script>
             document.addEventListener('DOMContentLoaded', function(){
@@ -761,8 +725,13 @@ ob_start();
                         $perTxt = number_format($sVal, 2, '.', '') . ' mp';
                         $totTxt = number_format($qty * $sVal, 2, '.', '') . ' mp';
                       } else {
-                        $perTxt = number_format($m2u, 4, '.', '') . ' mp';
-                        $totTxt = number_format($m2t, 4, '.', '') . ' mp';
+                        if ($m2u > 0) {
+                          $perTxt = number_format($m2u, 4, '.', '') . ' mp';
+                          $totTxt = number_format($m2t, 4, '.', '') . ' mp';
+                        } else {
+                          $perTxt = '—';
+                          $totTxt = '—';
+                        }
                       }
                     ?>
                     <div class="col-6 col-md-3">
