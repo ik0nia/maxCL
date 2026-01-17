@@ -24,6 +24,20 @@ final class ConsumptionsResetController
         return ((int)($r['c'] ?? 0)) > 0;
     }
 
+    private static function columnExists(PDO $pdo, string $table, string $col): bool
+    {
+        $st = $pdo->prepare("
+            SELECT COUNT(*) AS c
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+              AND COLUMN_NAME = ?
+        ");
+        $st->execute([$table, $col]);
+        $r = $st->fetch();
+        return ((int)($r['c'] ?? 0)) > 0;
+    }
+
     public static function run(): void
     {
         $token = trim((string)($_GET['token'] ?? ''));
@@ -64,6 +78,11 @@ final class ConsumptionsResetController
                 $st = $pdo->prepare("DELETE FROM hpl_stock_pieces WHERE status = 'CONSUMED'");
                 $st->execute();
                 $counts['hpl_stock_pieces_consumed'] = (int)$st->rowCount();
+                if (self::columnExists($pdo, 'hpl_stock_pieces', 'is_accounting')) {
+                    $st = $pdo->prepare("DELETE FROM hpl_stock_pieces WHERE is_accounting = 0");
+                    $st->execute();
+                    $counts['hpl_stock_pieces_non_stockable'] = (int)$st->rowCount();
+                }
             }
             if (self::tableExists($pdo, 'magazie_movements')) {
                 $st = $pdo->prepare("
