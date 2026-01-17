@@ -29,6 +29,7 @@ use App\Controllers\ClientsController;
 use App\Controllers\ProjectsController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
+use App\Controllers\Api\HplPiecesController as ApiHplPiecesController;
 use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
 use App\Controllers\System\CostSettingsController;
 use App\Controllers\System\DbUpdateController;
@@ -249,12 +250,16 @@ $router->post('/projects/create', fn() => ProjectsController::create(), $project
 $router->get('/projects/{id}', fn($p) => ProjectsController::show($p), $projectsReadMW);
 $router->post('/projects/{id}/edit', fn($p) => ProjectsController::update($p), $projectsWriteMW);
 $router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatus($p), $projectsWriteMW);
+$router->post('/projects/{id}/delete', fn($p) => ProjectsController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/projects/{id}/products/add-existing', fn($p) => ProjectsController::addExistingProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/create', fn($p) => ProjectsController::createProductInProject($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsController::updateProjectProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/status', fn($p) => ProjectsController::updateProjectProductStatus($p), $projectsProductStatusMW);
 $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/{ppId}/magazie/create', fn($p) => ProjectsController::addMagazieConsumptionForProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/hpl/create', fn($p) => ProjectsController::addHplConsumptionForProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/hpl/{cid}/cut', fn($p) => ProjectsController::cutHplForProjectProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/hpl/pieces/{pieceId}/return', fn($p) => ProjectsController::returnRestHplToStock($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/{cid}/update', fn($p) => ProjectsController::updateMagazieConsumption($p), $projectsWriteMW);
@@ -318,6 +323,7 @@ $router->get('/api/health', function () {
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);
+$router->get('/api/hpl/pieces/search', fn() => ApiHplPiecesController::search(), $hplReadMW);
 $router->get('/api/magazie/items/search', fn() => ApiMagazieItemsController::search(), $magReadMW);
 
 $router->get('/system/db-update', fn() => DbUpdateController::index(), [Auth::requireLogin()]);

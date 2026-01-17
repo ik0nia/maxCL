@@ -9,6 +9,7 @@ $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
 $canEditProducts = ProjectsController::canEditProjectProducts();
 $canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$canDelete = ProjectsController::canDelete();
 
 $project = $project ?? [];
 $tab = (string)($tab ?? 'general');
@@ -149,6 +150,17 @@ ob_start();
               </button>
             </div>
           </form>
+          <?php if ($canDelete): ?>
+            <div class="d-flex justify-content-end mt-3">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/delete')) ?>"
+                    onsubmit="return confirm('Ștergi proiectul <?= htmlspecialchars((string)($project['code'] ?? '')) ?> · <?= htmlspecialchars((string)($project['name'] ?? '')) ?>?');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-outline-danger" type="submit">
+                  <i class="bi bi-trash me-1"></i> Șterge proiect
+                </button>
+              </form>
+            </div>
+          <?php endif; ?>
         <?php else: ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
         <?php endif; ?>
@@ -266,32 +278,8 @@ ob_start();
                 <label class="form-label fw-semibold">Preț vânzare (lei)</label>
                 <input class="form-control" type="number" step="0.01" min="0" name="sale_price" placeholder="opțional">
               </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">Suprafață</label>
-                <div class="d-flex flex-wrap gap-3">
-                  <label class="form-check form-check-inline m-0">
-                    <input class="form-check-input" type="radio" name="surface_mode" value="0.5" required>
-                    <span class="form-check-label">1/2 placă</span>
-                  </label>
-                  <label class="form-check form-check-inline m-0">
-                    <input class="form-check-input" type="radio" name="surface_mode" value="1" required checked>
-                    <span class="form-check-label">1 placă</span>
-                  </label>
-                  <label class="form-check form-check-inline m-0">
-                    <input class="form-check-input" type="radio" name="surface_mode" value="M2" required>
-                    <span class="form-check-label">mp</span>
-                  </label>
-                </div>
-                <div class="mt-2 d-none" id="ppSurfaceM2Wrap">
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="surface_m2" placeholder="ex: 0.60">
-                  <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
-                </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">HPL pentru piesă (din rezervările proiectului)</label>
-                <select class="form-select js-pp-hpl-reserved-select" name="hpl_board_id" id="ppHplBoardSelect" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
-                <div class="text-muted small mt-1">Alegi din plăcile HPL rezervate pe proiect. (Cu thumbnail)</div>
-              </div>
+              <?php /* Suprafața nu mai este obligatorie la creare. Se poate seta ulterior din edit. */ ?>
+              <?php /* HPL-ul pe piesă se adaugă din butonul "Consum HPL" (pe cardul piesei). */ ?>
               <div class="col-12 d-flex justify-content-end">
                 <button class="btn btn-primary" type="submit">
                   <i class="bi bi-plus-lg me-1"></i> Creează
@@ -299,22 +287,6 @@ ob_start();
               </div>
             </form>
           </div>
-
-          <script>
-            document.addEventListener('DOMContentLoaded', function () {
-              const modeRadios = document.querySelectorAll('input[name="surface_mode"]');
-              const wrap = document.getElementById('ppSurfaceM2Wrap');
-              if (!wrap || !modeRadios || !modeRadios.length) return;
-              function sync() {
-                let v = '';
-                modeRadios.forEach(function(r){ if (r.checked) v = String(r.value || ''); });
-                if (v === 'M2') wrap.classList.remove('d-none');
-                else wrap.classList.add('d-none');
-              }
-              modeRadios.forEach(function (r) { r.addEventListener('change', sync); });
-              sync();
-            });
-          </script>
 
           <script>
             document.addEventListener('DOMContentLoaded', function(){
@@ -341,6 +313,99 @@ ob_start();
                     },
                     cache: true
                   }
+                });
+              });
+            });
+          </script>
+
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              const $ = window.jQuery;
+              $('.js-pp-hpl-piece').each(function(){
+                const el = this;
+                const $el = $(el);
+                if ($el.data('select2')) return;
+                const projId = parseInt(String(el.getAttribute('data-project-id') || ''), 10) || 0;
+                function fmtPiece(opt){
+                  if (!opt || !opt.id) return (opt && opt.text) ? opt.text : '';
+                  const thumb = opt.thumb || null;
+                  const thumbBack = opt.thumb_back || null;
+                  const fc = opt.face_color_code || '';
+                  const bc = opt.back_color_code || '';
+                  let colors = fc ? String(fc) : '';
+                  if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
+
+                  const th = (opt.thickness_mm !== undefined && opt.thickness_mm !== null) ? String(opt.thickness_mm) : '';
+                  const code = String(opt.code || '');
+                  const name = String(opt.name || '');
+                  const ph = (opt.piece_height_mm !== undefined && opt.piece_height_mm !== null) ? String(opt.piece_height_mm) : '';
+                  const pw = (opt.piece_width_mm !== undefined && opt.piece_width_mm !== null) ? String(opt.piece_width_mm) : '';
+                  const dim = (ph && pw) ? (ph + '×' + pw) : '';
+                  const pt = String(opt.piece_type || '');
+                  const loc = String(opt.location || '');
+                  const qty = (opt.qty !== undefined && opt.qty !== null) ? String(opt.qty) : '';
+
+                  const esc = (s) => String(s || '').replace(/</g,'&lt;');
+                  const $row = $('<span class="s2-row"></span>');
+                  if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
+                  if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
+
+                  const $txt = $('<span></span>');
+                  let tail = '';
+                  // Cerință: coduri culori + thumbnails la început, apoi dimensiune/denumire/rest.
+                  if (th) tail += esc(th) + 'mm';
+                  if (dim) tail += (tail ? ' · ' : '') + esc(dim) + ' mm';
+                  const nm = (code || name) ? (esc(code) + (name ? (' · ' + esc(name)) : '')) : '';
+                  if (nm) tail += (tail ? ' · ' : '') + '<strong>' + nm + '</strong>';
+                  if (pt) tail += (tail ? ' · ' : '') + esc(pt);
+                  if (loc) tail += (tail ? ' · ' : '') + esc(loc);
+                  if (qty) tail += (tail ? ' · ' : '') + 'buc: ' + esc(qty);
+
+                  if (colors) $txt.html('<strong>' + esc(colors) + '</strong>' + (tail ? (' · ' + tail) : ''));
+                  else $txt.html(tail || esc(opt.text || ''));
+                  $row.append($txt);
+                  return $row;
+                }
+                $el.select2({
+                  width: '100%',
+                  placeholder: 'Alege piesa HPL…',
+                  allowClear: true,
+                  minimumInputLength: 0,
+                  templateResult: fmtPiece,
+                  templateSelection: fmtPiece,
+                  escapeMarkup: m => m,
+                  ajax: {
+                    url: "<?= htmlspecialchars(Url::to('/api/hpl/pieces/search')) ?>",
+                    dataType: 'json',
+                    delay: 250,
+                    headers: { 'Accept': 'application/json' },
+                    data: function(params){
+                      const $form = $el.closest('form');
+                      const src = $form.find('input.js-pp-hpl-source:checked').val() || 'PROJECT';
+                      return { q: params.term || '', project_id: projId, source: src };
+                    },
+                    processResults: function(resp){
+                      const items = (resp && resp.items) ? resp.items : [];
+                      return { results: items };
+                    },
+                    cache: true
+                  }
+                });
+
+                // toggle mode UI on source change (REST => hide half option)
+                const $form = $el.closest('form');
+                $form.find('input.js-pp-hpl-source').on('change', function(){
+                  const src = String($form.find('input.js-pp-hpl-source:checked').val() || 'PROJECT');
+                  const $wrap = $form.find('.js-pp-hpl-mode-wrap');
+                  if (src === 'REST') {
+                    $wrap.addClass('d-none');
+                    $form.find('input[name="consume_mode"][value="FULL"]').prop('checked', true);
+                  } else {
+                    $wrap.removeClass('d-none');
+                  }
+                  // reset selection to refetch from correct source
+                  $el.val(null).trigger('change');
                 });
               });
             });
@@ -613,44 +678,12 @@ ob_start();
                           <?php if (!$isVisible) continue; ?>
 
                           <?php if ($isNext && $canAdvance): ?>
-                            <?php
-                              $needHpl = ($stVal === 'CNC' && $v === 'MONTAJ');
-                              $ppBoardId = isset($pp['hpl_board_id']) && $pp['hpl_board_id'] !== null && $pp['hpl_board_id'] !== '' ? (int)$pp['hpl_board_id'] : 0;
-                              $ppSurfType = (string)($pp['surface_type'] ?? '');
-                              $ppSurfVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
-                              $needsBoardConsume = $needHpl && $ppBoardId > 0 && $ppSurfType === 'BOARD' && ($ppSurfVal !== null) && (abs($ppSurfVal - 1.0) < 1e-9 || abs($ppSurfVal - 0.5) < 1e-9);
-                              $hasFull = $ppBoardId > 0 ? ((int)($reservedFullByBoard[$ppBoardId] ?? 0) > 0) : false;
-                              $hasHalf = $ppBoardId > 0 ? ((int)($reservedHalvesByBoard[$ppBoardId] ?? 0) > 0) : false;
-                            ?>
-                            <?php if ($needsBoardConsume && abs((float)$ppSurfVal - 0.5) < 1e-9 && !$hasHalf && $hasFull): ?>
-                              <div class="d-flex flex-wrap gap-1">
-                                <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
-                                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                  <input type="hidden" name="remainder_action" value="RETURN">
-                                  <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="CNC→Montaj: consum 1/2 placă, rest în depozit">
-                                    Montaj (rest depozit)
-                                  </button>
-                                </form>
-                                <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
-                                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                  <input type="hidden" name="remainder_action" value="KEEP">
-                                  <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="CNC→Montaj: consum 1/2 placă, rest rămâne rezervat">
-                                    Montaj (rest rezervat)
-                                  </button>
-                                </form>
-                              </div>
-                            <?php elseif ($needsBoardConsume && ((abs((float)$ppSurfVal - 1.0) < 1e-9 && !$hasFull) || (abs((float)$ppSurfVal - 0.5) < 1e-9 && !$hasHalf && !$hasFull))): ?>
-                              <button class="btn btn-sm btn-outline-secondary px-2 py-1" type="button" disabled title="Nu există rezervare suficientă pe proiect">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
                                 <?= htmlspecialchars($lbl) ?>
                               </button>
-                            <?php else: ?>
-                              <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
-                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
-                                  <?= htmlspecialchars($lbl) ?>
-                                </button>
-                              </form>
-                            <?php endif; ?>
+                            </form>
                           <?php else: ?>
                             <?php
                               $cls = 'bg-secondary-subtle text-secondary-emphasis';
@@ -692,8 +725,13 @@ ob_start();
                         $perTxt = number_format($sVal, 2, '.', '') . ' mp';
                         $totTxt = number_format($qty * $sVal, 2, '.', '') . ' mp';
                       } else {
-                        $perTxt = number_format($m2u, 4, '.', '') . ' mp';
-                        $totTxt = number_format($m2t, 4, '.', '') . ' mp';
+                        if ($m2u > 0) {
+                          $perTxt = number_format($m2u, 4, '.', '') . ' mp';
+                          $totTxt = number_format($m2t, 4, '.', '') . ' mp';
+                        } else {
+                          $perTxt = '—';
+                          $totTxt = '—';
+                        }
                       }
                     ?>
                     <div class="col-6 col-md-3">
@@ -812,18 +850,95 @@ ob_start();
                       <?php endif; ?>
                     </div>
 
+                    <?php
+                      $hplRows = [];
+                      if (is_array($mbr) && isset($mbr['hpl_rows']) && is_array($mbr['hpl_rows'])) {
+                        $hplRows = $mbr['hpl_rows'];
+                      }
+                    ?>
                     <div class="mt-2">
                       <div class="text-muted small fw-semibold">HPL</div>
-                      <?php if ($hbCode === '' && $hbName === ''): ?>
+                      <?php if (!$hplRows): ?>
                         <div class="text-muted small">—</div>
                       <?php else: ?>
-                        <div class="text-muted small">
-                          <span class="fw-semibold"><?= htmlspecialchars($hbCode) ?></span><?= $hbName !== '' ? (' · ' . htmlspecialchars($hbName)) : '' ?>
-                          · <span class="fw-semibold"><?= htmlspecialchars($perTxt) ?></span>
-                          · total <span class="fw-semibold"><?= htmlspecialchars($totTxt) ?></span>
-                          <?php if ($canSeePricesRole): ?>
-                            <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$hplCost, 2, '.', '') ?> lei</span></span>
-                          <?php endif; ?>
+                        <div class="table-responsive mt-1">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr class="text-muted small">
+                                <th>Placă</th>
+                                <th style="width:90px">Tip</th>
+                                <th style="width:110px">Status</th>
+                                <th style="width:160px">Dimensiuni</th>
+                                <th class="text-end" style="width:80px">Buc</th>
+                                <th style="width:120px">Locație</th>
+                                <th>Notă</th>
+                                <th class="text-end" style="width:90px">mp</th>
+                                <th style="width:80px">Mod</th>
+                                <th style="width:80px">Sursă</th>
+                                <th style="width:150px">Dată</th>
+                                <th style="width:120px"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <?php foreach ($hplRows as $hr): ?>
+                                <?php
+                                  $hrId = (int)($hr['id'] ?? 0);
+                                  $bcode2 = (string)($hr['board_code'] ?? '');
+                                  $bname2 = (string)($hr['board_name'] ?? '');
+                                  // preferăm piesa consumată dacă există, altfel piesa rezervată
+                                  $pt2 = (string)($hr['consumed_piece_type'] ?? '');
+                                  $pw2 = (int)($hr['consumed_piece_width_mm'] ?? 0);
+                                  $ph2 = (int)($hr['consumed_piece_height_mm'] ?? 0);
+                                  $pq2 = (int)($hr['consumed_piece_qty'] ?? 0);
+                                  $pl2 = (string)($hr['consumed_piece_location'] ?? '');
+                                  $pn2 = (string)($hr['consumed_piece_notes'] ?? '');
+                                  $pm2 = isset($hr['consumed_piece_area_total_m2']) ? (float)($hr['consumed_piece_area_total_m2'] ?? 0) : 0.0;
+                                  if ($pt2 === '' && $pw2 === 0 && $ph2 === 0) {
+                                    $pt2 = (string)($hr['piece_type'] ?? '');
+                                    $pw2 = (int)($hr['piece_width_mm'] ?? 0);
+                                    $ph2 = (int)($hr['piece_height_mm'] ?? 0);
+                                    $pq2 = (int)($hr['piece_qty'] ?? 0);
+                                    $pl2 = (string)($hr['piece_location'] ?? '');
+                                    $pn2 = (string)($hr['piece_notes'] ?? '');
+                                    $pm2 = isset($hr['piece_area_total_m2']) ? (float)($hr['piece_area_total_m2'] ?? 0) : 0.0;
+                                  }
+                                  $cm2 = (string)($hr['consume_mode'] ?? '');
+                                  $src2 = (string)($hr['source'] ?? '');
+                                  $st2 = (string)($hr['status'] ?? '');
+                                  $boardTxt = trim($bcode2 . ' · ' . $bname2);
+                                  $dimTxt = ($ph2 > 0 && $pw2 > 0) ? ($ph2 . ' × ' . $pw2 . ' mm') : '—';
+                                  $noteTxt = trim($pn2);
+                                  if ($noteTxt !== '' && mb_strlen($noteTxt) > 110) $noteTxt = mb_substr($noteTxt, 0, 110) . '…';
+                                  $createdAt = (string)($hr['created_at'] ?? '');
+                                ?>
+                                <tr>
+                                  <td class="fw-semibold"><?= htmlspecialchars($boardTxt !== '' ? $boardTxt : '—') ?></td>
+                                  <td class="fw-semibold"><?= htmlspecialchars($pt2 !== '' ? $pt2 : '—') ?></td>
+                                  <td><span class="badge app-badge"><?= htmlspecialchars($st2) ?></span></td>
+                                  <td class="text-muted"><?= htmlspecialchars($dimTxt) ?></td>
+                                  <td class="text-end fw-semibold"><?= $pq2 > 0 ? (int)$pq2 : '—' ?></td>
+                                  <td class="text-muted"><?= htmlspecialchars($pl2) ?></td>
+                                  <td class="text-muted small" style="max-width:420px;white-space:pre-line"><?= htmlspecialchars($noteTxt) ?></td>
+                                  <td class="text-end fw-semibold"><?= $pm2 > 0 ? number_format((float)$pm2, 2, '.', '') : '—' ?></td>
+                                  <td><?= htmlspecialchars($cm2) ?></td>
+                                  <td><?= htmlspecialchars($src2) ?></td>
+                                  <td class="text-muted small"><?= htmlspecialchars($createdAt) ?></td>
+                                  <td class="text-end">
+                                    <?php if ($canEditThis && $st2 === 'RESERVED' && $hrId > 0): ?>
+                                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>" class="m-0">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                        <button class="btn btn-outline-success btn-sm" type="submit">
+                                          Debitat
+                                        </button>
+                                      </form>
+                                    <?php else: ?>
+                                      <span class="text-muted small">—</span>
+                                    <?php endif; ?>
+                                  </td>
+                                </tr>
+                              <?php endforeach; ?>
+                            </tbody>
+                          </table>
                         </div>
                       <?php endif; ?>
                     </div>
@@ -849,6 +964,9 @@ ob_start();
                   ?>
                   <?php if ($canEditThis): ?>
                     <div class="d-flex justify-content-end gap-2 mt-3">
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppHpl<?= $ppId ?>">
+                        <i class="bi bi-layers me-1"></i> Consum HPL
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAcc<?= $ppId ?>">
                         <i class="bi bi-box-seam me-1"></i> Adaugă accesorii
                       </button>
@@ -862,6 +980,57 @@ ob_start();
                           <i class="bi bi-link-45deg me-1"></i> Scoate
                         </button>
                       </form>
+                    </div>
+
+                    <div class="collapse mt-3" id="ppHpl<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Consum HPL (alocare pe piesă)</div>
+                        <div class="text-muted small">Aloci din piesele rezervate pe proiect sau din plăci REST (nestocate). Consumul efectiv se face manual din butonul „Debitat” din tabelul HPL.</div>
+
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/create')) ?>" class="row g-2 mt-2 js-pp-hpl-form">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Sursă</label>
+                            <div class="d-flex flex-wrap gap-3">
+                              <label class="form-check form-check-inline m-0">
+                                <input class="form-check-input js-pp-hpl-source" type="radio" name="source" value="PROJECT" checked>
+                                <span class="form-check-label">Din proiect (rezervat)</span>
+                              </label>
+                              <label class="form-check form-check-inline m-0">
+                                <input class="form-check-input js-pp-hpl-source" type="radio" name="source" value="REST">
+                                <span class="form-check-label">REST (nestocat)</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          <div class="col-12 col-md-4 js-pp-hpl-mode-wrap">
+                            <label class="form-label fw-semibold mb-1">Consum</label>
+                            <div class="d-flex flex-wrap gap-3">
+                              <label class="form-check form-check-inline m-0">
+                                <input class="form-check-input" type="radio" name="consume_mode" value="FULL" checked>
+                                <span class="form-check-label">1 placă (FULL)</span>
+                              </label>
+                              <label class="form-check form-check-inline m-0">
+                                <input class="form-check-input" type="radio" name="consume_mode" value="HALF">
+                                <span class="form-check-label">1/2 placă</span>
+                              </label>
+                            </div>
+                            <div class="text-muted small mt-1">Pentru REST se alocă întotdeauna integral (FULL).</div>
+                          </div>
+
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Placă / piesă</label>
+                            <select class="form-select form-select-sm js-pp-hpl-piece" name="piece_id" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
+                          </div>
+
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-plus-lg me-1"></i> Adaugă
+                            </button>
+                          </div>
+                        </form>
+                      </div>
                     </div>
 
                     <div class="collapse mt-3" id="ppAcc<?= $ppId ?>">
@@ -950,14 +1119,7 @@ ob_start();
                             <div class="text-muted small mt-1">Suprafață per bucată (mp).</div>
                           </div>
                         </div>
-                        <div class="col-12">
-                          <label class="form-label fw-semibold mb-1">HPL pentru piesă (din rezervările proiectului)</label>
-                          <select class="form-select form-select-sm js-pp-hpl-reserved-select" name="hpl_board_id" data-project-id="<?= (int)$project['id'] ?>" style="width:100%">
-                            <?php if ($curHplId > 0 && $curHplText !== ''): ?>
-                              <option value="<?= (int)$curHplId ?>" selected><?= htmlspecialchars($curHplText) ?></option>
-                            <?php endif; ?>
-                          </select>
-                        </div>
+                        <?php /* HPL-ul pe piesă se gestionează prin butonul "Consum HPL". */ ?>
                         <div class="col-12 d-flex justify-content-end">
                           <button class="btn btn-primary btn-sm" type="submit">
                             <i class="bi bi-save me-1"></i> Salvează
@@ -1528,6 +1690,7 @@ ob_start();
                     <th>Dimensiuni</th>
                     <th class="text-end">Buc</th>
                     <th>Locație</th>
+                    <th>Notă</th>
                     <th class="text-end">mp</th>
                     <?php if ($canMoveHpl): ?><th class="text-end" style="width:260px">Acțiuni</th><?php endif; ?>
                   </tr>
@@ -1545,7 +1708,13 @@ ob_start();
                       $ptype = (string)($p['piece_type'] ?? '');
                       $pstatus = (string)($p['status'] ?? '');
                       $ploc = (string)($p['location'] ?? '');
-                      $isReturnable = ($ptype === 'FULL' && $pstatus === 'RESERVED');
+                      $note = trim((string)($p['notes'] ?? ''));
+                      $noteShort = $note;
+                      if ($noteShort !== '' && mb_strlen($noteShort) > 140) $noteShort = mb_substr($noteShort, 0, 140) . '…';
+                      $isAcc = (int)($p['is_accounting'] ?? 1);
+                      $isReturnable = ($pstatus === 'RESERVED' && $qty > 0);
+                      $isReturnableStock = ($isReturnable && $ptype === 'FULL');
+                      $isReturnableRest = ($isReturnable && $isAcc === 0);
                       $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
                     ?>
                     <tr>
@@ -1563,10 +1732,19 @@ ob_start();
                       <td class="text-muted"><?= $hmm > 0 && $wmm > 0 ? (htmlspecialchars($hmm . ' × ' . $wmm . ' mm')) : '—' ?></td>
                       <td class="text-end fw-semibold"><?= $qty > 0 ? (int)$qty : '—' ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($p['location'] ?? '')) ?></td>
+                      <td class="text-muted small" style="max-width:420px;white-space:pre-line"><?= htmlspecialchars($noteShort) ?></td>
                       <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
                       <?php if ($canMoveHpl): ?>
                         <td class="text-end">
-                          <?php if ($isReturnable && $bid > 0 && $pid > 0 && $qty > 0): ?>
+                          <?php if ($isReturnableRest && $bid > 0 && $pid > 0): ?>
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
+                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
+                              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
+                              </button>
+                            </form>
+                          <?php elseif ($isReturnableStock && $bid > 0 && $pid > 0 && $qty > 0): ?>
                             <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
                                   onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">

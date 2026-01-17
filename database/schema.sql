@@ -275,15 +275,19 @@ CREATE TABLE IF NOT EXISTS projects (
   created_by INT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  deleted_by INT UNSIGNED NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_projects_code (code),
   KEY idx_projects_client (client_id),
   KEY idx_projects_group (client_group_id),
   KEY idx_projects_status (status),
   KEY idx_projects_created (created_at),
+  KEY idx_projects_deleted (deleted_at),
   CONSTRAINT fk_projects_client FOREIGN KEY (client_id) REFERENCES clients(id),
   CONSTRAINT fk_projects_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id),
-  CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id)
+  CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_projects_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Produse (piesele din proiect)
@@ -414,6 +418,33 @@ CREATE TABLE IF NOT EXISTS project_hpl_allocations (
   KEY idx_ph_alloc_pp (project_product_id),
   CONSTRAINT fk_ph_alloc_cons FOREIGN KEY (consumption_id) REFERENCES project_hpl_consumptions(id) ON DELETE CASCADE,
   CONSTRAINT fk_ph_alloc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS project_product_hpl_consumptions (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  project_product_id BIGINT UNSIGNED NOT NULL,
+  board_id INT UNSIGNED NOT NULL,
+  stock_piece_id INT UNSIGNED NULL,
+  consumed_piece_id INT UNSIGNED NULL,
+  source ENUM('PROJECT','REST') NOT NULL DEFAULT 'PROJECT',
+  consume_mode ENUM('FULL','HALF') NOT NULL DEFAULT 'FULL',
+  status ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'RESERVED',
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  consumed_at DATETIME NULL,
+  PRIMARY KEY (id),
+  KEY idx_pphc_project (project_id),
+  KEY idx_pphc_pp (project_product_id),
+  KEY idx_pphc_piece (stock_piece_id),
+  KEY idx_pphc_consumed_piece (consumed_piece_id),
+  KEY idx_pphc_status (status),
+  CONSTRAINT fk_pphc_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pphc_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pphc_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+  CONSTRAINT fk_pphc_piece FOREIGN KEY (stock_piece_id) REFERENCES hpl_stock_pieces(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pphc_consumed_piece FOREIGN KEY (consumed_piece_id) REFERENCES hpl_stock_pieces(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pphc_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Livrări
