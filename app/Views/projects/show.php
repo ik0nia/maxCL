@@ -756,6 +756,8 @@ ob_start();
                     if (is_array($mbr) && isset($mbr['acc_rows']) && is_array($mbr['acc_rows'])) {
                       $accRows = $mbr['acc_rows'];
                     }
+                    // drepturi pentru acțiuni pe această piesă (folosit și în tabelul HPL pentru butonul "Debitat")
+                    $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
                   ?>
 
                   <div class="mt-3">
@@ -924,7 +926,7 @@ ob_start();
                                   <td><?= htmlspecialchars($src2) ?></td>
                                   <td class="text-muted small"><?= htmlspecialchars($createdAt) ?></td>
                                   <td class="text-end">
-                                    <?php if ($canEditThis && $st2 === 'RESERVED' && $hrId > 0): ?>
+                                    <?php if (($canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp)) && $st2 === 'RESERVED' && $hrId > 0): ?>
                                       <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>" class="m-0">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                         <button class="btn btn-outline-success btn-sm" type="submit">
@@ -959,9 +961,6 @@ ob_start();
                     </div>
                   </div>
 
-                  <?php
-                    $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
-                  ?>
                   <?php if ($canEditThis): ?>
                     <div class="d-flex justify-content-end gap-2 mt-3">
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppHpl<?= $ppId ?>">
