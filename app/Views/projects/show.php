@@ -1812,22 +1812,24 @@ ob_start();
                       <?php if ($canMoveHpl): ?>
                         <td class="text-end">
                           <?php if ($isReturnableRest && $bid > 0 && $pid > 0): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
-                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end js-return-note-form"
+                                  onsubmit="return window.appReturnNote ? window.appReturnNote.handleSubmit(this) : confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <input type="hidden" name="consum_tab" value="hpl">
+                              <input type="hidden" name="note_user" value="">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
                                 <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
                               </button>
                             </form>
                           <?php elseif ($isReturnableStock && $bid > 0 && $pid > 0 && $qty > 0): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
-                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end js-return-note-form"
+                                  onsubmit="return window.appReturnNote ? window.appReturnNote.handleSubmit(this) : confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
                               <input type="hidden" name="to_location" value="Depozit">
                               <input type="hidden" name="to_status" value="AVAILABLE">
                               <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc din proiect: ' . ($projLabel !== '' ? $projLabel : 'Proiect')) ?>">
+                              <input type="hidden" name="note_user" value="">
                               <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
                                      name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
@@ -1835,13 +1837,14 @@ ob_start();
                               </button>
                             </form>
                           <?php elseif ($isReturnableOffcut && $bid > 0 && $pid > 0 && $qty > 0): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
-                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă OFFCUT?');">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end js-return-note-form"
+                                  onsubmit="return window.appReturnNote ? window.appReturnNote.handleSubmit(this) : confirm('Revii în stoc (Depozit/Disponibil) această piesă OFFCUT?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
                               <input type="hidden" name="to_location" value="Depozit">
                               <input type="hidden" name="to_status" value="AVAILABLE">
                               <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc (OFFCUT) din proiect: ' . ($projLabel !== '' ? $projLabel : 'Proiect')) ?>">
+                              <input type="hidden" name="note_user" value="">
                               <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
                                      name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
@@ -2442,6 +2445,105 @@ ob_start();
     <div class="text-muted mt-1">Acest tab va fi completat în pasul următor.</div>
   </div>
 <?php endif; ?>
+
+<div class="modal fade" id="returnNoteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Notă pentru revenire în stoc</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="returnNoteText" class="form-label fw-semibold">Notă (opțional)</label>
+        <textarea class="form-control" id="returnNoteText" rows="3" maxlength="500" placeholder="Scrie o notă pentru această revenire..."></textarea>
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="returnNoteSkip">
+          <label class="form-check-label" for="returnNoteSkip">Nu doresc să adaug notă</label>
+        </div>
+        <div class="text-muted small mt-2">Nota introdusă va fi adăugată după nota automată.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+        <button type="button" class="btn btn-primary" id="returnNoteConfirm">Continuă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('returnNoteModal');
+    const modal = (modalEl && window.bootstrap && window.bootstrap.Modal)
+      ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
+      : null;
+    const noteEl = document.getElementById('returnNoteText');
+    const skipEl = document.getElementById('returnNoteSkip');
+    const confirmBtn = document.getElementById('returnNoteConfirm');
+    let activeForm = null;
+
+    function resetForm() {
+      if (noteEl) noteEl.value = '';
+      if (skipEl) skipEl.checked = false;
+      if (noteEl) noteEl.disabled = false;
+    }
+
+    function openModal(form) {
+      activeForm = form;
+      resetForm();
+      if (modal) {
+        modal.show();
+      } else {
+        const wantNote = window.confirm('Vrei să adaugi o notă pentru această revenire?');
+        if (!wantNote) {
+          applyAndSubmit('');
+          return;
+        }
+        const txt = window.prompt('Notă pentru revenire în stoc:') || '';
+        if (txt === '') return;
+        applyAndSubmit(txt);
+      }
+    }
+
+    function applyAndSubmit(txtOverride) {
+      if (!activeForm) return;
+      const input = activeForm.querySelector('input[name="note_user"]');
+      if (input) {
+        const noteText = typeof txtOverride === 'string' ? txtOverride : '';
+        const value = noteText !== ''
+          ? noteText.trim()
+          : (skipEl && skipEl.checked ? '' : (noteEl ? noteEl.value.trim() : ''));
+        input.value = value;
+      }
+      activeForm.dataset.returnNoteConfirmed = '1';
+      if (modal) modal.hide();
+      activeForm.submit();
+    }
+
+    if (skipEl && noteEl) {
+      skipEl.addEventListener('change', function () {
+        noteEl.disabled = skipEl.checked;
+        if (skipEl.checked) noteEl.value = '';
+      });
+    }
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () {
+        applyAndSubmit('');
+      });
+    }
+
+    window.appReturnNote = {
+      handleSubmit: function (form) {
+        if (!form) return true;
+        if (form.dataset.returnNoteConfirmed === '1') {
+          form.dataset.returnNoteConfirmed = '';
+          return true;
+        }
+        openModal(form);
+        return false;
+      }
+    };
+  });
+</script>
 
 <?php
 $content = ob_get_clean();

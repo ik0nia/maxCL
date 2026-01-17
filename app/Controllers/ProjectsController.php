@@ -4141,6 +4141,10 @@ final class ProjectsController
             if ($boardId <= 0 || $qty <= 0) throw new \RuntimeException('Stoc insuficient.');
 
             $note = 'Revenire în stoc (REST) din proiect: ' . $projLabel;
+            $userNote = trim((string)($_POST['note_user'] ?? ''));
+            if ($userNote !== '') {
+                $note = trim($note . "\n" . $userNote);
+            }
 
             // merge with identical AVAILABLE row, else update in place
             $ident = null;

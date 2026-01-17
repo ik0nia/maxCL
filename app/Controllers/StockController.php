@@ -604,7 +604,6 @@ final class StockController
             'qty' => 'Bucăți',
             'to_location' => 'Locație destinație',
             'to_status' => 'Status destinație',
-            'note' => 'Notiță',
         ]);
         $errors = $check['errors'];
 
@@ -613,6 +612,11 @@ final class StockController
         $toLocation = trim((string)($_POST['to_location'] ?? ''));
         $toStatus = trim((string)($_POST['to_status'] ?? ''));
         $note = trim((string)($_POST['note'] ?? ''));
+        $noteUser = trim((string)($_POST['note_user'] ?? ''));
+        $noteCombined = $note;
+        if ($noteUser !== '') {
+            $noteCombined = trim($noteCombined . ($noteCombined !== '' ? "\n" : '') . $noteUser);
+        }
 
         if ($fromId === null) $errors['from_piece_id'] = 'Selectează piesa sursă.';
         if ($qty === null) $errors['qty'] = 'Cantitate invalidă.';
@@ -623,12 +627,13 @@ final class StockController
             $toStatus = 'RESERVED';
         }
         if ($toStatus === '' || !in_array($toStatus, $allowedStatuses, true)) $errors['to_status'] = 'Status invalid.';
-        if ($note === '') $errors['note'] = 'Notița este obligatorie.';
+        if ($noteCombined === '') $errors['note'] = 'Notița este obligatorie.';
 
         if ($errors) {
             Session::flash('toast_error', 'Completează corect câmpurile pentru mutare.');
             Response::redirect('/stock/boards/' . $boardId);
         }
+        $note = $noteCombined;
 
         $from = HplStockPiece::find((int)$fromId);
         if (!$from || (int)$from['board_id'] !== $boardId) {
