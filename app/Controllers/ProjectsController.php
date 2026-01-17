@@ -4089,6 +4089,7 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $projLabel = self::projectLabel($project);
         $consumTab = trim((string)($_POST['consum_tab'] ?? 'hpl'));
         if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'hpl';
         $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
