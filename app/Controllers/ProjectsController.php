@@ -1908,31 +1908,6 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
-        // Dacă piesa e pe suprafață în plăci (1/0.5), asigurăm că are selectat un HPL (sau îl inferăm dacă există exact unul rezervat).
-        $stype0 = (string)($before['surface_type'] ?? '');
-        $sval0 = isset($before['surface_value']) && $before['surface_value'] !== null && $before['surface_value'] !== '' ? (float)$before['surface_value'] : null;
-        $needsHpl = ($stype0 === 'BOARD' && $sval0 !== null && (abs($sval0 - 1.0) < 1e-9 || abs($sval0 - 0.5) < 1e-9));
-        $curBid = isset($before['hpl_board_id']) && $before['hpl_board_id'] !== null && $before['hpl_board_id'] !== '' ? (int)$before['hpl_board_id'] : 0;
-        if ($needsHpl && $curBid <= 0) {
-            $inf = self::inferSingleReservedBoardIdForProject($projectId);
-            if ($inf !== null) {
-                try {
-                    ProjectProduct::updateFields($ppId, ['hpl_board_id' => (int)$inf]);
-                    $before['hpl_board_id'] = (int)$inf;
-                    Audit::log('PROJECT_PRODUCT_UPDATE', 'project_products', $ppId, null, null, [
-                        'message' => 'Auto-select placă HPL pe piesă (singura rezervată în proiect).',
-                        'project_id' => $projectId,
-                        'project_product_id' => $ppId,
-                        'board_id' => (int)$inf,
-                        'via' => 'status_flow',
-                    ]);
-                } catch (\Throwable $e) {}
-            } else {
-                Session::flash('toast_error', 'Piesa are suprafață în plăci (1/1⁄2), dar nu are selectată nicio placă HPL. Editează piesa și selectează placa.');
-                Response::redirect('/projects/' . $projectId . '?tab=products');
-            }
-        }
-
         $flow = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
         $old = (string)($before['production_status'] ?? 'CREAT');
         $idx = array_search($old, $flow, true);
@@ -1950,25 +1925,17 @@ final class ProjectsController
         }
 
         try {
-            // La trecerea în CNC: mutăm materialul necesar din Depozit în Producție (rămâne RESERVED).
-            if ($next === 'CNC') {
-                try {
-                    self::ensureHplInProductionOnCnc($projectId, $before);
-                } catch (\Throwable $e) {
-                    // best-effort: nu blocăm schimbarea statusului dacă mutarea stocului eșuează
-                }
-            }
-
-            // CNC -> Montaj: consum HPL automat (doar pentru suprafață în plăci: 1 / 0.5)
+            // CNC -> Montaj: blocăm până când toate plăcile/piesele HPL alocate pe piesă sunt debitate (consumate manual).
             if ($old === 'CNC' && $next === 'MONTAJ') {
+                $reserved = [];
                 try {
-                    $err = self::autoConsumeHplOnCncToMontaj($projectId, $before, (string)($_POST['remainder_action'] ?? ''));
-                    if ($err !== null) {
-                        Session::flash('toast_error', $err);
-                        Response::redirect('/projects/' . $projectId . '?tab=products');
-                    }
+                    $reserved = ProjectProductHplConsumption::reservedForProjectProduct($projectId, $ppId);
                 } catch (\Throwable $e) {
-                    Session::flash('toast_error', 'Nu pot consuma HPL automat: ' . $e->getMessage());
+                    try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                    try { $reserved = ProjectProductHplConsumption::reservedForProjectProduct($projectId, $ppId); } catch (\Throwable $e3) { $reserved = []; }
+                }
+                if ($reserved) {
+                    Session::flash('toast_error', 'Nu poți trece la Montaj până nu debitezi (consumi) toate plăcile HPL alocate pe această piesă.');
                     Response::redirect('/projects/' . $projectId . '?tab=products');
                 }
             }
