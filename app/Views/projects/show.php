@@ -1728,7 +1728,10 @@ ob_start();
                       $note = trim((string)($p['notes'] ?? ''));
                       $noteShort = $note;
                       if ($noteShort !== '' && mb_strlen($noteShort) > 140) $noteShort = mb_substr($noteShort, 0, 140) . '…';
-                      $isReturnable = ($ptype === 'FULL' && $pstatus === 'RESERVED');
+                      $isAcc = (int)($p['is_accounting'] ?? 1);
+                      $isReturnable = ($pstatus === 'RESERVED' && $qty > 0);
+                      $isReturnableStock = ($isReturnable && $ptype === 'FULL');
+                      $isReturnableRest = ($isReturnable && $isAcc === 0);
                       $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
                     ?>
                     <tr>
@@ -1750,7 +1753,15 @@ ob_start();
                       <td class="text-end fw-semibold"><?= number_format((float)$mp, 2, '.', '') ?></td>
                       <?php if ($canMoveHpl): ?>
                         <td class="text-end">
-                          <?php if ($isReturnable && $bid > 0 && $pid > 0 && $qty > 0): ?>
+                          <?php if ($isReturnableRest && $bid > 0 && $pid > 0): ?>
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
+                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
+                              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
+                              </button>
+                            </form>
+                          <?php elseif ($isReturnableStock && $bid > 0 && $pid > 0 && $qty > 0): ?>
                             <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
                                   onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">

@@ -258,6 +258,7 @@ $router->post('/projects/{id}/products/{ppId}/status', fn($p) => ProjectsControl
 $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/{ppId}/magazie/create', fn($p) => ProjectsController::addMagazieConsumptionForProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/hpl/create', fn($p) => ProjectsController::addHplConsumptionForProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/hpl/pieces/{pieceId}/return', fn($p) => ProjectsController::returnRestHplToStock($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/{cid}/update', fn($p) => ProjectsController::updateMagazieConsumption($p), $projectsWriteMW);
