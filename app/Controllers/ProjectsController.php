@@ -3424,14 +3424,20 @@ final class ProjectsController
             $isAcc = (int)($p['is_accounting'] ?? 1);
 
             $consumedPieceId = $pieceId;
+            // Cerință: la "Debitat" trecem materialul în Producție și apoi îl consumăm,
+            // astfel încât consumul să apară pe locația Producție.
+            $prodLoc = 'Producție';
+            $noteMove = 'TRANSFER · Debitat -> Producție · piesă #' . $ppId . ' · HPL #' . $cid;
             $note = 'CONSUMED · Debitat pe piesă #' . $ppId . ' · HPL #' . $cid;
 
             if ($qty === 1) {
-                $pdo->prepare("UPDATE hpl_stock_pieces SET status='CONSUMED' WHERE id=?")->execute([(int)$pieceId]);
+                $pdo->prepare("UPDATE hpl_stock_pieces SET location=?, status='CONSUMED' WHERE id=?")->execute([$prodLoc, (int)$pieceId]);
+                try { HplStockPiece::appendNote((int)$pieceId, $noteMove); } catch (\Throwable $e) {}
                 try { HplStockPiece::appendNote((int)$pieceId, $note); } catch (\Throwable $e) {}
             } else {
                 // decrement reserved qty, create a new consumed row (qty=1) for trasabilitate
-                $pdo->prepare("UPDATE hpl_stock_pieces SET qty = qty - 1 WHERE id=?")->execute([(int)$pieceId]);
+                $pdo->prepare("UPDATE hpl_stock_pieces SET location=?, qty = qty - 1 WHERE id=?")->execute([$prodLoc, (int)$pieceId]);
+                try { HplStockPiece::appendNote((int)$pieceId, $noteMove); } catch (\Throwable $e) {}
                 $consumedPieceId = HplStockPiece::create([
                     'board_id' => $boardId,
                     'project_id' => $projectId,
@@ -3441,7 +3447,7 @@ final class ProjectsController
                     'width_mm' => $w,
                     'height_mm' => $h,
                     'qty' => 1,
-                    'location' => $loc,
+                    'location' => $prodLoc,
                     'notes' => $note,
                 ]);
             }
