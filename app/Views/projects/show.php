@@ -779,7 +779,7 @@ ob_start();
                     $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
                     $hasReservedAcc = false;
                     foreach ($accRows as $ar) {
-                      if ((string)($ar['mode'] ?? '') === 'RESERVED' && (string)($ar['src'] ?? '') === 'DIRECT') {
+                      if ((string)($ar['mode'] ?? '') === 'RESERVED') {
                         $hasReservedAcc = true;
                         break;
                       }

@@ -1994,33 +1994,38 @@ final class ProjectsController
                 }
             }
 
-            // Gata de livrare: blocăm dacă există accesorii rezervate neconsumate pe piesă.
+            // Gata de livrare: blocăm dacă există accesorii rezervate neconsumate pe piesă (DIRECT sau PROIECT).
             if ($next === 'GATA_DE_LIVRARE') {
-                $magReserved = [];
+                $projectProducts = [];
+                $magConsum = [];
+                try { $projectProducts = ProjectProduct::forProject($projectId); } catch (\Throwable $e) { $projectProducts = []; }
                 try {
-                    $magReserved = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId);
+                    $magConsum = ProjectMagazieConsumption::forProject($projectId);
                 } catch (\Throwable $e) {
                     try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
-                    try { $magReserved = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId); } catch (\Throwable $e3) { $magReserved = []; }
+                    try { $magConsum = ProjectMagazieConsumption::forProject($projectId); } catch (\Throwable $e3) { $magConsum = []; }
                 }
-                if ($magReserved) {
-                    $agg = [];
-                    foreach ($magReserved as $r) {
-                        $iid = (int)($r['item_id'] ?? 0);
-                        if ($iid <= 0) continue;
-                        $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
-                        if ($qty <= 0) continue;
-                        $unit = (string)($r['unit'] ?? $r['item_unit'] ?? '');
-                        $code = trim((string)($r['winmentor_code'] ?? ''));
-                        $name = trim((string)($r['item_name'] ?? ''));
-                        $label = trim($code . ' · ' . $name);
-                        if ($label === '·' || $label === '· ') $label = $name !== '' ? $name : ($code !== '' ? $code : 'Accesoriu');
-                        if (!isset($agg[$iid])) {
-                            $agg[$iid] = ['label' => $label !== '' ? $label : 'Accesoriu', 'qty' => 0.0, 'unit' => $unit];
-                        }
-                        $agg[$iid]['qty'] += $qty;
-                        if ($agg[$iid]['unit'] === '' && $unit !== '') $agg[$iid]['unit'] = $unit;
+                $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+                $accRows = $accBy[$ppId] ?? [];
+                $agg = [];
+                foreach ($accRows as $r) {
+                    if ((string)($r['mode'] ?? '') !== 'RESERVED') continue;
+                    $iid = (int)($r['item_id'] ?? 0);
+                    if ($iid <= 0) continue;
+                    $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+                    if ($qty <= 0) continue;
+                    $unit = (string)($r['unit'] ?? '');
+                    $code = trim((string)($r['code'] ?? ''));
+                    $name = trim((string)($r['name'] ?? ''));
+                    $label = trim($code . ' · ' . $name);
+                    if ($label === '·' || $label === '· ') $label = $name !== '' ? $name : ($code !== '' ? $code : 'Accesoriu');
+                    if (!isset($agg[$iid])) {
+                        $agg[$iid] = ['label' => $label !== '' ? $label : 'Accesoriu', 'qty' => 0.0, 'unit' => $unit];
                     }
+                    $agg[$iid]['qty'] += $qty;
+                    if ($agg[$iid]['unit'] === '' && $unit !== '') $agg[$iid]['unit'] = $unit;
+                }
+                if ($agg) {
                     $items = [];
                     foreach ($agg as $a) {
                         $qtyTxt = number_format((float)($a['qty'] ?? 0), 3, '.', '');
@@ -2029,7 +2034,7 @@ final class ProjectsController
                     }
                     $more = count($items) > 4;
                     $items = array_slice($items, 0, 4);
-                    $cnt = count($agg) > 0 ? count($agg) : count($magReserved);
+                    $cnt = count($agg);
                     $msg = 'Nu poți trece la Gata de livrare: mai ai ' . $cnt . ' accesorii rezervate neconsumate pe această piesă. '
                          . 'Dă în consum accesoriile din secțiunea Accesorii.'
                          . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
@@ -2132,12 +2137,16 @@ final class ProjectsController
      * Consumă accesoriile rezervate pe piesă (manual, din buton).
      * - reserved (fără scădere stoc) -> consumed (OUT din stoc + mișcare)
      * - fără notă (cerință)
+     *
+     * @param array<int,float> $needByItem
      */
-    private static function consumeReservedMagazieForProjectProduct(int $projectId, int $projectProductId): void
+    private static function consumeReservedMagazieForProjectProduct(int $projectId, int $projectProductId, array $needByItem): void
     {
         if ($projectId <= 0 || $projectProductId <= 0) return;
         $project = Project::find($projectId);
         if (!$project) throw new \RuntimeException('Proiect inexistent.');
+        $needByItem = array_filter($needByItem, fn($v) => is_numeric($v) && (float)$v > 0.0);
+        if (!$needByItem) return;
 
         $rows = [];
         try {
@@ -2145,38 +2154,52 @@ final class ProjectsController
         } catch (\Throwable $e) {
             $rows = [];
         }
-        if (!$rows) return;
+        $directByItem = [];
+        foreach ($rows as $r) {
+            $iid = (int)($r['item_id'] ?? 0);
+            $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+            if ($iid <= 0 || $qty <= 0) continue;
+            $directByItem[$iid] = ($directByItem[$iid] ?? 0.0) + $qty;
+        }
+        foreach ($directByItem as $iid => $qty) {
+            if (!isset($needByItem[$iid]) || (float)$needByItem[$iid] < $qty) {
+                $needByItem[$iid] = $qty;
+            }
+        }
+        $projNeedByItem = [];
+        foreach ($needByItem as $iid => $need) {
+            $directQty = (float)($directByItem[$iid] ?? 0.0);
+            $rem = (float)$need - $directQty;
+            if ($rem > 0.000001) {
+                $projNeedByItem[(int)$iid] = $rem;
+            }
+        }
 
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
         $pdo->beginTransaction();
         try {
             // 1) verificăm stoc suficient per item (agregat)
-            $needByItem = [];
-            foreach ($rows as $r) {
-                $iid = (int)($r['item_id'] ?? 0);
-                $q = isset($r['qty']) ? (float)$r['qty'] : 0.0;
-                if ($iid <= 0 || $q <= 0) continue;
-                $needByItem[$iid] = ($needByItem[$iid] ?? 0.0) + $q;
-            }
+            $lockedItems = [];
             foreach ($needByItem as $iid => $need) {
                 $beforeItem = MagazieItem::findForUpdate((int)$iid);
                 if (!$beforeItem) {
                     throw new \RuntimeException('Accesoriu inexistent (id=' . (int)$iid . ').');
                 }
                 $stock = (float)($beforeItem['stock_qty'] ?? 0.0);
-                if ($need > $stock + 1e-9) {
+                if ((float)$need > $stock + 1e-9) {
                     $code = (string)($beforeItem['winmentor_code'] ?? '');
                     $name = (string)($beforeItem['name'] ?? '');
-                    throw new \RuntimeException('Stoc insuficient pentru accesoriu: ' . trim($code . ' · ' . $name) . ' (necesar ' . number_format($need, 3, '.', '') . ', stoc ' . number_format($stock, 3, '.', '') . ').');
+                    throw new \RuntimeException('Stoc insuficient pentru accesoriu: ' . trim($code . ' · ' . $name) . ' (necesar ' . number_format((float)$need, 3, '.', '') . ', stoc ' . number_format($stock, 3, '.', '') . ').');
                 }
+                $lockedItems[(int)$iid] = $beforeItem;
             }
 
-            // 2) procesăm fiecare rezervare: update mode + OUT din stoc
+            // 2) procesăm rezervările DIRECT: update mode + OUT din stoc
             foreach ($rows as $r) {
                 $cid = (int)($r['id'] ?? 0);
                 $iid = (int)($r['item_id'] ?? 0);
-                $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
+                $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
                 if ($cid <= 0 || $iid <= 0 || $qty <= 0) continue;
 
                 $beforeRow = ProjectMagazieConsumption::find($cid);
@@ -2228,6 +2251,92 @@ final class ProjectsController
                     'item_id' => $iid,
                     'qty' => (float)$qty,
                 ]);
+            }
+
+            // 3) consumăm din rezervările la nivel de proiect (PROIECT) pe baza alocării curente.
+            foreach ($projNeedByItem as $iid => $need) {
+                $need = (float)$need;
+                if ($need <= 0) continue;
+                $stProj = $pdo->prepare("
+                    SELECT id, qty, unit
+                    FROM project_magazie_consumptions
+                    WHERE project_id = ?
+                      AND (project_product_id IS NULL OR project_product_id = 0)
+                      AND item_id = ?
+                      AND mode = 'RESERVED'
+                    ORDER BY created_at ASC, id ASC
+                    FOR UPDATE
+                ");
+                $stProj->execute([$projectId, (int)$iid]);
+                $projRows = $stProj->fetchAll();
+                if (!$projRows) {
+                    throw new \RuntimeException('Nu există rezervări de proiect pentru acest accesoriu.');
+                }
+                $remaining = $need;
+                foreach ($projRows as $pr) {
+                    if ($remaining <= 0.000001) break;
+                    $rid = (int)($pr['id'] ?? 0);
+                    $q = isset($pr['qty']) ? (float)($pr['qty'] ?? 0) : 0.0;
+                    if ($rid <= 0 || $q <= 0) continue;
+                    $take = min($q, $remaining);
+                    $newQ = $q - $take;
+                    if ($newQ <= 0.000001) {
+                        $pdo->prepare("DELETE FROM project_magazie_consumptions WHERE id = ?")->execute([$rid]);
+                    } else {
+                        $pdo->prepare("UPDATE project_magazie_consumptions SET qty = ? WHERE id = ?")->execute([$newQ, $rid]);
+                    }
+
+                    if (!MagazieItem::adjustStock($iid, -(float)$take)) {
+                        throw new \RuntimeException('Nu pot scădea stocul (concurență / stoc insuficient).');
+                    }
+
+                    $unit = (string)($pr['unit'] ?? ($lockedItems[$iid]['unit'] ?? 'buc'));
+                    $cid = ProjectMagazieConsumption::create([
+                        'project_id' => $projectId,
+                        'project_product_id' => $projectProductId,
+                        'item_id' => (int)$iid,
+                        'qty' => (float)$take,
+                        'unit' => $unit !== '' ? $unit : 'buc',
+                        'mode' => 'CONSUMED',
+                        'note' => null,
+                        'created_by' => Auth::id(),
+                    ]);
+
+                    $beforeItem = $lockedItems[$iid] ?? MagazieItem::findForUpdate($iid);
+                    $movementId = \App\Models\MagazieMovement::create([
+                        'item_id' => (int)$iid,
+                        'direction' => 'OUT',
+                        'qty' => (float)$take,
+                        'unit_price' => ($beforeItem && isset($beforeItem['unit_price']) && $beforeItem['unit_price'] !== '' && is_numeric($beforeItem['unit_price'])) ? (float)$beforeItem['unit_price'] : null,
+                        'project_id' => $projectId,
+                        'project_code' => (string)($project['code'] ?? null),
+                        'note' => null,
+                        'created_by' => Auth::id(),
+                    ]);
+                    $afterItem = MagazieItem::findForUpdate((int)$iid) ?: $beforeItem;
+                    if ($beforeItem) {
+                        Audit::log('MAGAZIE_OUT', 'magazie_items', (int)$iid, $beforeItem, $afterItem, [
+                            'movement_id' => $movementId,
+                            'project_id' => $projectId,
+                            'project_code' => (string)($project['code'] ?? ''),
+                            'project_product_id' => $projectProductId,
+                            'qty' => (float)$take,
+                        ]);
+                    }
+                    Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_magazie_consumptions', $cid, null, null, [
+                        'message' => 'Consum Magazie manual (buton).',
+                        'project_id' => $projectId,
+                        'project_product_id' => $projectProductId,
+                        'item_id' => (int)$iid,
+                        'qty' => (float)$take,
+                        'unit' => $unit,
+                    ]);
+
+                    $remaining -= $take;
+                }
+                if ($remaining > 0.000001) {
+                    throw new \RuntimeException('Rezervarea de proiect este insuficientă pentru cantitatea cerută.');
+                }
             }
 
             $pdo->commit();
@@ -3238,20 +3347,33 @@ final class ProjectsController
             }
         }
 
-        $rows = [];
+        $projectProducts = [];
+        $magConsum = [];
+        try { $projectProducts = ProjectProduct::forProject($projectId); } catch (\Throwable $e) { $projectProducts = []; }
         try {
-            $rows = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId);
+            $magConsum = ProjectMagazieConsumption::forProject($projectId);
         } catch (\Throwable $e) {
             try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
-            try { $rows = ProjectMagazieConsumption::reservedForProjectProduct($projectId, $ppId); } catch (\Throwable $e3) { $rows = []; }
+            try { $magConsum = ProjectMagazieConsumption::forProject($projectId); } catch (\Throwable $e3) { $magConsum = []; }
         }
-        if (!$rows) {
+        $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+        $accRows = $accBy[$ppId] ?? [];
+        $needByItem = [];
+        foreach ($accRows as $r) {
+            if ((string)($r['mode'] ?? '') !== 'RESERVED') continue;
+            $iid = (int)($r['item_id'] ?? 0);
+            if ($iid <= 0) continue;
+            $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+            if ($qty <= 0) continue;
+            $needByItem[$iid] = ($needByItem[$iid] ?? 0.0) + $qty;
+        }
+        if (!$needByItem) {
             Session::flash('toast_error', 'Nu există accesorii rezervate pentru consum.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
         try {
-            self::consumeReservedMagazieForProjectProduct($projectId, $ppId);
+            self::consumeReservedMagazieForProjectProduct($projectId, $ppId, $needByItem);
             Session::flash('toast_success', 'Accesoriile au fost date în consum.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot da în consum accesoriile: ' . $e->getMessage());
