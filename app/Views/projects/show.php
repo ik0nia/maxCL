@@ -1827,7 +1827,7 @@ ob_start();
                               <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
                               <input type="hidden" name="to_location" value="Depozit">
                               <input type="hidden" name="to_status" value="AVAILABLE">
-                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . (int)($project['id'] ?? 0)))) ?>">
+                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc din proiect: ' . ($projLabel !== '' ? $projLabel : 'Proiect')) ?>">
                               <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
                                      name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
@@ -1841,7 +1841,7 @@ ob_start();
                               <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
                               <input type="hidden" name="to_location" value="Depozit">
                               <input type="hidden" name="to_status" value="AVAILABLE">
-                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc (OFFCUT) din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . (int)($project['id'] ?? 0)))) ?>">
+                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc (OFFCUT) din proiect: ' . ($projLabel !== '' ? $projLabel : 'Proiect')) ?>">
                               <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
                                      name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
