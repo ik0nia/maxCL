@@ -809,6 +809,7 @@ ob_start();
                                 <?php if ($canSeePricesRole): ?>
                                   <th style="width:140px" class="text-end js-price d-none">Preț</th>
                                 <?php endif; ?>
+                                <th style="width:110px"></th>
                               </tr>
                             </thead>
                             <tbody>
@@ -822,6 +823,7 @@ ob_start();
                                   $up = $ar['unit_price'];
                                   $val = ($up !== null) ? ($up * $aq) : null;
                                   $badgeCls = ($mode === 'CONSUMED') ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis';
+                                  $iid = (int)($ar['item_id'] ?? 0);
                                 ?>
                                 <tr>
                                   <td class="fw-semibold">
@@ -844,6 +846,17 @@ ob_start();
                                       <?php endif; ?>
                                     </td>
                                   <?php endif; ?>
+                                  <td class="text-end">
+                                    <?php if ($canEditThis && $srcTag === 'DIRECT' && $mode === 'RESERVED' && $iid > 0): ?>
+                                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/unallocate')) ?>" class="m-0"
+                                            onsubmit="return confirm('Renunți la acest accesoriu rezervat pe piesă?');">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                        <button class="btn btn-outline-danger btn-sm" type="submit">Renunță</button>
+                                      </form>
+                                    <?php else: ?>
+                                      <span class="text-muted small">—</span>
+                                    <?php endif; ?>
+                                  </td>
                                 </tr>
                               <?php endforeach; ?>
                             </tbody>
@@ -927,12 +940,17 @@ ob_start();
                                   <td class="text-muted small"><?= htmlspecialchars($createdAt) ?></td>
                                   <td class="text-end">
                                     <?php if (($canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp)) && $st2 === 'RESERVED' && $hrId > 0): ?>
-                                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>" class="m-0">
-                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                                        <button class="btn btn-outline-success btn-sm" type="submit">
-                                          Debitat
-                                        </button>
-                                      </form>
+                                      <div class="d-flex justify-content-end gap-1">
+                                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>" class="m-0">
+                                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                          <button class="btn btn-outline-success btn-sm" type="submit">Debitat</button>
+                                        </form>
+                                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/unallocate')) ?>" class="m-0"
+                                              onsubmit="return confirm('Renunți la această alocare HPL (revine în stoc)?');">
+                                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                          <button class="btn btn-outline-danger btn-sm" type="submit">Renunță</button>
+                                        </form>
+                                      </div>
                                     <?php else: ?>
                                       <span class="text-muted small">—</span>
                                     <?php endif; ?>

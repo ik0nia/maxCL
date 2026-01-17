@@ -3134,6 +3134,99 @@ final class ProjectsController
     }
 
     /**
+     * Renunță la accesorii rezervate pe piesă (DIRECT, mode=RESERVED).
+     * - șterge rezervările pentru item_id pe piesa de proiect
+     * - nu afectează stocul (rezervarea nu a scăzut stocul)
+     */
+    public static function unallocateMagazieForProjectProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $itemId = (int)($params['itemId'] ?? 0);
+
+        if ($projectId <= 0 || $ppId <= 0 || $itemId <= 0) {
+            Session::flash('toast_error', 'Parametri invalizi.');
+            Response::redirect('/projects');
+        }
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        // OPERATOR lock after final status
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($pp['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        $item = MagazieItem::find($itemId);
+        if (!$item) {
+            Session::flash('toast_error', 'Accesoriu inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $stSel = $pdo->prepare("
+                SELECT id, qty, unit
+                FROM project_magazie_consumptions
+                WHERE project_id = ?
+                  AND project_product_id = ?
+                  AND item_id = ?
+                  AND mode = 'RESERVED'
+            ");
+            $stSel->execute([$projectId, $ppId, $itemId]);
+            $rows = $stSel->fetchAll();
+            if (!$rows) {
+                throw new \RuntimeException('Nu există rezervări de anulat.');
+            }
+            $sumQty = 0.0;
+            $unit = '';
+            foreach ($rows as $r) {
+                $sumQty += (float)($r['qty'] ?? 0);
+                $unit = (string)($r['unit'] ?? $unit);
+            }
+
+            $stDel = $pdo->prepare("
+                DELETE FROM project_magazie_consumptions
+                WHERE project_id = ?
+                  AND project_product_id = ?
+                  AND item_id = ?
+                  AND mode = 'RESERVED'
+            ");
+            $stDel->execute([$projectId, $ppId, $itemId]);
+
+            $pdo->commit();
+            Audit::log('PROJECT_PRODUCT_MAGAZIE_UNALLOCATE', 'project_magazie_consumptions', 0, null, null, [
+                'message' => 'Anulat accesoriu rezervat pe piesă: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'item_id' => $itemId,
+                'qty' => $sumQty,
+                'unit' => $unit,
+            ]);
+            Session::flash('toast_success', 'Rezervarea de accesoriu a fost anulată.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot anula rezervarea: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
      * HPL pe piesă (alocare, fără consum automat):
      * - source=PROJECT: selectăm o piesă RESERVED din stocul proiectului (contabilă)
      *   - FULL: alocăm o placă/piesă întreagă (exclusiv)
@@ -3481,6 +3574,131 @@ final class ProjectsController
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot debita HPL: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
+     * Renunță la o alocare HPL pe piesă (status=RESERVED).
+     * - șterge rândul din project_product_hpl_consumptions
+     * - eliberează piesa:
+     *   - contabilă (is_accounting=1): rămâne RESERVED în proiect (devine disponibilă pentru alte piese)
+     *   - REST (is_accounting=0): revine AVAILABLE în stoc (Depozit), project_id=NULL (cu merge dacă există piesă identică)
+     */
+    public static function unallocateHplForProjectProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $cid = (int)($params['cid'] ?? 0);
+
+        if ($projectId <= 0 || $ppId <= 0 || $cid <= 0) {
+            Session::flash('toast_error', 'Parametri invalizi.');
+            Response::redirect('/projects');
+        }
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        // OPERATOR lock after final status
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($pp['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $stC = $pdo->prepare("SELECT * FROM project_product_hpl_consumptions WHERE id = ? FOR UPDATE");
+            $stC->execute([(int)$cid]);
+            $c = $stC->fetch();
+            if (!$c) throw new \RuntimeException('Alocare HPL inexistentă.');
+            if ((int)($c['project_id'] ?? 0) !== $projectId || (int)($c['project_product_id'] ?? 0) !== $ppId) {
+                throw new \RuntimeException('Alocare HPL invalidă.');
+            }
+            if ((string)($c['status'] ?? '') !== 'RESERVED') {
+                throw new \RuntimeException('Poți renunța doar la alocări rezervate (neconsumate).');
+            }
+            $pieceId = (int)($c['stock_piece_id'] ?? 0);
+            if ($pieceId <= 0) throw new \RuntimeException('Piesa HPL alocată lipsește.');
+
+            $stP = $pdo->prepare("SELECT * FROM hpl_stock_pieces WHERE id = ? FOR UPDATE");
+            $stP->execute([(int)$pieceId]);
+            $p = $stP->fetch();
+            if (!$p) throw new \RuntimeException('Piesa HPL alocată nu mai există în stoc.');
+
+            $isAcc = (int)($p['is_accounting'] ?? 1);
+            $boardId = (int)($p['board_id'] ?? 0);
+            $ptype = (string)($p['piece_type'] ?? '');
+            $w = (int)($p['width_mm'] ?? 0);
+            $h = (int)($p['height_mm'] ?? 0);
+            $qty = (int)($p['qty'] ?? 0);
+            $loc = (string)($p['location'] ?? '');
+
+            // delete allocation row first (so Select2 sees it as available again)
+            $pdo->prepare("DELETE FROM project_product_hpl_consumptions WHERE id = ?")->execute([(int)$cid]);
+
+            if ($isAcc === 0) {
+                // REST -> return to general stock
+                $note = 'Revenire (renunțat) din piesă #' . $ppId . ' · Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? '');
+                $ident = null;
+                try {
+                    $ident = HplStockPiece::findIdentical($boardId, $ptype !== '' ? $ptype : 'OFFCUT', 'AVAILABLE', $w, $h, 'Depozit', 0, null, $pieceId);
+                } catch (\Throwable $e) {
+                    $ident = null;
+                }
+                if ($ident && (int)($ident['id'] ?? 0) > 0) {
+                    HplStockPiece::incrementQty((int)$ident['id'], max(1, $qty));
+                    try { HplStockPiece::appendNote((int)$ident['id'], $note); } catch (\Throwable $e) {}
+                    HplStockPiece::delete($pieceId);
+                } else {
+                    HplStockPiece::updateFields($pieceId, ['status' => 'AVAILABLE', 'project_id' => null, 'location' => 'Depozit']);
+                    try { HplStockPiece::appendNote($pieceId, $note); } catch (\Throwable $e) {}
+                }
+            } else {
+                // accounting: keep RESERVED for project, but make it "unallocated" (merge with identical if possible)
+                $ident = null;
+                try {
+                    $ident = HplStockPiece::findIdentical($boardId, $ptype !== '' ? $ptype : 'OFFCUT', 'RESERVED', $w, $h, $loc, 1, $projectId, $pieceId);
+                } catch (\Throwable $e) {
+                    $ident = null;
+                }
+                if ($ident && (int)($ident['id'] ?? 0) > 0) {
+                    HplStockPiece::incrementQty((int)$ident['id'], max(1, $qty));
+                    HplStockPiece::delete($pieceId);
+                } else {
+                    // ensure it's visible in project stock
+                    HplStockPiece::updateFields($pieceId, ['project_id' => $projectId, 'status' => 'RESERVED']);
+                }
+                try { HplStockPiece::appendNote((int)$pieceId, 'Renunțat de pe piesă #' . $ppId); } catch (\Throwable $e) {}
+            }
+
+            $pdo->commit();
+            Audit::log('PROJECT_PRODUCT_HPL_UNALLOCATE', 'project_product_hpl_consumptions', $cid, null, null, [
+                'message' => 'Renunțat la HPL alocat pe piesă (neconsumat).',
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'board_id' => (int)($c['board_id'] ?? 0),
+                'stock_piece_id' => $pieceId,
+                'source' => (string)($c['source'] ?? ''),
+                'consume_mode' => (string)($c['consume_mode'] ?? ''),
+            ]);
+            Session::flash('toast_success', 'Alocarea HPL a fost anulată.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot anula alocarea HPL: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
     }
