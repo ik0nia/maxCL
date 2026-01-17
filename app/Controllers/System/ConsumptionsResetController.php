@@ -75,6 +75,10 @@ final class ConsumptionsResetController
                 $counts['magazie_movements'] = (int)$st->rowCount();
             }
             if (self::tableExists($pdo, 'audit_log')) {
+                $st = $pdo->prepare("DELETE FROM audit_log WHERE created_at >= ?");
+                $st->execute(['2026-01-14 00:00:00']);
+                $counts['audit_log_since_2026_01_14'] = (int)$st->rowCount();
+
                 $actions = [
                     'PROJECT_CONSUMPTION_CREATE',
                     'PROJECT_CONSUMPTION_UPDATE',
