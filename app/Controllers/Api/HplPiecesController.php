@@ -64,7 +64,7 @@ final class HplPiecesController
                 if ($projectId <= 0) {
                     Response::json(['ok' => true, 'q' => $q, 'count' => 0, 'items' => []]);
                 }
-                $sql = "
+                $sqlBase = "
                     SELECT
                       sp.*,
                       b.code AS board_code,
@@ -82,18 +82,50 @@ final class HplPiecesController
                     LEFT JOIN finishes bc ON bc.id = b.back_color_id
                     WHERE sp.qty > 0
                       AND sp.status = 'RESERVED'
-                      AND (sp.project_id = ?)
+                      AND (
+                        sp.project_id = ?
+                        OR EXISTS (
+                          SELECT 1
+                          FROM project_hpl_consumptions c
+                          WHERE c.project_id = ?
+                            AND sp.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                      )
                 ";
-                $params = [(int)$projectId];
+                // Exclude piesele deja alocate pe produse (RESERVED în project_product_hpl_consumptions), dacă tabela există.
+                $sql = $sqlBase . "
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM project_product_hpl_consumptions x
+                        WHERE x.stock_piece_id = sp.id
+                          AND x.status = 'RESERVED'
+                      )
+                ";
+                $params = [(int)$projectId, (int)$projectId];
                 if ($q !== '') {
                     $sql .= " AND (b.code LIKE ? OR b.name LIKE ? OR sp.notes LIKE ?)";
                     $qq = '%' . $q . '%';
                     $params[] = $qq; $params[] = $qq; $params[] = $qq;
                 }
                 $sql .= " ORDER BY sp.created_at DESC, sp.id DESC LIMIT " . (int)$limit;
-                $st = $pdo->prepare($sql);
-                $st->execute($params);
-                $rows = $st->fetchAll();
+                try {
+                    $st = $pdo->prepare($sql);
+                    $st->execute($params);
+                    $rows = $st->fetchAll();
+                } catch (\Throwable $e) {
+                    // compat: dacă tabela project_product_hpl_consumptions nu există, folosim query fără filtrare
+                    $sql = $sqlBase;
+                    $params = [(int)$projectId, (int)$projectId];
+                    if ($q !== '') {
+                        $sql .= " AND (b.code LIKE ? OR b.name LIKE ? OR sp.notes LIKE ?)";
+                        $qq = '%' . $q . '%';
+                        $params[] = $qq; $params[] = $qq; $params[] = $qq;
+                    }
+                    $sql .= " ORDER BY sp.created_at DESC, sp.id DESC LIMIT " . (int)$limit;
+                    $st = $pdo->prepare($sql);
+                    $st->execute($params);
+                    $rows = $st->fetchAll();
+                }
             }
 
             foreach ($rows as $r) {

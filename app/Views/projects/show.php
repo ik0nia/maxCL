@@ -876,11 +876,13 @@ ob_start();
                                 <th style="width:80px">Mod</th>
                                 <th style="width:80px">Sursă</th>
                                 <th style="width:150px">Dată</th>
+                                <th style="width:120px"></th>
                               </tr>
                             </thead>
                             <tbody>
                               <?php foreach ($hplRows as $hr): ?>
                                 <?php
+                                  $hrId = (int)($hr['id'] ?? 0);
                                   $bcode2 = (string)($hr['board_code'] ?? '');
                                   $bname2 = (string)($hr['board_name'] ?? '');
                                   // preferăm piesa consumată dacă există, altfel piesa rezervată
@@ -921,6 +923,18 @@ ob_start();
                                   <td><?= htmlspecialchars($cm2) ?></td>
                                   <td><?= htmlspecialchars($src2) ?></td>
                                   <td class="text-muted small"><?= htmlspecialchars($createdAt) ?></td>
+                                  <td class="text-end">
+                                    <?php if ($canEditThis && $st2 === 'RESERVED' && $hrId > 0): ?>
+                                      <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>" class="m-0">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                        <button class="btn btn-outline-success btn-sm" type="submit">
+                                          Debitat
+                                        </button>
+                                      </form>
+                                    <?php else: ?>
+                                      <span class="text-muted small">—</span>
+                                    <?php endif; ?>
+                                  </td>
                                 </tr>
                               <?php endforeach; ?>
                             </tbody>
@@ -970,8 +984,8 @@ ob_start();
 
                     <div class="collapse mt-3" id="ppHpl<?= $ppId ?>">
                       <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
-                        <div class="fw-semibold">Consum HPL (rezervare pe piesă)</div>
-                        <div class="text-muted small">Selectezi fie din piesele rezervate pe proiect, fie din plăci REST (nestocate). Se consumă automat la „Gata de livrare”.</div>
+                        <div class="fw-semibold">Consum HPL (alocare pe piesă)</div>
+                        <div class="text-muted small">Aloci din piesele rezervate pe proiect sau din plăci REST (nestocate). Consumul efectiv se face manual din butonul „Debitat” din tabelul HPL.</div>
 
                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/create')) ?>" class="row g-2 mt-2 js-pp-hpl-form">
                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
@@ -1002,7 +1016,7 @@ ob_start();
                                 <span class="form-check-label">1/2 placă</span>
                               </label>
                             </div>
-                            <div class="text-muted small mt-1">Pentru REST se consumă întotdeauna placa întreagă.</div>
+                            <div class="text-muted small mt-1">Pentru REST se alocă întotdeauna integral (FULL).</div>
                           </div>
 
                           <div class="col-12 col-md-4">
