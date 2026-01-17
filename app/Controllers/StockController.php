@@ -650,6 +650,7 @@ final class StockController
         $labels = self::statusLabels();
         $fromStatus = (string)($from['status'] ?? '');
         $fromLoc = (string)($from['location'] ?? '');
+        $carryNotes = !($fromStatus === 'AVAILABLE' || $toStatus === 'AVAILABLE');
 
         /** @var \PDO $pdo */
         $pdo = DB::pdo();
@@ -679,7 +680,13 @@ final class StockController
                 if ($destExisting) {
                     $destId = (int)$destExisting['id'];
                     HplStockPiece::incrementQty($destId, $qty);
-                    HplStockPiece::appendNote($destId, $note);
+                    if ($note !== '') {
+                        if ($carryNotes) {
+                            HplStockPiece::appendNote($destId, $note);
+                        } else {
+                            try { HplStockPiece::updateFields($destId, ['notes' => $note]); } catch (\Throwable $e) {}
+                        }
+                    }
                     try {
                         HplStockPiece::updateFields($destId, [
                             'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
@@ -704,7 +711,13 @@ final class StockController
                 if ($destExisting) {
                     $destId = (int)$destExisting['id'];
                     HplStockPiece::incrementQty($destId, $qty);
-                    HplStockPiece::appendNote($destId, $note);
+                    if ($note !== '') {
+                        if ($carryNotes) {
+                            HplStockPiece::appendNote($destId, $note);
+                        } else {
+                            try { HplStockPiece::updateFields($destId, ['notes' => $note]); } catch (\Throwable $e) {}
+                        }
+                    }
                     try {
                         HplStockPiece::updateFields($destId, [
                             'project_id' => ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
@@ -714,8 +727,10 @@ final class StockController
                 } else {
                     // Update pe aceeași piesă
                     $newNotes = $note;
-                    $oldNotes = trim((string)($from['notes'] ?? ''));
-                    if ($oldNotes !== '') $newNotes = $oldNotes . "\n" . $note;
+                    if ($carryNotes) {
+                        $oldNotes = trim((string)($from['notes'] ?? ''));
+                        if ($oldNotes !== '') $newNotes = $oldNotes . "\n" . $note;
+                    }
                     HplStockPiece::updateFields((int)$from['id'], [
                         'status' => $toStatus,
                         'location' => $toLocation,

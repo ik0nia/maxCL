@@ -794,6 +794,7 @@ final class ProjectsController
             $destLocation = ($toLocation !== null && $toLocation !== '') ? $toLocation : $location;
             $isAcc = (int)($r['is_accounting'] ?? 1);
             $notes = (string)($r['notes'] ?? '');
+            $carryNotes = !($fromStatus === 'AVAILABLE' || $toStatus === 'AVAILABLE');
 
             if ($take === $rowQty) {
                 // Mută întreg rândul: încercăm să cumulăm într-un rând identic în destinație,
@@ -809,7 +810,11 @@ final class ProjectsController
                     if ($destId > 0) {
                         HplStockPiece::incrementQty($destId, $take);
                         if ($noteAppend) {
-                            HplStockPiece::appendNote($destId, $noteAppend);
+                            if ($carryNotes) {
+                                HplStockPiece::appendNote($destId, $noteAppend);
+                            } else {
+                                try { HplStockPiece::updateFields($destId, ['notes' => $noteAppend]); } catch (\Throwable $e) {}
+                            }
                         }
                         // sincronizare project_id pe destinație
                         try {
@@ -823,12 +828,16 @@ final class ProjectsController
                         HplStockPiece::delete($id);
                     } else {
                         // fallback: dacă nu avem id valid, mutăm în loc
-                        HplStockPiece::updateFields($id, ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation]);
-                        if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                        $data = ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation];
+                        if ($noteAppend && !$carryNotes) $data['notes'] = $noteAppend;
+                        HplStockPiece::updateFields($id, $data);
+                        if ($noteAppend && $carryNotes) HplStockPiece::appendNote($id, $noteAppend);
                     }
                 } else {
-                    HplStockPiece::updateFields($id, ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation]);
-                    if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                    $data = ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation];
+                    if ($noteAppend && !$carryNotes) $data['notes'] = $noteAppend;
+                    HplStockPiece::updateFields($id, $data);
+                    if ($noteAppend && $carryNotes) HplStockPiece::appendNote($id, $noteAppend);
                 }
             } else {
                 // scade din rândul sursă
@@ -843,9 +852,15 @@ final class ProjectsController
                 }
                 if ($ident) {
                     HplStockPiece::incrementQty((int)$ident['id'], $take);
-                    if ($noteAppend) HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
+                    if ($noteAppend) {
+                        if ($carryNotes) {
+                            HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
+                        } else {
+                            try { HplStockPiece::updateFields((int)$ident['id'], ['notes' => $noteAppend]); } catch (\Throwable $e) {}
+                        }
+                    }
                 } else {
-                    $newNotes = trim($notes);
+                    $newNotes = $carryNotes ? trim($notes) : '';
                     if ($noteAppend) $newNotes = trim($newNotes . ($newNotes !== '' ? "\n" : '') . $noteAppend);
                     HplStockPiece::create([
                         'board_id' => $boardId,
@@ -3698,10 +3713,8 @@ final class ProjectsController
                 if ($isAcc !== 0) throw new \RuntimeException('Piesa REST trebuie să fie „nestocată”.');
                 if ($status !== 'AVAILABLE') throw new \RuntimeException('Placa REST nu este disponibilă.');
                 // rezervăm pe proiect ca să nu mai fie disponibilă
-                HplStockPiece::updateFields((int)$pieceId, ['status' => 'RESERVED', 'project_id' => $projectId]);
-                try {
-                    HplStockPiece::appendNote((int)$pieceId, 'REST rezervat · ' . $projNote . ' · ' . $prodNote);
-                } catch (\Throwable $e) {}
+                $restNote = 'REST rezervat · ' . $projNote . ' · ' . $prodNote;
+                HplStockPiece::updateFields((int)$pieceId, ['status' => 'RESERVED', 'project_id' => $projectId, 'notes' => $restNote]);
             }
 
             // Pentru alocare, lucrăm ideal cu qty=1 per rând (mai simplu pentru FULL/HALF).
