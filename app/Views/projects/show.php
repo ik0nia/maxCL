@@ -1789,6 +1789,7 @@ ob_start();
                       $isReturnable = ($pstatus === 'RESERVED' && $qty > 0);
                       $isReturnableStock = ($isReturnable && $ptype === 'FULL');
                       $isReturnableRest = ($isReturnable && $isAcc === 0);
+                      $isReturnableOffcut = ($isReturnable && $ptype === 'OFFCUT' && $isAcc !== 0);
                       $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
                     ?>
                     <tr>
@@ -1827,6 +1828,20 @@ ob_start();
                               <input type="hidden" name="to_location" value="Depozit">
                               <input type="hidden" name="to_status" value="AVAILABLE">
                               <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . (int)($project['id'] ?? 0)))) ?>">
+                              <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
+                                     name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
+                              <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
+                              </button>
+                            </form>
+                          <?php elseif ($isReturnableOffcut && $bid > 0 && $pid > 0 && $qty > 0): ?>
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
+                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă OFFCUT?');">
+                              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
+                              <input type="hidden" name="to_location" value="Depozit">
+                              <input type="hidden" name="to_status" value="AVAILABLE">
+                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc (OFFCUT) din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . (int)($project['id'] ?? 0)))) ?>">
                               <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
                                      name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
