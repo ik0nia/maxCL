@@ -3004,6 +3004,9 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $consumTab = trim((string)($_POST['consum_tab'] ?? 'accesorii'));
+        if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'accesorii';
+        $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
 
         $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
@@ -3012,14 +3015,14 @@ final class ProjectsController
         $note = trim((string)($_POST['note'] ?? ''));
         if ($itemId === null || $qty === null || $qty <= 0) {
             Session::flash('toast_error', 'Consum invalid.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'CONSUMED';
 
         $item = MagazieItem::find((int)$itemId);
         if (!$item) {
             Session::flash('toast_error', 'Accesoriu inexistent.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         $unit = trim((string)($item['unit'] ?? 'buc'));
 
@@ -3028,7 +3031,7 @@ final class ProjectsController
             $stock = (float)($item['stock_qty'] ?? 0);
             if ($qty > $stock + 1e-9) {
                 Session::flash('toast_error', 'Stoc insuficient în Magazie.');
-                Response::redirect('/projects/' . $projectId . '?tab=consum');
+                Response::redirect($consumRedirect);
             }
         }
 
@@ -3080,7 +3083,7 @@ final class ProjectsController
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva consumul: ' . $e->getMessage());
         }
-        Response::redirect('/projects/' . $projectId . '?tab=consum');
+        Response::redirect($consumRedirect);
     }
 
     /**
@@ -3750,11 +3753,14 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $consumTab = trim((string)($_POST['consum_tab'] ?? 'hpl'));
+        if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'hpl';
+        $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
         $u = Auth::user();
         $role = $u ? (string)($u['role'] ?? '') : '';
         if (!$u || !in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true)) {
             Session::flash('toast_error', 'Nu ai drepturi.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
 
         /** @var \PDO $pdo */
@@ -3828,7 +3834,7 @@ final class ProjectsController
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot face revenirea: ' . $e->getMessage());
         }
-        Response::redirect('/projects/' . $projectId . '?tab=consum');
+        Response::redirect($consumRedirect);
     }
 
     public static function addHplConsumption(array $params): void
@@ -3840,6 +3846,9 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $consumTab = trim((string)($_POST['consum_tab'] ?? 'hpl'));
+        if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'hpl';
+        $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
 
         $boardId = Validator::int(trim((string)($_POST['board_id'] ?? '')), 1);
         $qtyBoards = Validator::int(trim((string)($_POST['qty_boards'] ?? '')), 1);
@@ -3847,7 +3856,7 @@ final class ProjectsController
         $note = trim((string)($_POST['note'] ?? ''));
         if ($boardId === null || $qtyBoards === null || $qtyBoards <= 0) {
             Session::flash('toast_error', 'Consum HPL invalid.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'RESERVED';
 
@@ -3855,11 +3864,11 @@ final class ProjectsController
             $board = HplBoard::find((int)$boardId);
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot încărca placa HPL.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         if (!$board) {
             Session::flash('toast_error', 'Placă HPL inexistentă.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
 
         // Stoc disponibil (plăci întregi)
@@ -3868,11 +3877,11 @@ final class ProjectsController
             $stockFull = self::countFullBoardsAvailable((int)$boardId);
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot calcula stocul HPL.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         if ($qtyBoards > $stockFull) {
             Session::flash('toast_error', 'Stoc HPL insuficient (plăci întregi).');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
 
         /** @var \PDO $pdo */
@@ -3937,7 +3946,7 @@ final class ProjectsController
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva consumul HPL: ' . $e->getMessage());
         }
-        Response::redirect('/projects/' . $projectId . '?tab=consum');
+        Response::redirect($consumRedirect);
     }
 
     public static function updateMagazieConsumption(array $params): void
@@ -3950,10 +3959,13 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $consumTab = trim((string)($_POST['consum_tab'] ?? 'accesorii'));
+        if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'accesorii';
+        $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
         $before = ProjectMagazieConsumption::find($cid);
         if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
             Session::flash('toast_error', 'Consum inexistent.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
 
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
@@ -3963,7 +3975,7 @@ final class ProjectsController
         $note = trim((string)($_POST['note'] ?? ''));
         if ($qty === null || $qty <= 0) {
             Session::flash('toast_error', 'Cantitate invalidă.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = (string)($before['mode'] ?? 'CONSUMED');
 
@@ -3971,7 +3983,7 @@ final class ProjectsController
         $item = MagazieItem::find($itemId);
         if (!$item) {
             Session::flash('toast_error', 'Accesoriu inexistent.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
 
         $beforeMode = (string)($before['mode'] ?? '');
@@ -3986,7 +3998,7 @@ final class ProjectsController
         $stock = (float)($item['stock_qty'] ?? 0);
         if ($stockDelta < 0 && (($stock + $stockDelta) < -1e-9)) {
             Session::flash('toast_error', 'Stoc insuficient pentru actualizare.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
 
         /** @var \PDO $pdo */
@@ -4025,7 +4037,7 @@ final class ProjectsController
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot actualiza consumul.');
         }
-        Response::redirect('/projects/' . $projectId . '?tab=consum');
+        Response::redirect($consumRedirect);
     }
 
     public static function deleteMagazieConsumption(array $params): void
@@ -4038,10 +4050,13 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $consumTab = trim((string)($_POST['consum_tab'] ?? 'accesorii'));
+        if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'accesorii';
+        $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
         $before = ProjectMagazieConsumption::find($cid);
         if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
             Session::flash('toast_error', 'Consum inexistent.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         $itemId = (int)($before['item_id'] ?? 0);
         $item = MagazieItem::find($itemId);
@@ -4081,7 +4096,7 @@ final class ProjectsController
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot șterge consumul.');
         }
-        Response::redirect('/projects/' . $projectId . '?tab=consum');
+        Response::redirect($consumRedirect);
     }
 
     public static function deleteHplConsumption(array $params): void
@@ -4094,10 +4109,13 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $consumTab = trim((string)($_POST['consum_tab'] ?? 'hpl'));
+        if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'hpl';
+        $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
         $before = ProjectHplConsumption::find($cid);
         if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
             Session::flash('toast_error', 'Consum inexistent.');
-            Response::redirect('/projects/' . $projectId . '?tab=consum');
+            Response::redirect($consumRedirect);
         }
         try {
             // Reverse stoc (best-effort): RESERVED/CONSUMED -> AVAILABLE
@@ -4139,7 +4157,7 @@ final class ProjectsController
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot șterge consumul HPL.');
         }
-        Response::redirect('/projects/' . $projectId . '?tab=consum');
+        Response::redirect($consumRedirect);
     }
 
     public static function createDelivery(array $params): void

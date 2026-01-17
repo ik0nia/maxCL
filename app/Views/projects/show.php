@@ -1295,15 +1295,34 @@ ob_start();
     </div>
   </div>
 <?php elseif ($tab === 'consum'): ?>
-  <div class="row g-3">
-    <div class="col-12 col-lg-6">
-      <div class="card app-card p-3">
+  <?php
+    $consumTabs = [
+      'accesorii' => 'Consum accesorii',
+      'hpl' => 'Consum HPL',
+    ];
+    $consumTab = isset($_GET['consum_tab']) ? trim((string)$_GET['consum_tab']) : 'accesorii';
+    if (!isset($consumTabs[$consumTab])) $consumTab = 'accesorii';
+  ?>
+  <ul class="nav nav-tabs mb-3">
+    <?php foreach ($consumTabs as $k => $label): ?>
+      <li class="nav-item">
+        <a class="nav-link <?= $consumTab === $k ? 'active' : '' ?>"
+           href="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '?tab=consum&consum_tab=' . $k)) ?>">
+          <?= htmlspecialchars($label) ?>
+        </a>
+      </li>
+    <?php endforeach; ?>
+  </ul>
+
+  <?php if ($consumTab === 'accesorii'): ?>
+    <div class="card app-card p-3">
         <div class="h5 m-0">Consum Magazie (accesorii)</div>
         <div class="text-muted">Rezervat/Consumat — legabil la produs</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/create')) ?>" class="row g-2 mt-2">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <input type="hidden" name="consum_tab" value="accesorii">
             <div class="col-12">
               <label class="form-label fw-semibold">Accesoriu</label>
               <select class="form-select" name="item_id" id="magazieItemSelect" style="width:100%"></select>
@@ -1447,6 +1466,7 @@ ob_start();
                           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/' . $cid . '/delete')) ?>" class="d-inline"
                                 onsubmit="return confirm('Ștergi consumul?');">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <input type="hidden" name="consum_tab" value="accesorii">
                             <button class="btn btn-outline-secondary btn-sm" type="submit">
                               <i class="bi bi-trash me-1"></i> Șterge
                             </button>
@@ -1461,6 +1481,7 @@ ob_start();
                         <td colspan="5">
                           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/' . $cid . '/update')) ?>" class="row g-2 align-items-end">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <input type="hidden" name="consum_tab" value="accesorii">
                             <div class="col-6 col-md-2">
                               <label class="form-label fw-semibold mb-1">Cant</label>
                               <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty" value="<?= htmlspecialchars((string)($c['qty'] ?? '')) ?>">
@@ -1507,16 +1528,15 @@ ob_start();
           <?php endif; ?>
         </div>
       </div>
-    </div>
-
-    <div class="col-12 col-lg-6">
-      <div class="card app-card p-3">
+  <?php else: ?>
+    <div class="card app-card p-3">
         <div class="h5 m-0">Consum HPL</div>
         <div class="text-muted">Rezervat/Consumat (plăci întregi)</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+            <input type="hidden" name="consum_tab" value="hpl">
             <div class="col-12">
               <label class="form-label fw-semibold">Placă HPL</label>
               <select class="form-select" name="board_id" id="hplBoardSelect" style="width:100%"></select>
@@ -1757,6 +1777,7 @@ ob_start();
                             <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
                                   onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <input type="hidden" name="consum_tab" value="hpl">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
                                 <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
                               </button>
@@ -1789,8 +1810,7 @@ ob_start();
         </div>
 
       </div>
-    </div>
-  </div>
+  <?php endif; ?>
 <?php elseif ($tab === 'deliveries'): ?>
   <div class="row g-3">
     <div class="col-12 col-lg-6">
