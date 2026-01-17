@@ -1986,6 +1986,10 @@ final class ProjectsController
                          . 'Debitează (sau Renunță) din tabelul HPL.'
                          . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
                     Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products');
                 }
             }

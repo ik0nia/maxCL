@@ -4,6 +4,7 @@ use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\Url;
 use App\Core\View;
+use App\Core\Session;
 
 $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
@@ -33,6 +34,19 @@ $cncFiles = $cncFiles ?? [];
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
+$ppStatusError = null;
+$ppStatusErrorRaw = Session::flash('pp_status_error');
+if (is_string($ppStatusErrorRaw) && $ppStatusErrorRaw !== '') {
+  $ppStatusError = json_decode($ppStatusErrorRaw, true);
+  if (!is_array($ppStatusError) || !isset($ppStatusError['id'], $ppStatusError['message'])) {
+    $ppStatusError = null;
+  } else {
+    $ppStatusError = [
+      'id' => (int)$ppStatusError['id'],
+      'message' => (string)$ppStatusError['message'],
+    ];
+  }
+}
 
 $tabs = [
   'general' => 'General',
@@ -645,6 +659,11 @@ ob_start();
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                     </div>
                   </div>
+                  <?php if ($ppStatusError && (int)($ppStatusError['id'] ?? 0) === $ppId): ?>
+                    <div class="alert alert-danger py-2 px-3 mt-2 mb-0" role="alert">
+                      <?= htmlspecialchars((string)($ppStatusError['message'] ?? '')) ?>
+                    </div>
+                  <?php endif; ?>
 
                   <?php
                     $stVal = (string)($pp['production_status'] ?? '');
