@@ -9,7 +9,9 @@ use App\Core\DB;
 use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
+use App\Core\Upload;
 use App\Core\View;
+use App\Models\AppSetting;
 
 final class AdminSettingsController
 {
@@ -283,6 +285,21 @@ final class AdminSettingsController
         $hasPhpDump = self::canPhpSnapshot();
         $hasPhpRestore = self::canPhpSnapshot();
         $isWritable = is_writable($dir);
+        $companyKeys = [
+            'company_name',
+            'company_cui',
+            'company_reg',
+            'company_address',
+            'company_phone',
+            'company_email',
+            'company_contact_name',
+            'company_contact_phone',
+            'company_contact_email',
+            'company_contact_position',
+            'company_logo_url',
+            'company_logo_thumb_url',
+        ];
+        $companySettings = AppSetting::getMany($companyKeys);
         echo View::render('system/admin_settings', [
             'title' => 'Setări admin',
             'snapshots' => $snapshots,
@@ -292,6 +309,7 @@ final class AdminSettingsController
             'hasPhpDump' => $hasPhpDump,
             'hasPhpRestore' => $hasPhpRestore,
             'isWritable' => $isWritable,
+            'companySettings' => $companySettings,
         ]);
     }
 
@@ -349,6 +367,44 @@ final class AdminSettingsController
         } else {
             Session::flash('toast_error', 'Nu pot restaura snapshot: ' . $err);
         }
+        Response::redirect('/system/admin-settings');
+    }
+
+    public static function updateCompany(): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        self::requireAdmin();
+
+        $fields = [
+            'company_name' => trim((string)($_POST['company_name'] ?? '')),
+            'company_cui' => trim((string)($_POST['company_cui'] ?? '')),
+            'company_reg' => trim((string)($_POST['company_reg'] ?? '')),
+            'company_address' => trim((string)($_POST['company_address'] ?? '')),
+            'company_phone' => trim((string)($_POST['company_phone'] ?? '')),
+            'company_email' => trim((string)($_POST['company_email'] ?? '')),
+            'company_contact_name' => trim((string)($_POST['company_contact_name'] ?? '')),
+            'company_contact_phone' => trim((string)($_POST['company_contact_phone'] ?? '')),
+            'company_contact_email' => trim((string)($_POST['company_contact_email'] ?? '')),
+            'company_contact_position' => trim((string)($_POST['company_contact_position'] ?? '')),
+        ];
+
+        foreach ($fields as $k => $v) {
+            AppSetting::set($k, $v !== '' ? $v : null, Auth::id());
+        }
+
+        $logo = $_FILES['company_logo'] ?? null;
+        if (is_array($logo) && isset($logo['error']) && (int)$logo['error'] !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $res = Upload::saveCompanyLogo($logo);
+                AppSetting::set('company_logo_url', $res['image_url'] ?? null, Auth::id());
+                AppSetting::set('company_logo_thumb_url', $res['thumb_url'] ?? null, Auth::id());
+            } catch (\Throwable $e) {
+                Session::flash('toast_error', 'Nu pot salva logo-ul: ' . $e->getMessage());
+                Response::redirect('/system/admin-settings');
+            }
+        }
+
+        Session::flash('toast_success', 'Datele firmei au fost salvate.');
         Response::redirect('/system/admin-settings');
     }
 }

@@ -151,6 +151,31 @@ $router->get('/uploads/finishes/{name}', function (array $params) {
     exit;
 }, [Auth::requireLogin()]);
 
+// ---- Uploads company logo (servite din storage/uploads/company)
+$router->get('/uploads/company/{name}', function (array $params) {
+    $name = (string)($params['name'] ?? '');
+    if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $name)) {
+        http_response_code(404);
+        exit;
+    }
+    $fs = __DIR__ . '/../storage/uploads/company/' . $name;
+    if (!is_file($fs)) {
+        http_response_code(404);
+        exit;
+    }
+    $ext = strtolower(pathinfo($fs, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'jpg', 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        default => 'application/octet-stream',
+    };
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: private, max-age=86400');
+    readfile($fs);
+    exit;
+}, [Auth::requireLogin()]);
+
 // ---- Uploads files (servite din storage/uploads/files)
 $router->get('/uploads/files/{name}', function (array $params) {
     $name = (string)($params['name'] ?? '');
@@ -242,6 +267,7 @@ $systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
 $router->get('/system/consumuri/reset', fn() => ConsumptionsResetController::run(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->get('/system/admin-settings', fn() => AdminSettingsController::index(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
+$router->post('/system/admin-settings/company/update', fn() => AdminSettingsController::updateCompany(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/snapshot/create', fn() => AdminSettingsController::createSnapshot(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/snapshot/restore', fn() => AdminSettingsController::restoreSnapshot(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 

@@ -3,8 +3,13 @@ use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\Session;
 use App\Core\Url;
+use App\Models\AppSetting;
 
 $user = Auth::user();
+$brandSettings = AppSetting::getMany(['company_name', 'company_logo_thumb_url', 'company_logo_url']);
+$brandName = trim((string)($brandSettings['company_name'] ?? ''));
+if ($brandName === '') $brandName = 'HPL Manager';
+$brandLogo = (string)($brandSettings['company_logo_thumb_url'] ?? $brandSettings['company_logo_url'] ?? '');
 $toastSuccess = Session::flash('toast_success');
 $toastError = Session::flash('toast_error');
 ?>
@@ -13,7 +18,7 @@ $toastError = Session::flash('toast_error');
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?= htmlspecialchars(($title ?? 'Aplicație atelier') . ' · HPL Manager') ?></title>
+  <title><?= htmlspecialchars(($title ?? 'Aplicație atelier') . ' · ' . $brandName) ?></title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,8 +41,13 @@ $toastError = Session::flash('toast_error');
           <i class="bi bi-list"></i>
         </button>
         <div class="app-brand">
-          <span class="app-dot"></span>
-          <span class="fw-bold">HPL Manager</span>
+          <?php if ($brandLogo !== ''): ?>
+            <img src="<?= htmlspecialchars($brandLogo) ?>" alt="<?= htmlspecialchars($brandName) ?>" style="height:34px;width:auto;display:block">
+            <span class="visually-hidden"><?= htmlspecialchars($brandName) ?></span>
+          <?php else: ?>
+            <span class="app-dot"></span>
+            <span class="fw-bold"><?= htmlspecialchars($brandName) ?></span>
+          <?php endif; ?>
         </div>
       </div>
 
