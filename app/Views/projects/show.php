@@ -675,10 +675,10 @@ ob_start();
                 $totUnit = $showPerUnit ? ($totalEst / $qtyUnits) : $totalEst;
               ?>
               <div class="col-12">
-                <div class="card app-card p-3">
+                <div class="card app-card p-3" id="pp-<?= (int)$ppId ?>">
                   <div class="d-flex align-items-start justify-content-between gap-2">
                     <div>
-                      <div class="h5 m-0"><?= htmlspecialchars($pname) ?></div>
+                      <div class="h4 m-0 text-success"><?= htmlspecialchars($pname) ?></div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                     </div>
                   </div>
