@@ -846,7 +846,7 @@ ob_start();
 
                     <div class="mt-2">
                       <div class="d-flex justify-content-between align-items-center gap-2">
-                        <div class="text-muted small fw-semibold">Accesorii</div>
+                        <div class="h6 m-0 text-success fw-semibold">Consum Accesorii</div>
                         <?php if ($canEditThis && $hasReservedAcc): ?>
                           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/consume')) ?>" class="m-0"
                                 onsubmit="return confirm('Dai în consum accesoriile rezervate pe această piesă?');">
@@ -932,7 +932,7 @@ ob_start();
                       }
                     ?>
                     <div class="mt-2">
-                      <div class="text-muted small fw-semibold">HPL</div>
+                      <div class="h6 m-0 text-success fw-semibold">Consum HPL</div>
                       <?php if (!$hplRows): ?>
                         <div class="text-muted small">—</div>
                       <?php else: ?>
