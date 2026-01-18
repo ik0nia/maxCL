@@ -1568,12 +1568,13 @@ ob_start();
   <?php else: ?>
     <div class="card app-card p-3">
         <div class="h5 m-0">Consum HPL</div>
-        <div class="text-muted">Rezervat/Consumat (plăci întregi)</div>
+        <div class="text-muted">Rezervat (plăci întregi)</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
             <input type="hidden" name="consum_tab" value="hpl">
+            <input type="hidden" name="mode" value="RESERVED">
             <div class="col-12">
               <label class="form-label fw-semibold">Placă HPL</label>
               <select class="form-select" name="board_id" id="hplBoardSelect" style="width:100%"></select>
@@ -1583,13 +1584,7 @@ ob_start();
               <label class="form-label fw-semibold">Plăci (buc)</label>
               <input class="form-control" type="number" step="1" min="1" name="qty_boards" value="1" id="hplQtyBoards">
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Mod</label>
-              <select class="form-select" name="mode">
-                <option value="RESERVED">rezervat</option>
-                <option value="CONSUMED">consumat</option>
-              </select>
-            </div>
+            <div class="col-6"></div>
             <div class="col-12">
               <label class="form-label fw-semibold">Notă</label>
               <input class="form-control" name="note" maxlength="255" placeholder="opțional…">
