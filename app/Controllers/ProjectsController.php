@@ -2027,12 +2027,103 @@ final class ProjectsController
 
         try {
             $rows = Project::all($q !== '' ? $q : null, $status !== '' ? $status : null, 800);
+            $projectMeta = [];
+            $projectIds = [];
+            foreach ($rows as $r) {
+                $pid = (int)($r['id'] ?? 0);
+                if ($pid <= 0) continue;
+                $projectIds[] = $pid;
+                $projectMeta[$pid] = [
+                    'products_count' => 0,
+                    'all_delivered' => false,
+                    'reserved_any' => false,
+                ];
+            }
+            $projectIds = array_values(array_unique($projectIds));
+            if ($projectIds) {
+                $pdo = \App\Core\DB::pdo();
+                $in = implode(',', array_fill(0, count($projectIds), '?'));
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id,
+                               COUNT(*) AS cnt,
+                               SUM(CASE WHEN qty <= delivered_qty + 1e-9 THEN 1 ELSE 0 END) AS delivered_cnt
+                        FROM project_products
+                        WHERE project_id IN (' . $in . ')
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (!isset($projectMeta[$pid])) continue;
+                        $cnt = (int)($row['cnt'] ?? 0);
+                        $delCnt = (int)($row['delivered_cnt'] ?? 0);
+                        $projectMeta[$pid]['products_count'] = $cnt;
+                        $projectMeta[$pid]['all_delivered'] = ($cnt > 0 && $delCnt >= $cnt);
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM project_magazie_consumptions
+                        WHERE project_id IN (' . $in . ')
+                          AND mode = "RESERVED"
+                          AND qty > 0
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM project_product_hpl_consumptions
+                        WHERE project_id IN (' . $in . ')
+                          AND status = "RESERVED"
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM project_hpl_consumptions
+                        WHERE project_id IN (' . $in . ')
+                          AND mode = "RESERVED"
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
             echo View::render('projects/index', [
                 'title' => 'Proiecte',
                 'rows' => $rows,
                 'q' => $q,
                 'status' => $status,
                 'statuses' => self::statuses(),
+                'projectMeta' => $projectMeta,
             ]);
         } catch (\Throwable $e) {
             echo View::render('system/placeholder', [
