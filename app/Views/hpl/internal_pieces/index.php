@@ -120,6 +120,7 @@ ob_start();
               <option value="Depozit">Depozit</option>
               <option value="Producție">Producție</option>
               <option value="Magazin">Magazin</option>
+              <option value="Atelier">Atelier</option>
               <option value="Depozit (Stricat)">Depozit (Stricat)</option>
             </select>
             <div class="text-muted small mt-1"><strong>Producție</strong> setează automat statusul pe <strong>Rezervat</strong>.</div>
