@@ -21,6 +21,10 @@ final class ProjectProductHplConsumption
               b.thickness_mm AS board_thickness_mm,
               b.std_width_mm AS board_std_width_mm,
               b.std_height_mm AS board_std_height_mm,
+              fc.code AS face_color_code,
+              bc.code AS back_color_code,
+              fc.thumb_path AS face_thumb,
+              bc.thumb_path AS back_thumb,
               u.name AS user_name,
               sp.piece_type AS piece_type,
               sp.status AS piece_status,
@@ -41,6 +45,8 @@ final class ProjectProductHplConsumption
               sp2.area_total_m2 AS consumed_piece_area_total_m2
             FROM project_product_hpl_consumptions x
             INNER JOIN hpl_boards b ON b.id = x.board_id
+            LEFT JOIN finishes fc ON fc.id = b.face_color_id
+            LEFT JOIN finishes bc ON bc.id = b.back_color_id
             LEFT JOIN users u ON u.id = x.created_by
             LEFT JOIN hpl_stock_pieces sp ON sp.id = x.stock_piece_id
             LEFT JOIN hpl_stock_pieces sp2 ON sp2.id = x.consumed_piece_id

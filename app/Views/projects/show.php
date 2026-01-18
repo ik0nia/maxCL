@@ -980,14 +980,51 @@ ob_start();
                                   $cm2 = (string)($hr['consume_mode'] ?? '');
                                   $src2 = (string)($hr['source'] ?? '');
                                   $st2 = (string)($hr['status'] ?? '');
+                                  $bid2 = (int)($hr['board_id'] ?? 0);
                                   $boardTxt = trim($bcode2 . ' · ' . $bname2);
+                                  $fc2 = trim((string)($hr['face_color_code'] ?? ''));
+                                  $bc2 = trim((string)($hr['back_color_code'] ?? ''));
+                                  $thumbF = trim((string)($hr['face_thumb'] ?? ''));
+                                  $thumbB = trim((string)($hr['back_thumb'] ?? ''));
+                                  $colors2 = $fc2;
+                                  if ($bc2 !== '' && $bc2 !== $fc2) {
+                                    $colors2 = $colors2 !== '' ? ($colors2 . '/' . $bc2) : $bc2;
+                                  }
                                   $dimTxt = ($ph2 > 0 && $pw2 > 0) ? ($ph2 . ' × ' . $pw2 . ' mm') : '—';
                                   $noteTxt = trim($pn2);
                                   if ($noteTxt !== '' && mb_strlen($noteTxt) > 110) $noteTxt = mb_substr($noteTxt, 0, 110) . '…';
                                   $createdAt = (string)($hr['created_at'] ?? '');
                                 ?>
                                 <tr>
-                                  <td class="fw-semibold"><?= htmlspecialchars($boardTxt !== '' ? $boardTxt : '—') ?></td>
+                                  <td class="fw-semibold">
+                                    <?php
+                                      $boardLabel = $boardTxt !== '' ? $boardTxt : '—';
+                                      $colorLabel = $colors2 !== '' ? $colors2 : '';
+                                    ?>
+                                    <?php if ($bid2 > 0): ?>
+                                      <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid2)) ?>">
+                                        <span class="d-inline-flex align-items-center">
+                                          <?php if ($thumbF !== ''): ?>
+                                            <img class="s2-thumb" src="<?= htmlspecialchars($thumbF) ?>" alt="">
+                                          <?php endif; ?>
+                                          <?php if ($thumbB !== '' && $thumbB !== $thumbF): ?>
+                                            <img class="s2-thumb2" src="<?= htmlspecialchars($thumbB) ?>" alt="">
+                                          <?php endif; ?>
+                                          <span>
+                                            <?php if ($colorLabel !== ''): ?>
+                                              <strong><?= htmlspecialchars($colorLabel) ?></strong> ·
+                                            <?php endif; ?>
+                                            <?= htmlspecialchars($boardLabel) ?>
+                                          </span>
+                                        </span>
+                                      </a>
+                                    <?php else: ?>
+                                      <?php if ($colorLabel !== ''): ?>
+                                        <strong><?= htmlspecialchars($colorLabel) ?></strong> ·
+                                      <?php endif; ?>
+                                      <?= htmlspecialchars($boardLabel) ?>
+                                    <?php endif; ?>
+                                  </td>
                                   <td class="fw-semibold"><?= htmlspecialchars($pt2 !== '' ? $pt2 : '—') ?></td>
                                   <td><span class="badge app-badge"><?= htmlspecialchars($st2) ?></span></td>
                                   <td class="text-muted"><?= htmlspecialchars($dimTxt) ?></td>
