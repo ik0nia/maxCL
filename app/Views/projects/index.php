@@ -81,19 +81,22 @@ ob_start();
           $icon = '';
           $iconClass = '';
           $iconTitle = '';
-          if ($prodCount > 0 && !$allDelivered) {
+          if ($prodCount <= 0) {
+            $icon = 'bi-info-circle';
+            $iconClass = 'text-muted';
+            $iconTitle = 'Fără produse';
+          } elseif (!$allDelivered) {
             $icon = 'bi-gear-fill';
             $iconClass = 'text-primary';
             $iconTitle = 'În lucru';
-          } elseif ($prodCount > 0 && $allDelivered) {
+          } elseif ($reservedAny) {
             $icon = 'bi-exclamation-triangle-fill';
-            if ($reservedAny) {
-              $iconClass = 'text-danger';
-              $iconTitle = 'Livrat, dar există rezervări';
-            } else {
-              $iconClass = 'text-warning';
-              $iconTitle = 'Livrat, fără rezervări';
-            }
+            $iconClass = 'text-danger';
+            $iconTitle = 'Livrat, dar există rezervări';
+          } else {
+            $icon = 'bi-check-circle-fill';
+            $iconClass = 'text-success';
+            $iconTitle = 'Livrat complet';
           }
         ?>
         <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/projects/' . (int)$r['id'])) ?>" role="button" tabindex="0">
@@ -130,8 +133,9 @@ ob_start();
 </div>
 <div class="text-muted small mt-2">
   <div class="d-flex flex-wrap align-items-center gap-3">
+    <span><i class="bi bi-info-circle text-muted me-1"></i> Fără produse</span>
     <span><i class="bi bi-gear-fill text-primary me-1"></i> În lucru (are produse nelivrate)</span>
-    <span><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Livrat, fără rezervări</span>
+    <span><i class="bi bi-check-circle-fill text-success me-1"></i> Livrat complet</span>
     <span><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i> Livrat, cu rezervări rămase</span>
   </div>
 </div>
