@@ -7,6 +7,11 @@ $snapshots = is_array($snapshots ?? null) ? $snapshots : [];
 $canExec = (bool)($canExec ?? false);
 $hasDump = (bool)($hasDump ?? false);
 $hasMysql = (bool)($hasMysql ?? false);
+$hasPhpDump = (bool)($hasPhpDump ?? false);
+$hasPhpRestore = (bool)($hasPhpRestore ?? false);
+$isWritable = (bool)($isWritable ?? false);
+$canCreate = $isWritable && ($hasDump || $hasPhpDump);
+$canRestore = ($hasMysql || $hasPhpRestore);
 
 ob_start();
 ?>
@@ -21,20 +26,23 @@ ob_start();
   <div class="h5 m-0">Time machine DB</div>
   <div class="text-muted">Creează snapshot-uri și revino la un punct anterior</div>
 
+  <?php if (!$isWritable): ?>
+    <div class="alert alert-warning mt-2 mb-0">Directorul `storage/db_backups` nu este accesibil la scriere.</div>
+  <?php endif; ?>
   <?php if (!$canExec): ?>
-    <div class="alert alert-warning mt-2 mb-0">Funcțiile exec sunt dezactivate pe server. Time machine nu poate rula.</div>
+    <div class="alert alert-info mt-2 mb-0">Funcțiile exec sunt dezactivate pe server. Se folosește fallback PHP (mai lent).</div>
   <?php else: ?>
     <?php if (!$hasDump): ?>
-      <div class="alert alert-warning mt-2 mb-0">`mysqldump` nu este disponibil pe server.</div>
+      <div class="alert alert-warning mt-2 mb-0">`mysqldump` nu este disponibil pe server. Se folosește fallback PHP.</div>
     <?php endif; ?>
     <?php if (!$hasMysql): ?>
-      <div class="alert alert-warning mt-2 mb-0">`mysql` client nu este disponibil pe server.</div>
+      <div class="alert alert-warning mt-2 mb-0">`mysql` client nu este disponibil pe server. Restaurarea folosește fallback PHP.</div>
     <?php endif; ?>
   <?php endif; ?>
 
   <form method="post" action="<?= htmlspecialchars(Url::to('/system/admin-settings/snapshot/create')) ?>" class="mt-3">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-    <button class="btn btn-primary" type="submit" <?= (!$hasDump ? 'disabled' : '') ?>>
+    <button class="btn btn-primary" type="submit" <?= (!$canCreate ? 'disabled' : '') ?>>
       <i class="bi bi-clock-history me-1"></i> Creează snapshot
     </button>
   </form>
@@ -73,7 +81,7 @@ ob_start();
                       onsubmit="return confirm('Restaurezi snapshot-ul? Baza de date curentă va fi suprascrisă.');">
                   <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                   <input type="hidden" name="snapshot" value="<?= htmlspecialchars($name) ?>">
-                  <button class="btn btn-outline-secondary btn-sm" type="submit" <?= (!$hasMysql ? 'disabled' : '') ?>>
+                  <button class="btn btn-outline-secondary btn-sm" type="submit" <?= (!$canRestore ? 'disabled' : '') ?>>
                     <i class="bi bi-arrow-counterclockwise me-1"></i> Restaurează
                   </button>
                 </form>

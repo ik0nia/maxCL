@@ -5,6 +5,7 @@ namespace App\Controllers\System;
 
 use App\Core\Auth;
 use App\Core\Csrf;
+use App\Core\DB;
 use App\Core\Env;
 use App\Core\Response;
 use App\Core\Session;
@@ -77,6 +78,128 @@ final class AdminSettingsController
             'user' => (string)Env::get('DB_USER', ''),
             'pass' => (string)Env::get('DB_PASS', ''),
         ];
+    }
+
+    private static function canPhpSnapshot(): bool
+    {
+        $db = self::dbEnv();
+        return $db['name'] !== '' && $db['user'] !== '';
+    }
+
+    private static function sqlQuote(string $value): string
+    {
+        $value = str_replace(
+            ["\\", "\0", "\n", "\r", "\t", "\x1a", "'"],
+            ["\\\\", "\\0", "\\n", "\\r", "\\t", "\\Z", "\\'"],
+            $value
+        );
+        return "'" . $value . "'";
+    }
+
+    private static function sqlValues(array $row): string
+    {
+        $vals = [];
+        foreach ($row as $v) {
+            if ($v === null) {
+                $vals[] = 'NULL';
+            } else {
+                $vals[] = self::sqlQuote((string)$v);
+            }
+        }
+        return '(' . implode(',', $vals) . ')';
+    }
+
+    private static function dumpDatabasePhp(string $path, string &$error): bool
+    {
+        $error = '';
+        if (!self::canPhpSnapshot()) {
+            $error = 'DB_NAME/DB_USER lipsesc în .env.';
+            return false;
+        }
+        $fh = @fopen($path, 'wb');
+        if (!$fh) {
+            $error = 'Nu pot crea fișierul de snapshot.';
+            return false;
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        fwrite($fh, "-- Snapshot DB\n");
+        fwrite($fh, "SET NAMES utf8mb4;\n");
+        fwrite($fh, "SET FOREIGN_KEY_CHECKS=0;\n");
+
+        $tables = $pdo->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME")->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($tables as $table) {
+            $table = (string)$table;
+            if ($table === '') continue;
+            $st = $pdo->query("SHOW CREATE TABLE `" . str_replace('`', '``', $table) . "`");
+            $row = $st ? $st->fetch(\PDO::FETCH_ASSOC) : null;
+            $create = $row && isset($row['Create Table']) ? (string)$row['Create Table'] : '';
+            if ($create === '') continue;
+            fwrite($fh, "\nDROP TABLE IF EXISTS `" . $table . "`;\n");
+            fwrite($fh, $create . ";\n");
+
+            $stRows = $pdo->query("SELECT * FROM `" . str_replace('`', '``', $table) . "`");
+            if (!$stRows) continue;
+            $batch = [];
+            while ($r = $stRows->fetch(\PDO::FETCH_ASSOC)) {
+                $batch[] = self::sqlValues($r);
+                if (count($batch) >= 200) {
+                    fwrite($fh, "INSERT INTO `" . $table . "` VALUES " . implode(',', $batch) . ";\n");
+                    $batch = [];
+                }
+            }
+            if ($batch) {
+                fwrite($fh, "INSERT INTO `" . $table . "` VALUES " . implode(',', $batch) . ";\n");
+            }
+        }
+
+        fwrite($fh, "SET FOREIGN_KEY_CHECKS=1;\n");
+        fclose($fh);
+        return true;
+    }
+
+    private static function restoreDatabasePhp(string $path, string &$error): bool
+    {
+        $error = '';
+        if (!self::canPhpSnapshot()) {
+            $error = 'DB_NAME/DB_USER lipsesc în .env.';
+            return false;
+        }
+        $fh = @fopen($path, 'rb');
+        if (!$fh) {
+            $error = 'Nu pot deschide fișierul snapshot.';
+            return false;
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+        $sql = '';
+        while (($line = fgets($fh)) !== false) {
+            $trim = trim($line);
+            if ($trim === '' || str_starts_with($trim, '--')) {
+                continue;
+            }
+            if (str_starts_with($trim, '/*')) {
+                continue;
+            }
+            $sql .= $line;
+            if (str_ends_with(trim($line), ';')) {
+                try {
+                    $pdo->exec($sql);
+                } catch (\Throwable $e) {
+                    fclose($fh);
+                    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+                    $error = 'Eroare SQL: ' . $e->getMessage();
+                    return false;
+                }
+                $sql = '';
+            }
+        }
+        fclose($fh);
+        $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+        return true;
     }
 
     private static function dumpDatabase(string $path, string &$error): bool
@@ -157,12 +280,18 @@ final class AdminSettingsController
         $canExec = self::canExec();
         $hasDump = $canExec && self::binaryExists('mysqldump');
         $hasMysql = $canExec && self::binaryExists('mysql');
+        $hasPhpDump = self::canPhpSnapshot();
+        $hasPhpRestore = self::canPhpSnapshot();
+        $isWritable = is_writable($dir);
         echo View::render('system/admin_settings', [
             'title' => 'Setări admin',
             'snapshots' => $snapshots,
             'canExec' => $canExec,
             'hasDump' => $hasDump,
             'hasMysql' => $hasMysql,
+            'hasPhpDump' => $hasPhpDump,
+            'hasPhpRestore' => $hasPhpRestore,
+            'isWritable' => $isWritable,
         ]);
     }
 
@@ -175,7 +304,15 @@ final class AdminSettingsController
         $name = 'db-' . date('Ymd-His') . '.sql';
         $path = $dir . '/' . $name;
         $err = '';
-        if (self::dumpDatabase($path, $err)) {
+        if (!is_writable($dir)) {
+            Session::flash('toast_error', 'Directorul de snapshot nu este accesibil la scriere.');
+        } elseif (self::canExec() && self::binaryExists('mysqldump')) {
+            if (self::dumpDatabase($path, $err)) {
+                Session::flash('toast_success', 'Snapshot creat: ' . $name);
+            } else {
+                Session::flash('toast_error', 'Nu pot crea snapshot: ' . $err);
+            }
+        } elseif (self::dumpDatabasePhp($path, $err)) {
             Session::flash('toast_success', 'Snapshot creat: ' . $name);
         } else {
             Session::flash('toast_error', 'Nu pot crea snapshot: ' . $err);
@@ -201,7 +338,13 @@ final class AdminSettingsController
             Response::redirect('/system/admin-settings');
         }
         $err = '';
-        if (self::restoreDatabase($path, $err)) {
+        if (self::canExec() && self::binaryExists('mysql')) {
+            if (self::restoreDatabase($path, $err)) {
+                Session::flash('toast_success', 'Snapshot restaurat: ' . $name);
+            } else {
+                Session::flash('toast_error', 'Nu pot restaura snapshot: ' . $err);
+            }
+        } elseif (self::restoreDatabasePhp($path, $err)) {
             Session::flash('toast_success', 'Snapshot restaurat: ' . $name);
         } else {
             Session::flash('toast_error', 'Nu pot restaura snapshot: ' . $err);
