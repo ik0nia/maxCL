@@ -60,6 +60,7 @@ final class ConsumptionsResetController
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         $pdo->beginTransaction();
+        $docFiles = [];
         try {
             $counts = [];
             if (self::tableExists($pdo, 'project_hpl_allocations')) {
@@ -93,6 +94,32 @@ final class ConsumptionsResetController
                 $st->execute();
                 $counts['magazie_movements'] = (int)$st->rowCount();
             }
+            if (self::tableExists($pdo, 'entity_files')) {
+                $st = $pdo->prepare("
+                    SELECT id, stored_name
+                    FROM entity_files
+                    WHERE stored_name LIKE 'deviz-%-pp%.html'
+                       OR stored_name LIKE 'bon-consum-%-pp%.html'
+                ");
+                $st->execute();
+                $docFiles = $st->fetchAll() ?: [];
+                $docIds = [];
+                foreach ($docFiles as $f) {
+                    $fid = (int)($f['id'] ?? 0);
+                    if ($fid > 0) $docIds[] = $fid;
+                }
+                if ($docIds) {
+                    $ph = implode(',', array_fill(0, count($docIds), '?'));
+                    $st = $pdo->prepare("DELETE FROM entity_files WHERE id IN ($ph)");
+                    $st->execute($docIds);
+                    $counts['entity_files_docs'] = (int)$st->rowCount();
+                }
+            }
+            if (self::tableExists($pdo, 'app_settings')) {
+                $st = $pdo->prepare("DELETE FROM app_settings WHERE `key` IN ('deviz_last_number','bon_consum_last_number')");
+                $st->execute();
+                $counts['app_settings_docs'] = (int)$st->rowCount();
+            }
             if (self::tableExists($pdo, 'audit_log')) {
                 $st = $pdo->prepare("DELETE FROM audit_log WHERE created_at >= ?");
                 $st->execute(['2026-01-14 00:00:00']);
@@ -113,6 +140,8 @@ final class ConsumptionsResetController
                     'HPL_STOCK_CONSUME',
                     'HPL_STOCK_UNRESERVE',
                     'MAGAZIE_OUT',
+                    'DEVIZ_GENERATED',
+                    'BON_CONSUM_GENERATED',
                 ];
                 $entityTypes = [
                     'project_magazie_consumptions',
@@ -133,6 +162,27 @@ final class ConsumptionsResetController
             }
 
             $pdo->commit();
+            $deletedFiles = 0;
+            $failedFiles = [];
+            if ($docFiles) {
+                $dir = __DIR__ . '/../../../storage/uploads/files';
+                foreach ($docFiles as $f) {
+                    $name = basename((string)($f['stored_name'] ?? ''));
+                    if ($name === '') continue;
+                    $path = $dir . '/' . $name;
+                    if (!is_file($path)) continue;
+                    if (@unlink($path)) {
+                        $deletedFiles++;
+                    } else {
+                        $failedFiles[] = $name;
+                    }
+                }
+            }
+            if ($deletedFiles > 0) $counts['files_deleted'] = $deletedFiles;
+            if ($failedFiles) {
+                $counts['files_failed'] = count($failedFiles);
+                $counts['files_failed_names'] = $failedFiles;
+            }
             Response::json(['ok' => true, 'deleted' => $counts]);
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
