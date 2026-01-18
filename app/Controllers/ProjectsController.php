@@ -2306,7 +2306,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -2418,7 +2418,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3862,7 +3862,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3941,7 +3941,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4012,7 +4012,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4151,7 +4151,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4377,7 +4377,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4514,7 +4514,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
