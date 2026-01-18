@@ -78,11 +78,10 @@ ob_start();
           $prodCount = (int)($meta['products_count'] ?? 0);
           $allDelivered = (bool)($meta['all_delivered'] ?? false);
           $reservedAny = (bool)($meta['reserved_any'] ?? false);
-          $statusVal = (string)($r['status'] ?? '');
           $icon = '';
           $iconClass = '';
           $iconTitle = '';
-          if ($prodCount > 0 && $statusVal !== 'LIVRAT_COMPLET') {
+          if ($prodCount > 0 && !$allDelivered) {
             $icon = 'bi-gear-fill';
             $iconClass = 'text-primary';
             $iconTitle = 'În lucru';
