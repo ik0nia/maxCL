@@ -1,6 +1,7 @@
 <?php
 use App\Core\Csrf;
 use App\Core\Url;
+use App\Core\View;
 
 $snapshots = is_array($snapshots ?? null) ? $snapshots : [];
 $canExec = (bool)($canExec ?? false);
