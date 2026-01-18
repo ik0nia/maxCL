@@ -18,7 +18,7 @@ final class InternalPiecesController
     /** @return array<int,string> */
     private static function locations(): array
     {
-        return ['Depozit', 'Producție', 'Magazin', 'Depozit (Stricat)'];
+        return ['Depozit', 'Producție', 'Magazin', 'Atelier', 'Depozit (Stricat)'];
     }
 
     public static function index(): void
