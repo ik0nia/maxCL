@@ -5,6 +5,8 @@ use App\Core\View;
 $filters = $filters ?? [];
 $users = $users ?? [];
 $actions = $actions ?? [];
+$projectLabels = is_array($projectLabels ?? null) ? $projectLabels : [];
+$productLabels = is_array($productLabels ?? null) ? $productLabels : [];
 
 ob_start();
 ?>
@@ -98,20 +100,31 @@ ob_start();
               $projId = (is_array($meta) && isset($meta['project_id']) && is_numeric($meta['project_id'])) ? (int)$meta['project_id'] : 0;
               $projCode = (is_array($meta) && isset($meta['project_code'])) ? (string)$meta['project_code'] : '';
               $projName = (is_array($meta) && isset($meta['project_name'])) ? (string)$meta['project_name'] : '';
+              $ppId = (is_array($meta) && isset($meta['project_product_id']) && is_numeric($meta['project_product_id'])) ? (int)$meta['project_product_id'] : 0;
+              $projLabel = ($projId > 0 && isset($projectLabels[$projId])) ? (string)$projectLabels[$projId] : '';
+              $prodLabel = ($ppId > 0 && isset($productLabels[$ppId]['label'])) ? (string)$productLabels[$ppId]['label'] : '';
+              $prodProjectId = ($ppId > 0 && isset($productLabels[$ppId]['project_id'])) ? (int)$productLabels[$ppId]['project_id'] : 0;
               $boardId = (is_array($meta) && isset($meta['board_id']) && is_numeric($meta['board_id'])) ? (int)$meta['board_id'] : 0;
             ?>
             <div class="fw-semibold"><?= htmlspecialchars($msg) ?></div>
-            <?php if ($projId > 0 || $boardId > 0): ?>
+            <?php if ($projId > 0 || $ppId > 0 || $boardId > 0): ?>
               <div class="mt-1 d-flex flex-wrap gap-2">
                 <?php if ($projId > 0): ?>
                   <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
-                    Proiect <?= htmlspecialchars($projCode !== '' ? $projCode : ('#' . $projId)) ?>
+                    Proiect <?= htmlspecialchars($projLabel !== '' ? $projLabel : ($projCode !== '' ? $projCode : ('#' . $projId))) ?>
                   </a>
                   <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=consum')) ?>">
                     Consum materiale
                   </a>
-                  <?php if (trim($projName) !== ''): ?>
-                    <span class="text-muted small"><?= htmlspecialchars($projName) ?></span>
+                <?php endif; ?>
+                <?php if ($ppId > 0): ?>
+                  <?php $ppLinkId = $prodProjectId > 0 ? $prodProjectId : $projId; ?>
+                  <?php if ($ppLinkId > 0): ?>
+                    <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $ppLinkId . '?tab=products#pp-' . $ppId)) ?>">
+                      Produs <?= htmlspecialchars($prodLabel !== '' ? $prodLabel : ('#' . $ppId)) ?>
+                    </a>
+                  <?php else: ?>
+                    <span class="badge app-badge">Produs <?= htmlspecialchars($prodLabel !== '' ? $prodLabel : ('#' . $ppId)) ?></span>
                   <?php endif; ?>
                 <?php endif; ?>
                 <?php if ($boardId > 0): ?>
@@ -122,7 +135,20 @@ ob_start();
               </div>
             <?php endif; ?>
           </td>
-          <td class="text-muted"><?= htmlspecialchars((string)($r['entity_type'] ?? '—')) ?><?= $r['entity_id'] ? ' #' . htmlspecialchars((string)$r['entity_id']) : '' ?></td>
+          <td class="text-muted">
+            <?php
+              $etype = (string)($r['entity_type'] ?? '');
+              $eid = isset($r['entity_id']) && is_numeric($r['entity_id']) ? (int)$r['entity_id'] : 0;
+              if ($etype === 'projects' && $eid > 0 && isset($projectLabels[$eid])) {
+                echo 'Proiect ' . htmlspecialchars((string)$projectLabels[$eid]);
+              } elseif ($etype === 'project_products' && $eid > 0 && isset($productLabels[$eid]['label'])) {
+                echo 'Produs ' . htmlspecialchars((string)$productLabels[$eid]['label']);
+              } else {
+                echo htmlspecialchars($etype !== '' ? $etype : '—');
+                if ($eid > 0) echo ' #' . htmlspecialchars((string)$eid);
+              }
+            ?>
+          </td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['ip'] ?? '—')) ?></td>
           <td class="text-end">
             <button class="btn btn-outline-secondary btn-sm auditDetailsBtn" type="button" data-id="<?= (int)$r['id'] ?>" data-bs-toggle="modal" data-bs-target="#auditDetailsModal">
@@ -252,7 +278,8 @@ ob_start();
         setText('auditAfter', pretty(d.after_json));
         setText('auditMeta', pretty(d.meta_json));
         setText('auditHdrAction', d.action || '—');
-        setText('auditHdrEntity', (d.entity_type ? d.entity_type : '—') + (d.entity_id ? (' #' + d.entity_id) : ''));
+        const ent = d.entity_label ? d.entity_label : ((d.entity_type ? d.entity_type : '—') + (d.entity_id ? (' #' + d.entity_id) : ''));
+        setText('auditHdrEntity', ent);
         setText('auditHdrMessage', d.message || '—');
         setText('auditHdrDate', d.created_at || '—');
         setText('auditHdrIpUa', (d.ip || '—') + (d.user_agent ? (' · ' + d.user_agent) : ''));

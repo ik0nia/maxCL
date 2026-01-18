@@ -2428,8 +2428,22 @@ final class ProjectsController
                 }
 
                 $history = [];
+                $projectProductLabels = [];
                 if ($tab === 'history') {
                     try { $history = AuditLog::forProject($id, 300); } catch (\Throwable $e) { $history = []; }
+                    try {
+                        $ppRows = ProjectProduct::forProject($id);
+                        foreach ($ppRows as $pp) {
+                            $ppId = (int)($pp['id'] ?? 0);
+                            if ($ppId <= 0) continue;
+                            $name = trim((string)($pp['product_name'] ?? ''));
+                            $code = trim((string)($pp['product_code'] ?? ''));
+                            $label = $code !== '' ? ($code . ' · ' . $name) : ($name !== '' ? $name : ('#' . $ppId));
+                            $projectProductLabels[$ppId] = $label;
+                        }
+                    } catch (\Throwable $e) {
+                        $projectProductLabels = [];
+                    }
                 }
 
                 echo View::render('projects/show', [
@@ -2458,6 +2472,7 @@ final class ProjectsController
                         'cnc' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
                     ],
                     'history' => $history,
+                    'projectProductLabels' => $projectProductLabels,
                     'projectLabels' => $projectLabels,
                     'cncFiles' => $cncFiles,
                     'statuses' => self::statuses(),

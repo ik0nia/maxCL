@@ -33,12 +33,76 @@ final class AuditController
         ];
 
         $rows = AuditLog::list($filters, 800);
+        $projectLabels = [];
+        $productLabels = [];
+        $projectIds = [];
+        $ppIds = [];
+        foreach ($rows as $r) {
+            $etype = (string)($r['entity_type'] ?? '');
+            $eid = isset($r['entity_id']) && is_numeric($r['entity_id']) ? (int)$r['entity_id'] : 0;
+            if ($etype === 'projects' && $eid > 0) $projectIds[] = $eid;
+            if ($etype === 'project_products' && $eid > 0) $ppIds[] = $eid;
+            $meta = null;
+            if (!empty($r['meta_json'])) {
+                $decoded = json_decode((string)$r['meta_json'], true);
+                if (is_array($decoded)) $meta = $decoded;
+            }
+            if (is_array($meta)) {
+                if (isset($meta['project_id']) && is_numeric($meta['project_id'])) $projectIds[] = (int)$meta['project_id'];
+                if (isset($meta['project_product_id']) && is_numeric($meta['project_product_id'])) $ppIds[] = (int)$meta['project_product_id'];
+            }
+        }
+        $projectIds = array_values(array_unique(array_filter($projectIds)));
+        $ppIds = array_values(array_unique(array_filter($ppIds)));
+        try {
+            if ($projectIds) {
+                $pdo = \App\Core\DB::pdo();
+                $ph = implode(',', array_fill(0, count($projectIds), '?'));
+                $st = $pdo->prepare("SELECT id, code, name FROM projects WHERE id IN ($ph)");
+                $st->execute($projectIds);
+                foreach ($st->fetchAll() as $p) {
+                    $pid = (int)($p['id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $code = trim((string)($p['code'] ?? ''));
+                    $name = trim((string)($p['name'] ?? ''));
+                    $label = $code !== '' ? ($code . ' · ' . $name) : ($name !== '' ? $name : ('#' . $pid));
+                    $projectLabels[$pid] = $label;
+                }
+            }
+            if ($ppIds) {
+                $pdo = $pdo ?? \App\Core\DB::pdo();
+                $ph = implode(',', array_fill(0, count($ppIds), '?'));
+                $st = $pdo->prepare("
+                    SELECT pp.id, pp.project_id, p.code AS product_code, p.name AS product_name
+                    FROM project_products pp
+                    INNER JOIN products p ON p.id = pp.product_id
+                    WHERE pp.id IN ($ph)
+                ");
+                $st->execute($ppIds);
+                foreach ($st->fetchAll() as $pp) {
+                    $ppId = (int)($pp['id'] ?? 0);
+                    if ($ppId <= 0) continue;
+                    $name = trim((string)($pp['product_name'] ?? ''));
+                    $code = trim((string)($pp['product_code'] ?? ''));
+                    $label = $code !== '' ? ($code . ' · ' . $name) : ($name !== '' ? $name : ('#' . $ppId));
+                    $productLabels[$ppId] = [
+                        'label' => $label,
+                        'project_id' => (int)($pp['project_id'] ?? 0),
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            $projectLabels = $projectLabels ?: [];
+            $productLabels = $productLabels ?: [];
+        }
         echo View::render('audit/index', [
             'title' => 'Jurnal activitate',
             'rows' => $rows,
             'filters' => $filters,
             'users' => AuditLog::usersForFilter(),
             'actions' => AuditLog::actionsForFilter(),
+            'projectLabels' => $projectLabels,
+            'productLabels' => $productLabels,
         ]);
     }
 
@@ -84,6 +148,40 @@ final class AuditController
             }
         }
 
+        $entityLabel = null;
+        $etype = (string)($row['entity_type'] ?? '');
+        $eid = isset($row['entity_id']) && is_numeric($row['entity_id']) ? (int)$row['entity_id'] : 0;
+        try {
+            if ($etype === 'projects' && $eid > 0) {
+                $pdo = \App\Core\DB::pdo();
+                $st = $pdo->prepare('SELECT code,name FROM projects WHERE id = ?');
+                $st->execute([$eid]);
+                $p = $st->fetch();
+                if ($p) {
+                    $code = trim((string)($p['code'] ?? ''));
+                    $name = trim((string)($p['name'] ?? ''));
+                    $entityLabel = $code !== '' ? ($code . ' · ' . $name) : ($name !== '' ? $name : ('#' . $eid));
+                }
+            } elseif ($etype === 'project_products' && $eid > 0) {
+                $pdo = \App\Core\DB::pdo();
+                $st = $pdo->prepare('
+                    SELECT p.code AS product_code, p.name AS product_name
+                    FROM project_products pp
+                    INNER JOIN products p ON p.id = pp.product_id
+                    WHERE pp.id = ?
+                ');
+                $st->execute([$eid]);
+                $pp = $st->fetch();
+                if ($pp) {
+                    $code = trim((string)($pp['product_code'] ?? ''));
+                    $name = trim((string)($pp['product_name'] ?? ''));
+                    $entityLabel = $code !== '' ? ($code . ' · ' . $name) : ($name !== '' ? $name : ('#' . $eid));
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         Response::json([
             'ok' => true,
             'data' => [
@@ -99,6 +197,7 @@ final class AuditController
                 'after_json' => $afterDecoded ?? $after,
                 'meta_json' => $metaDecoded ?? $meta,
                 'message' => $message,
+                'entity_label' => $entityLabel,
             ],
         ]);
     }

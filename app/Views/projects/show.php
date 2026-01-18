@@ -2651,7 +2651,19 @@ ob_start();
                 <td><?= htmlspecialchars((string)($h['message'] ?? '')) ?></td>
                 <td class="text-muted"><?= htmlspecialchars((string)($h['note'] ?? '')) ?></td>
                 <td class="text-muted">
-                  <?= htmlspecialchars((string)($h['entity_type'] ?? '')) ?>#<?= htmlspecialchars((string)($h['entity_id'] ?? '')) ?>
+                  <?php
+                    $etype = (string)($h['entity_type'] ?? '');
+                    $eid = isset($h['entity_id']) && is_numeric($h['entity_id']) ? (int)$h['entity_id'] : 0;
+                    $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
+                    if ($etype === 'projects') {
+                      echo 'Proiect ' . htmlspecialchars($projLabel !== '' ? $projLabel : ('#' . $eid));
+                    } elseif ($etype === 'project_products' && $eid > 0 && isset($projectProductLabels[$eid])) {
+                      echo 'Produs ' . htmlspecialchars((string)$projectProductLabels[$eid]);
+                    } else {
+                      echo htmlspecialchars($etype !== '' ? $etype : '—');
+                      if ($eid > 0) echo ' #' . htmlspecialchars((string)$eid);
+                    }
+                  ?>
                 </td>
               </tr>
             <?php endforeach; ?>
