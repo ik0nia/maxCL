@@ -407,17 +407,40 @@ ob_start();
                   }
                 });
 
-                // toggle mode UI on source change (REST => hide half option)
                 const $form = $el.closest('form');
-                $form.find('input.js-pp-hpl-source').on('change', function(){
+                const $wrap = $form.find('.js-pp-hpl-consume-wrap');
+                const $hidden = $form.find('.js-pp-hpl-consume-hidden');
+                const $half = $form.find('.js-pp-hpl-half');
+                function setConsumeMode(val){
+                  if ($hidden.length) $hidden.val(val);
+                }
+                function updateConsumeUi(pieceType){
                   const src = String($form.find('input.js-pp-hpl-source:checked').val() || 'PROJECT');
-                  const $wrap = $form.find('.js-pp-hpl-mode-wrap');
-                  if (src === 'REST') {
-                    $wrap.addClass('d-none');
-                    $form.find('input[name="consume_mode"][value="FULL"]').prop('checked', true);
-                  } else {
+                  const pt = String(pieceType || '').toUpperCase();
+                  const show = (src === 'PROJECT' && pt === 'FULL');
+                  if (show) {
                     $wrap.removeClass('d-none');
+                  } else {
+                    $wrap.addClass('d-none');
+                    if ($half.length) $half.prop('checked', false);
+                    setConsumeMode('FULL');
                   }
+                }
+                $half.on('change', function(){
+                  setConsumeMode(this.checked ? 'HALF' : 'FULL');
+                });
+                $el.on('select2:select', function(e){
+                  const data = (e && e.params && e.params.data) ? e.params.data : {};
+                  updateConsumeUi(data.piece_type || '');
+                });
+                $el.on('select2:clear', function(){
+                  updateConsumeUi('');
+                });
+                updateConsumeUi('');
+
+                // toggle consume UI on source change (REST => hide half option)
+                $form.find('input.js-pp-hpl-source').on('change', function(){
+                  updateConsumeUi('');
                   // reset selection to refetch from correct source
                   $el.val(null).trigger('change');
                 });
@@ -1058,24 +1081,19 @@ ob_start();
                             </div>
                           </div>
 
-                          <div class="col-12 col-md-4 js-pp-hpl-mode-wrap">
-                            <label class="form-label fw-semibold mb-1">Consum</label>
-                            <div class="d-flex flex-wrap gap-3">
-                              <label class="form-check form-check-inline m-0">
-                                <input class="form-check-input" type="radio" name="consume_mode" value="FULL" checked>
-                                <span class="form-check-label">1 placă (FULL)</span>
-                              </label>
-                              <label class="form-check form-check-inline m-0">
-                                <input class="form-check-input" type="radio" name="consume_mode" value="HALF">
-                                <span class="form-check-label">1/2 placă</span>
-                              </label>
-                            </div>
-                            <div class="text-muted small mt-1">Pentru REST se alocă întotdeauna integral (FULL).</div>
-                          </div>
-
                           <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold mb-1">Placă / piesă</label>
                             <select class="form-select form-select-sm js-pp-hpl-piece" name="piece_id" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
+                          </div>
+
+                          <div class="col-12 col-md-4 js-pp-hpl-consume-wrap">
+                            <label class="form-label fw-semibold mb-1">Consum</label>
+                            <input type="hidden" name="consume_mode" value="FULL" class="js-pp-hpl-consume-hidden">
+                            <label class="form-check m-0">
+                              <input class="form-check-input js-pp-hpl-half" type="checkbox" value="HALF">
+                              <span class="form-check-label">1/2 placă (din FULL)</span>
+                            </label>
+                            <div class="text-muted small mt-1">Disponibil doar pentru plăci FULL din proiect.</div>
                           </div>
 
                           <div class="col-12 d-flex justify-content-end">
