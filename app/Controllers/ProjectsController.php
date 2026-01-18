@@ -659,6 +659,41 @@ final class ProjectsController
         }
     }
 
+    private static function countOffcutAvailableByDim(int $boardId, int $widthMm, int $heightMm): int
+    {
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        try {
+            $st = $pdo->prepare("
+                SELECT COALESCE(SUM(qty),0) AS c
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'OFFCUT'
+                  AND status = 'AVAILABLE'
+                  AND width_mm = ?
+                  AND height_mm = ?
+                  AND (is_accounting = 1 OR is_accounting IS NULL)
+            ");
+            $st->execute([(int)$boardId, (int)$widthMm, (int)$heightMm]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        } catch (\Throwable $e) {
+            // Compat: vechi schema fără is_accounting
+            $st = $pdo->prepare("
+                SELECT COALESCE(SUM(qty),0) AS c
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'OFFCUT'
+                  AND status = 'AVAILABLE'
+                  AND width_mm = ?
+                  AND height_mm = ?
+            ");
+            $st->execute([(int)$boardId, (int)$widthMm, (int)$heightMm]);
+            $r = $st->fetch();
+            return (int)($r['c'] ?? 0);
+        }
+    }
+
     /** @return array<int, array{value:string,label:string}> */
     private static function statuses(): array
     {
@@ -900,6 +935,214 @@ final class ProjectsController
 
         if ($need > 0) {
             throw new \RuntimeException('Stoc insuficient (plăci întregi).');
+        }
+    }
+
+    private static function moveOffcutPieces(
+        int $boardId,
+        int $widthMm,
+        int $heightMm,
+        int $qty,
+        string $fromStatus,
+        string $toStatus,
+        ?string $noteAppend = null,
+        ?int $projectId = null,
+        ?string $fromLocation = null,
+        ?string $toLocation = null
+    ): void {
+        $qty = (int)$qty;
+        if ($qty <= 0 || $boardId <= 0 || $widthMm <= 0 || $heightMm <= 0) return;
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+
+        $fromLocation = $fromLocation !== null ? trim((string)$fromLocation) : null;
+        $toLocation = $toLocation !== null ? trim((string)$toLocation) : null;
+
+        $rows = [];
+        try {
+            $st = $pdo->prepare("
+                SELECT *
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'OFFCUT'
+                  AND status = ?
+                  AND width_mm = ?
+                  AND height_mm = ?
+                  AND (? IS NULL OR location = ?)
+                  AND (
+                        ? IS NULL
+                        OR ? = 0
+                        OR status = 'AVAILABLE'
+                        OR project_id = ?
+                        OR (project_id IS NULL AND (notes LIKE CONCAT('%Proiect ', ?, '%') OR notes LIKE CONCAT('%proiect ', ?, '%')))
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
+                  AND (is_accounting = 1 OR is_accounting IS NULL)
+                ORDER BY (location = 'Producție') DESC, created_at ASC, id ASC
+                FOR UPDATE
+            ");
+            $st->execute([
+                (int)$boardId,
+                $fromStatus,
+                (int)$widthMm,
+                (int)$heightMm,
+                $fromLocation,
+                $fromLocation,
+                $projectId,
+                $projectId,
+                $projectId,
+                $projectId,
+                $projectId,
+                $projectId,
+            ]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $st = $pdo->prepare("
+                SELECT *
+                FROM hpl_stock_pieces
+                WHERE board_id = ?
+                  AND piece_type = 'OFFCUT'
+                  AND status = ?
+                  AND width_mm = ?
+                  AND height_mm = ?
+                  AND (? IS NULL OR location = ?)
+                  AND (
+                        ? IS NULL
+                        OR ? = 0
+                        OR status = 'AVAILABLE'
+                        OR project_id = ?
+                        OR (project_id IS NULL AND (notes LIKE CONCAT('%Proiect ', ?, '%') OR notes LIKE CONCAT('%proiect ', ?, '%')))
+                        OR EXISTS (
+                            SELECT 1
+                            FROM project_hpl_consumptions c
+                            WHERE c.project_id = ?
+                              AND hpl_stock_pieces.notes LIKE CONCAT('%consum HPL #', c.id, '%')
+                        )
+                  )
+                ORDER BY (location = 'Producție') DESC, created_at ASC, id ASC
+                FOR UPDATE
+            ");
+            $st->execute([
+                (int)$boardId,
+                $fromStatus,
+                (int)$widthMm,
+                (int)$heightMm,
+                $fromLocation,
+                $fromLocation,
+                $projectId,
+                $projectId,
+                $projectId,
+                $projectId,
+                $projectId,
+                $projectId,
+            ]);
+            $rows = $st->fetchAll();
+        }
+
+        $need = $qty;
+        foreach ($rows as $r) {
+            if ($need <= 0) break;
+            $id = (int)($r['id'] ?? 0);
+            $rowQty = (int)($r['qty'] ?? 0);
+            if ($id <= 0 || $rowQty <= 0) continue;
+
+            $take = min($need, $rowQty);
+            if ($take <= 0) continue;
+
+            $location = (string)($r['location'] ?? '');
+            $destLocation = ($toLocation !== null && $toLocation !== '') ? $toLocation : $location;
+            $isAcc = (int)($r['is_accounting'] ?? 1);
+            $notes = (string)($r['notes'] ?? '');
+            $carryNotes = !($fromStatus === 'AVAILABLE' || $toStatus === 'AVAILABLE');
+
+            if ($take === $rowQty) {
+                $ident = null;
+                try {
+                    $ident = HplStockPiece::findIdentical($boardId, 'OFFCUT', $toStatus, $widthMm, $heightMm, $destLocation, $isAcc, $toStatus === 'AVAILABLE' ? null : $projectId, $id);
+                } catch (\Throwable $e) {
+                    $ident = null;
+                }
+                if ($ident) {
+                    if ($toStatus === 'AVAILABLE') {
+                        $destNote = trim((string)($ident['notes'] ?? ''));
+                        $noteForMatch = trim((string)($noteAppend ?? ''));
+                        if ($noteForMatch === '') {
+                            if ($destNote !== '') $ident = null;
+                        } elseif ($destNote !== $noteForMatch) {
+                            $ident = null;
+                        }
+                    }
+                    $destId = (int)($ident['id'] ?? 0);
+                    if ($destId > 0) {
+                        HplStockPiece::incrementQty($destId, $take);
+                        if ($noteAppend) {
+                            if ($carryNotes) {
+                                HplStockPiece::appendNote($destId, $noteAppend);
+                            } else {
+                                try { HplStockPiece::updateFields($destId, ['notes' => $noteAppend]); } catch (\Throwable $e) {}
+                            }
+                        }
+                        try {
+                            if ($toStatus === 'AVAILABLE') {
+                                HplStockPiece::updateFields($destId, ['project_id' => null]);
+                            } elseif ($projectId !== null && $projectId > 0) {
+                                HplStockPiece::updateFields($destId, ['project_id' => $projectId]);
+                            }
+                        } catch (\Throwable $e) {}
+                        HplStockPiece::delete($id);
+                    } else {
+                        $data = ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation];
+                        if ($noteAppend && !$carryNotes) $data['notes'] = $noteAppend;
+                        HplStockPiece::updateFields($id, $data);
+                        if ($noteAppend && $carryNotes) HplStockPiece::appendNote($id, $noteAppend);
+                    }
+                } else {
+                    $data = ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation];
+                    if ($noteAppend && !$carryNotes) $data['notes'] = $noteAppend;
+                    HplStockPiece::updateFields($id, $data);
+                    if ($noteAppend && $carryNotes) HplStockPiece::appendNote($id, $noteAppend);
+                }
+            } else {
+                HplStockPiece::updateQty($id, $rowQty - $take);
+
+                $ident = null;
+                try {
+                    $ident = HplStockPiece::findIdentical($boardId, 'OFFCUT', $toStatus, $widthMm, $heightMm, $destLocation, $isAcc, $toStatus === 'AVAILABLE' ? null : $projectId);
+                } catch (\Throwable $e) {
+                    $ident = null;
+                }
+                if ($ident) {
+                    HplStockPiece::incrementQty((int)$ident['id'], $take);
+                    if ($noteAppend) HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
+                } else {
+                    $newNotes = trim($notes);
+                    if ($noteAppend) $newNotes = trim($newNotes . ($newNotes !== '' ? "\n" : '') . $noteAppend);
+                    HplStockPiece::create([
+                        'board_id' => $boardId,
+                        'project_id' => ($toStatus === 'AVAILABLE') ? null : $projectId,
+                        'is_accounting' => $isAcc,
+                        'piece_type' => 'OFFCUT',
+                        'status' => $toStatus,
+                        'width_mm' => $widthMm,
+                        'height_mm' => $heightMm,
+                        'qty' => $take,
+                        'location' => $destLocation,
+                        'notes' => $newNotes !== '' ? $newNotes : null,
+                    ]);
+                }
+            }
+
+            $need -= $take;
+        }
+
+        if ($need > 0) {
+            throw new \RuntimeException('Stoc insuficient (resturi).');
         }
     }
 
@@ -4248,6 +4491,21 @@ final class ProjectsController
         $qtyBoards = Validator::int(trim((string)($_POST['qty_boards'] ?? '')), 1);
         $mode = trim((string)($_POST['mode'] ?? 'RESERVED'));
         $note = trim((string)($_POST['note'] ?? ''));
+        $offcutDim = trim((string)($_POST['offcut_dim'] ?? ''));
+        $offcutW = 0;
+        $offcutH = 0;
+        if ($offcutDim !== '') {
+            if (!preg_match('/^(\d{1,6})[xX×](\d{1,6})$/', $offcutDim, $m)) {
+                Session::flash('toast_error', 'Dimensiune rest invalidă.');
+                Response::redirect($consumRedirect);
+            }
+            $offcutW = (int)($m[1] ?? 0);
+            $offcutH = (int)($m[2] ?? 0);
+            if ($offcutW <= 0 || $offcutH <= 0) {
+                Session::flash('toast_error', 'Dimensiune rest invalidă.');
+                Response::redirect($consumRedirect);
+            }
+        }
         if ($boardId === null || $qtyBoards === null || $qtyBoards <= 0) {
             Session::flash('toast_error', 'Consum HPL invalid.');
             Response::redirect($consumRedirect);
@@ -4265,17 +4523,32 @@ final class ProjectsController
             Response::redirect($consumRedirect);
         }
 
-        // Stoc disponibil (plăci întregi)
-        $stockFull = 0;
-        try {
-            $stockFull = self::countFullBoardsAvailable((int)$boardId);
-        } catch (\Throwable $e) {
-            Session::flash('toast_error', 'Nu pot calcula stocul HPL.');
-            Response::redirect($consumRedirect);
-        }
-        if ($qtyBoards > $stockFull) {
-            Session::flash('toast_error', 'Stoc HPL insuficient (plăci întregi).');
-            Response::redirect($consumRedirect);
+        $isOffcut = ($offcutW > 0 && $offcutH > 0);
+        if ($isOffcut) {
+            $stockOffcut = 0;
+            try {
+                $stockOffcut = self::countOffcutAvailableByDim((int)$boardId, (int)$offcutW, (int)$offcutH);
+            } catch (\Throwable $e) {
+                Session::flash('toast_error', 'Nu pot calcula stocul HPL (resturi).');
+                Response::redirect($consumRedirect);
+            }
+            if ($qtyBoards > $stockOffcut) {
+                Session::flash('toast_error', 'Stoc HPL insuficient (resturi).');
+                Response::redirect($consumRedirect);
+            }
+        } else {
+            // Stoc disponibil (plăci întregi)
+            $stockFull = 0;
+            try {
+                $stockFull = self::countFullBoardsAvailable((int)$boardId);
+            } catch (\Throwable $e) {
+                Session::flash('toast_error', 'Nu pot calcula stocul HPL.');
+                Response::redirect($consumRedirect);
+            }
+            if ($qtyBoards > $stockFull) {
+                Session::flash('toast_error', 'Stoc HPL insuficient (plăci întregi).');
+                Response::redirect($consumRedirect);
+            }
         }
 
         /** @var \PDO $pdo */
@@ -4284,13 +4557,18 @@ final class ProjectsController
         try {
             $wStd = (int)($board['std_width_mm'] ?? 0);
             $hStd = (int)($board['std_height_mm'] ?? 0);
-            $areaPer = ($wStd > 0 && $hStd > 0) ? (($wStd * $hStd) / 1000000.0) : 0.0;
-            $qtyM2 = $areaPer > 0 ? ($areaPer * (float)$qtyBoards) : 0.0;
+            if ($isOffcut) {
+                $areaPer = ($offcutW > 0 && $offcutH > 0) ? (($offcutW * $offcutH) / 1000000.0) : 0.0;
+                $qtyM2 = $areaPer > 0 ? ($areaPer * (float)$qtyBoards) : 0.0;
+            } else {
+                $areaPer = ($wStd > 0 && $hStd > 0) ? (($wStd * $hStd) / 1000000.0) : 0.0;
+                $qtyM2 = $areaPer > 0 ? ($areaPer * (float)$qtyBoards) : 0.0;
+            }
 
             $cid = ProjectHplConsumption::create([
                 'project_id' => $projectId,
                 'board_id' => (int)$boardId,
-                'qty_boards' => (int)$qtyBoards,
+                'qty_boards' => $isOffcut ? 0 : (int)$qtyBoards,
                 'qty_m2' => (float)$qtyM2,
                 'mode' => $mode,
                 'note' => $note !== '' ? $note : null,
@@ -4305,15 +4583,20 @@ final class ProjectsController
             // IMPORTANT (cerință): nota afișată pe piesa din stoc trebuie să coincidă cu nota din proiect.
             // Păstrăm mesajul tehnic (proiect/consumption id) în Audit, nu în notes.
             $noteAppend = ($note !== '') ? $note : ('Proiect: ' . $projLabel . ' · consum HPL');
-            self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend, $projectId);
+            if ($isOffcut) {
+                self::moveOffcutPieces((int)$boardId, (int)$offcutW, (int)$offcutH, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend, $projectId);
+            } else {
+                self::moveFullBoards((int)$boardId, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend, $projectId);
+            }
 
             $pdo->commit();
 
+            $pieceLabel = $isOffcut ? ('REST ' . (int)$offcutH . '×' . (int)$offcutW) : 'FULL';
             Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_hpl_consumptions', $cid, null, null, [
-                'message' => 'Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? '') . ' — HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? '') . ' · ' . (int)$qtyBoards . ' buc',
+                'message' => 'Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? '') . ' — HPL ' . $mode . ': ' . (string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? '') . ' · ' . (int)$qtyBoards . ' buc (' . $pieceLabel . ')',
                 'project_id' => $projectId,
                 'board_id' => (int)$boardId,
-                'qty_boards' => (int)$qtyBoards,
+                'qty_boards' => $isOffcut ? 0 : (int)$qtyBoards,
                 'qty_m2' => (float)$qtyM2,
                 'mode' => $mode,
                 'note' => $note !== '' ? $note : null,
@@ -4321,7 +4604,7 @@ final class ProjectsController
 
             // Log explicit pe placă (pentru Istoric placă + Jurnal activitate), cu link-uri către proiect și stoc.
             Audit::log('HPL_STOCK_' . ($target === 'RESERVED' ? 'RESERVE' : 'CONSUME'), 'hpl_boards', (int)$boardId, null, null, [
-                'message' => ($target === 'RESERVED' ? 'Rezervat' : 'Consumat') . ' ' . (int)$qtyBoards . ' buc (FULL) pentru Proiect: ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
+                'message' => ($target === 'RESERVED' ? 'Rezervat' : 'Consumat') . ' ' . (int)$qtyBoards . ' buc (' . $pieceLabel . ') pentru Proiect: ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
                 'board_id' => (int)$boardId,
                 'board_code' => (string)($board['code'] ?? ''),
                 'board_name' => (string)($board['name'] ?? ''),
@@ -4330,7 +4613,7 @@ final class ProjectsController
                 'project_name' => (string)($project['name'] ?? ''),
                 'consumption_id' => $cid,
                 'mode' => $mode,
-                'qty_boards' => (int)$qtyBoards,
+                'qty_boards' => $isOffcut ? 0 : (int)$qtyBoards,
                 'to_status' => $target,
                 'url_board' => \App\Core\Url::to('/stock/boards/' . (int)$boardId),
                 'url_project' => \App\Core\Url::to('/projects/' . $projectId),

@@ -1586,7 +1586,7 @@ ob_start();
   <?php else: ?>
     <div class="card app-card p-3">
         <div class="h5 m-0">Consum HPL</div>
-        <div class="text-muted">Rezervat (plăci întregi)</div>
+        <div class="text-muted">Rezervat (plăci întregi / resturi)</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
@@ -1598,8 +1598,15 @@ ob_start();
               <select class="form-select" name="board_id" id="hplBoardSelect" style="width:100%"></select>
               <div class="text-muted small mt-1">Caută după cod placă sau coduri culoare. (Cu thumbnail)</div>
             </div>
+            <div class="col-12" id="hplOffcutWrap" style="display:none;">
+              <label class="form-label fw-semibold">Dimensiune rest (opțional)</label>
+              <select class="form-select" name="offcut_dim" id="hplOffcutSelect">
+                <option value="">Alege rest (opțional)…</option>
+              </select>
+              <div class="text-muted small mt-1">Apare când există resturi disponibile pentru placa selectată.</div>
+            </div>
             <div class="col-6">
-              <label class="form-label fw-semibold">Plăci (buc)</label>
+              <label class="form-label fw-semibold" id="hplQtyLabel">Plăci (buc)</label>
               <input class="form-control" type="number" step="1" min="1" name="qty_boards" value="1" id="hplQtyBoards">
             </div>
             <div class="col-6"></div>
@@ -1626,6 +1633,12 @@ ob_start();
               const $ = window.jQuery;
               const $el = $(el);
               const qtyEl = document.getElementById('hplQtyBoards');
+              const qtyLabelEl = document.getElementById('hplQtyLabel');
+              const offcutWrap = document.getElementById('hplOffcutWrap');
+              const offcutSelect = document.getElementById('hplOffcutSelect');
+              const offcutUrl = "<?= htmlspecialchars(Url::to('/api/hpl/boards/offcuts')) ?>";
+              const defaultQtyLabel = qtyLabelEl ? String(qtyLabelEl.textContent || '') : 'Plăci (buc)';
+              let currentBoard = null;
               function fmtBoard(opt){
                 if (!opt.id) return opt.text;
                 const thumb = opt.thumb || null;
@@ -1654,7 +1667,7 @@ ob_start();
                   : NaN;
                 const offcutTxt = Number.isFinite(offcut) ? offcut : null;
 
-                if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex && stockTxt === null) return opt.text;
+                if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex && stockTxt === null && offcutTxt === null) return opt.text;
                 const $row = $('<span class="s2-row"></span>');
                 if (thumb) $row.append($('<img class="s2-thumb" />').attr('src', thumb));
                 if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" />').attr('src', thumbBack));
@@ -1675,6 +1688,83 @@ ob_start();
                 }
                 $row.append($txt);
                 return $row;
+              }
+              function setQtyLabel(isOffcut){
+                if (!qtyLabelEl) return;
+                qtyLabelEl.textContent = isOffcut ? 'Bucăți (rest)' : (defaultQtyLabel || 'Plăci (buc)');
+              }
+              function resetOffcutOptions(){
+                if (!offcutSelect) return;
+                offcutSelect.innerHTML = '<option value="">Alege rest (opțional)…</option>';
+                offcutSelect.value = '';
+              }
+              function hideOffcuts(){
+                if (offcutWrap) offcutWrap.style.display = 'none';
+                if (offcutSelect) offcutSelect.disabled = false;
+                resetOffcutOptions();
+                setQtyLabel(false);
+              }
+              function getSelectedOffcutQty(){
+                if (!offcutSelect || !offcutSelect.value) return null;
+                const opt = offcutSelect.options[offcutSelect.selectedIndex];
+                const raw = opt ? opt.getAttribute('data-qty') : null;
+                const qty = raw !== null ? parseInt(String(raw), 10) : NaN;
+                return Number.isFinite(qty) ? qty : null;
+              }
+              function applyMaxValue(maxVal){
+                if (!qtyEl) return;
+                if (Number.isFinite(maxVal) && maxVal > 0) {
+                  qtyEl.max = String(maxVal);
+                  const cur = parseInt(String(qtyEl.value || '1'), 10);
+                  if (Number.isFinite(cur) && cur > maxVal) {
+                    qtyEl.value = String(maxVal);
+                    if (window.toastr) window.toastr.warning('Cantitatea a fost ajustată la stocul disponibil: ' + maxVal + ' buc.');
+                  }
+                } else {
+                  qtyEl.removeAttribute('max');
+                }
+              }
+              function loadOffcuts(boardId){
+                if (!offcutWrap || !offcutSelect) return;
+                if (!boardId) {
+                  hideOffcuts();
+                  return;
+                }
+                offcutWrap.style.display = '';
+                offcutSelect.disabled = true;
+                offcutSelect.innerHTML = '<option value="">Se încarcă…</option>';
+                const url = offcutUrl + '?board_id=' + encodeURIComponent(String(boardId));
+                fetch(url, { headers: { 'Accept': 'application/json' } })
+                  .then(r => r.json())
+                  .then(resp => {
+                    if (!resp || resp.ok === false) {
+                      let msg = String((resp && resp.error) ? resp.error : 'Nu pot încărca resturile disponibile.');
+                      if (resp && resp.debug) msg += ' — ' + String(resp.debug);
+                      if (window.toastr) window.toastr.error(msg);
+                      hideOffcuts();
+                      return;
+                    }
+                    const items = Array.isArray(resp.items) ? resp.items : [];
+                    if (!items.length) {
+                      hideOffcuts();
+                      return;
+                    }
+                    offcutSelect.disabled = false;
+                    offcutSelect.innerHTML = '<option value="">Alege rest (opțional)…</option>';
+                    items.forEach(function(it){
+                      const opt = document.createElement('option');
+                      opt.value = String(it.dim || it.id || '');
+                      opt.textContent = String(it.text || '');
+                      if (it.qty !== undefined && it.qty !== null) opt.setAttribute('data-qty', String(it.qty));
+                      offcutSelect.appendChild(opt);
+                    });
+                    setQtyLabel(false);
+                    applyQtyMax();
+                  })
+                  .catch(function(){
+                    if (window.toastr) window.toastr.error('Nu pot încărca resturile disponibile. (API)');
+                    hideOffcuts();
+                  });
               }
               $el.select2({
                 width: '100%',
@@ -1731,27 +1821,44 @@ ob_start();
 
               // UI guard: nu permite introducerea unei cantități > stoc disponibil pentru placa selectată.
               function applyMaxFromSelection(sel){
-                if (!qtyEl) return;
                 const stock = sel && sel.stock_qty_full_available !== undefined ? parseInt(String(sel.stock_qty_full_available), 10) : NaN;
-                if (Number.isFinite(stock) && stock > 0) {
-                  qtyEl.max = String(stock);
-                  // dacă userul avea deja un număr mai mare, îl aducem în limită
-                  const cur = parseInt(String(qtyEl.value || '1'), 10);
-                  if (Number.isFinite(cur) && cur > stock) {
-                    qtyEl.value = String(stock);
-                    if (window.toastr) window.toastr.warning('Cantitatea a fost ajustată la stocul disponibil: ' + stock + ' buc.');
-                  }
-                } else {
-                  qtyEl.removeAttribute('max');
+                applyMaxValue(stock);
+              }
+              function applyQtyMax(){
+                const offcutQty = getSelectedOffcutQty();
+                if (offcutQty !== null) {
+                  setQtyLabel(true);
+                  applyMaxValue(offcutQty);
+                  return;
                 }
+                setQtyLabel(false);
+                if (currentBoard) {
+                  applyMaxFromSelection(currentBoard);
+                  return;
+                }
+                if (qtyEl) qtyEl.removeAttribute('max');
               }
               $el.on('select2:select', function(e){
                 const data = (e && e.params && e.params.data) ? e.params.data : null;
-                applyMaxFromSelection(data);
+                currentBoard = data;
+                const offcutCount = data && data.stock_qty_offcut_available !== undefined ? parseInt(String(data.stock_qty_offcut_available), 10) : NaN;
+                if (Number.isFinite(offcutCount) && offcutCount > 0) {
+                  loadOffcuts(data && data.id ? data.id : null);
+                } else {
+                  hideOffcuts();
+                }
+                applyQtyMax();
               });
               $el.on('select2:clear', function(){
+                currentBoard = null;
+                hideOffcuts();
                 if (qtyEl) qtyEl.removeAttribute('max');
               });
+              if (offcutSelect) {
+                offcutSelect.addEventListener('change', function(){
+                  applyQtyMax();
+                });
+              }
               if (qtyEl) {
                 qtyEl.addEventListener('input', function(){
                   const max = qtyEl.max ? parseInt(String(qtyEl.max), 10) : NaN;

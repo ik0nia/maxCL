@@ -333,6 +333,7 @@ $router->get('/api/health', function () {
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);
+$router->get('/api/hpl/boards/offcuts', fn() => ApiHplBoardsController::offcuts(), $hplReadMW);
 $router->get('/api/hpl/pieces/search', fn() => ApiHplPiecesController::search(), $hplReadMW);
 $router->get('/api/magazie/items/search', fn() => ApiMagazieItemsController::search(), $magReadMW);
 
