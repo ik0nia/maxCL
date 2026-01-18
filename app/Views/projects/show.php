@@ -4,6 +4,7 @@ use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\Url;
 use App\Core\View;
+use App\Core\Session;
 
 $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
@@ -24,19 +25,35 @@ $deliveryItems = $deliveryItems ?? [];
 $projectFiles = $projectFiles ?? [];
 $workLogs = $workLogs ?? [];
 $history = $history ?? [];
+$projectProductLabels = $projectProductLabels ?? [];
 $discussions = $discussions ?? [];
 $laborByProduct = $laborByProduct ?? [];
 $materialsByProduct = $materialsByProduct ?? [];
 $projectCostSummary = $projectCostSummary ?? [];
+$billingClients = $billingClients ?? [];
+$billingAddresses = $billingAddresses ?? [];
 $projectLabels = $projectLabels ?? [];
 $cncFiles = $cncFiles ?? [];
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
+$ppStatusError = null;
+$ppStatusErrorRaw = Session::flash('pp_status_error');
+if (is_string($ppStatusErrorRaw) && $ppStatusErrorRaw !== '') {
+  $ppStatusError = json_decode($ppStatusErrorRaw, true);
+  if (!is_array($ppStatusError) || !isset($ppStatusError['id'], $ppStatusError['message'])) {
+    $ppStatusError = null;
+  } else {
+    $ppStatusError = [
+      'id' => (int)$ppStatusError['id'],
+      'message' => (string)$ppStatusError['message'],
+    ];
+  }
+}
 
 $tabs = [
   'general' => 'General',
-  'products' => 'Produse (piese)',
+  'products' => 'Produse',
   'consum' => 'Consum materiale',
   'hours' => 'Ore & Manoperă',
   'cnc' => 'CNC / Tehnic',
@@ -244,11 +261,11 @@ ob_start();
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <div class="h5 m-0">Adaugă produs (nou)</div>
-            <div class="text-muted">Fiecare piesă se creează direct în proiect</div>
+            <div class="text-muted">Fiecare produs se creează direct în proiect</div>
           </div>
           <?php if ($canWrite): ?>
             <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNewCollapse" aria-expanded="false" aria-controls="ppAddNewCollapse">
-              <i class="bi bi-plus-lg me-1"></i> Creează piesă
+              <i class="bi bi-plus-lg me-1"></i> Creează produs
             </button>
           <?php endif; ?>
         </div>
@@ -393,17 +410,40 @@ ob_start();
                   }
                 });
 
-                // toggle mode UI on source change (REST => hide half option)
                 const $form = $el.closest('form');
-                $form.find('input.js-pp-hpl-source').on('change', function(){
+                const $wrap = $form.find('.js-pp-hpl-consume-wrap');
+                const $hidden = $form.find('.js-pp-hpl-consume-hidden');
+                const $half = $form.find('.js-pp-hpl-half');
+                function setConsumeMode(val){
+                  if ($hidden.length) $hidden.val(val);
+                }
+                function updateConsumeUi(pieceType){
                   const src = String($form.find('input.js-pp-hpl-source:checked').val() || 'PROJECT');
-                  const $wrap = $form.find('.js-pp-hpl-mode-wrap');
-                  if (src === 'REST') {
-                    $wrap.addClass('d-none');
-                    $form.find('input[name="consume_mode"][value="FULL"]').prop('checked', true);
-                  } else {
+                  const pt = String(pieceType || '').toUpperCase();
+                  const show = (src === 'PROJECT' && pt === 'FULL');
+                  if (show) {
                     $wrap.removeClass('d-none');
+                  } else {
+                    $wrap.addClass('d-none');
+                    if ($half.length) $half.prop('checked', false);
+                    setConsumeMode('FULL');
                   }
+                }
+                $half.on('change', function(){
+                  setConsumeMode(this.checked ? 'HALF' : 'FULL');
+                });
+                $el.on('select2:select', function(e){
+                  const data = (e && e.params && e.params.data) ? e.params.data : {};
+                  updateConsumeUi(data.piece_type || '');
+                });
+                $el.on('select2:clear', function(){
+                  updateConsumeUi('');
+                });
+                updateConsumeUi('');
+
+                // toggle consume UI on source change (REST => hide half option)
+                $form.find('input.js-pp-hpl-source').on('change', function(){
+                  updateConsumeUi('');
                   // reset selection to refetch from correct source
                   $el.val(null).trigger('change');
                 });
@@ -542,7 +582,7 @@ ob_start();
       </div>
 
       <div class="card app-card p-3">
-        <div class="h5 m-0">Produse (piese) în proiect</div>
+        <div class="h5 m-0">Produse în proiect</div>
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
 
         <?php
@@ -625,6 +665,24 @@ ob_start();
                 $matCost = $magCost + $hplCost;
                 $totalEst = $manCost + $matCost;
 
+                $projectClientId = (int)($project['client_id'] ?? 0);
+                $invoiceClientId = isset($pp['invoice_client_id']) ? (int)$pp['invoice_client_id'] : 0;
+                if ($invoiceClientId <= 0) $invoiceClientId = $projectClientId;
+                $deliveryAddressId = isset($pp['delivery_address_id']) ? (int)$pp['delivery_address_id'] : 0;
+                $addrList = is_array(($billingAddresses[$invoiceClientId] ?? null)) ? $billingAddresses[$invoiceClientId] : [];
+                $defaultAddrId = $deliveryAddressId;
+                if ($defaultAddrId <= 0 && $addrList) {
+                  foreach ($addrList as $addrRow) {
+                    if ((int)($addrRow['is_default'] ?? 0) === 1) {
+                      $defaultAddrId = (int)($addrRow['id'] ?? 0);
+                      break;
+                    }
+                  }
+                  if ($defaultAddrId <= 0) {
+                    $defaultAddrId = (int)($addrList[0]['id'] ?? 0);
+                  }
+                }
+
                 $qtyUnits = ($qty > 0.0) ? $qty : 0.0;
                 $showPerUnit = ($qtyUnits > 1.0001);
                 $cncHUnit = $showPerUnit ? ($cncH / $qtyUnits) : $cncH;
@@ -638,13 +696,18 @@ ob_start();
                 $totUnit = $showPerUnit ? ($totalEst / $qtyUnits) : $totalEst;
               ?>
               <div class="col-12">
-                <div class="card app-card p-3">
+                <div class="card app-card p-3" id="pp-<?= (int)$ppId ?>">
                   <div class="d-flex align-items-start justify-content-between gap-2">
                     <div>
-                      <div class="h5 m-0"><?= htmlspecialchars($pname) ?></div>
+                      <div class="h2 m-0 text-success"><?= htmlspecialchars($pname) ?></div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                     </div>
                   </div>
+                  <?php if ($ppStatusError && (int)($ppStatusError['id'] ?? 0) === $ppId): ?>
+                    <div class="alert alert-danger py-2 px-3 mt-2 mb-0" role="alert">
+                      <?= htmlspecialchars((string)($ppStatusError['message'] ?? '')) ?>
+                    </div>
+                  <?php endif; ?>
 
                   <?php
                     $stVal = (string)($pp['production_status'] ?? '');
@@ -678,8 +741,12 @@ ob_start();
                           <?php if (!$isVisible) continue; ?>
 
                           <?php if ($isNext && $canAdvance): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0"
+                                  <?= $nextVal === 'AVIZAT' ? 'data-aviz-required="1"' : '' ?>>
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <?php if ($nextVal === 'AVIZAT'): ?>
+                                <input type="hidden" name="aviz_number" value="">
+                              <?php endif; ?>
                               <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
                                 <?= htmlspecialchars($lbl) ?>
                               </button>
@@ -700,7 +767,7 @@ ob_start();
                       </div>
 
                       <?php if (!$canSetPPFinal): ?>
-                        <div class="text-muted small">Avizat/Livrat: doar Admin/Gestionar.</div>
+                    <div class="text-muted small">Avizare/Livrat: doar Admin/Gestionar.</div>
                       <?php endif; ?>
                     </div>
                   <?php endif; ?>
@@ -758,6 +825,13 @@ ob_start();
                     }
                     // drepturi pentru acțiuni pe această piesă (folosit și în tabelul HPL pentru butonul "Debitat")
                     $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
+                    $hasReservedAcc = false;
+                    foreach ($accRows as $ar) {
+                      if ((string)($ar['mode'] ?? '') === 'RESERVED') {
+                        $hasReservedAcc = true;
+                        break;
+                      }
+                    }
                   ?>
 
                   <div class="mt-3">
@@ -796,7 +870,16 @@ ob_start();
                     </div>
 
                     <div class="mt-2">
-                      <div class="text-muted small fw-semibold">Accesorii</div>
+                      <div class="d-flex justify-content-between align-items-center gap-2">
+                        <div class="h5 m-0 text-success fw-semibold">Accesorii</div>
+                        <?php if ($canEditThis && $hasReservedAcc): ?>
+                          <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/consume')) ?>" class="m-0"
+                                onsubmit="return confirm('Dai în consum accesoriile rezervate pe acest produs?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                            <button class="btn btn-outline-success btn-sm" type="submit">Dat în consum</button>
+                          </form>
+                        <?php endif; ?>
+                      </div>
                       <?php if (!$accRows): ?>
                         <div class="text-muted small">—</div>
                       <?php else: ?>
@@ -847,10 +930,12 @@ ob_start();
                                     </td>
                                   <?php endif; ?>
                                   <td class="text-end">
-                                    <?php if ($canEditThis && $srcTag === 'DIRECT' && $mode === 'RESERVED' && $iid > 0): ?>
+                                    <?php if ($canEditThis && $mode === 'RESERVED' && $iid > 0 && ($srcTag === 'DIRECT' || $srcTag === 'PROIECT')): ?>
                                       <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/unallocate')) ?>" class="m-0"
-                                            onsubmit="return confirm('Renunți la acest accesoriu rezervat pe piesă?');">
+                                            onsubmit="return confirm('Renunți la acest accesoriu rezervat pe produs?');">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                        <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
+                                        <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>">
                                         <button class="btn btn-outline-danger btn-sm" type="submit">Renunță</button>
                                       </form>
                                     <?php else: ?>
@@ -872,7 +957,7 @@ ob_start();
                       }
                     ?>
                     <div class="mt-2">
-                      <div class="text-muted small fw-semibold">HPL</div>
+                      <div class="h5 m-0 text-success fw-semibold">Consum HPL</div>
                       <?php if (!$hplRows): ?>
                         <div class="text-muted small">—</div>
                       <?php else: ?>
@@ -920,14 +1005,51 @@ ob_start();
                                   $cm2 = (string)($hr['consume_mode'] ?? '');
                                   $src2 = (string)($hr['source'] ?? '');
                                   $st2 = (string)($hr['status'] ?? '');
+                                  $bid2 = (int)($hr['board_id'] ?? 0);
                                   $boardTxt = trim($bcode2 . ' · ' . $bname2);
+                                  $fc2 = trim((string)($hr['face_color_code'] ?? ''));
+                                  $bc2 = trim((string)($hr['back_color_code'] ?? ''));
+                                  $thumbF = trim((string)($hr['face_thumb'] ?? ''));
+                                  $thumbB = trim((string)($hr['back_thumb'] ?? ''));
+                                  $colors2 = $fc2;
+                                  if ($bc2 !== '' && $bc2 !== $fc2) {
+                                    $colors2 = $colors2 !== '' ? ($colors2 . '/' . $bc2) : $bc2;
+                                  }
                                   $dimTxt = ($ph2 > 0 && $pw2 > 0) ? ($ph2 . ' × ' . $pw2 . ' mm') : '—';
                                   $noteTxt = trim($pn2);
                                   if ($noteTxt !== '' && mb_strlen($noteTxt) > 110) $noteTxt = mb_substr($noteTxt, 0, 110) . '…';
                                   $createdAt = (string)($hr['created_at'] ?? '');
                                 ?>
                                 <tr>
-                                  <td class="fw-semibold"><?= htmlspecialchars($boardTxt !== '' ? $boardTxt : '—') ?></td>
+                                  <td class="fw-semibold">
+                                    <?php
+                                      $boardLabel = $boardTxt !== '' ? $boardTxt : '—';
+                                      $colorLabel = $colors2 !== '' ? $colors2 : '';
+                                    ?>
+                                    <?php if ($bid2 > 0): ?>
+                                      <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid2)) ?>">
+                                        <span class="d-inline-flex align-items-center">
+                                          <?php if ($thumbF !== ''): ?>
+                                            <img class="s2-thumb" src="<?= htmlspecialchars($thumbF) ?>" alt="">
+                                          <?php endif; ?>
+                                          <?php if ($thumbB !== '' && $thumbB !== $thumbF): ?>
+                                            <img class="s2-thumb2" src="<?= htmlspecialchars($thumbB) ?>" alt="">
+                                          <?php endif; ?>
+                                          <span>
+                                            <?php if ($colorLabel !== ''): ?>
+                                              <strong><?= htmlspecialchars($colorLabel) ?></strong> ·
+                                            <?php endif; ?>
+                                            <?= htmlspecialchars($boardLabel) ?>
+                                          </span>
+                                        </span>
+                                      </a>
+                                    <?php else: ?>
+                                      <?php if ($colorLabel !== ''): ?>
+                                        <strong><?= htmlspecialchars($colorLabel) ?></strong> ·
+                                      <?php endif; ?>
+                                      <?= htmlspecialchars($boardLabel) ?>
+                                    <?php endif; ?>
+                                  </td>
                                   <td class="fw-semibold"><?= htmlspecialchars($pt2 !== '' ? $pt2 : '—') ?></td>
                                   <td><span class="badge app-badge"><?= htmlspecialchars($st2) ?></span></td>
                                   <td class="text-muted"><?= htmlspecialchars($dimTxt) ?></td>
@@ -987,6 +1109,9 @@ ob_start();
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAcc<?= $ppId ?>">
                         <i class="bi bi-box-seam me-1"></i> Adaugă accesorii
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppBill<?= $ppId ?>">
+                        <i class="bi bi-receipt me-1"></i> Facturare/Livrare
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
                         <i class="bi bi-pencil me-1"></i> Editează
                       </button>
@@ -1001,7 +1126,7 @@ ob_start();
 
                     <div class="collapse mt-3" id="ppHpl<?= $ppId ?>">
                       <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
-                        <div class="fw-semibold">Consum HPL (alocare pe piesă)</div>
+                        <div class="fw-semibold">Consum HPL (alocare pe produs)</div>
                         <div class="text-muted small">Aloci din piesele rezervate pe proiect sau din plăci REST (nestocate). Consumul efectiv se face manual din butonul „Debitat” din tabelul HPL.</div>
 
                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/create')) ?>" class="row g-2 mt-2 js-pp-hpl-form">
@@ -1021,24 +1146,19 @@ ob_start();
                             </div>
                           </div>
 
-                          <div class="col-12 col-md-4 js-pp-hpl-mode-wrap">
-                            <label class="form-label fw-semibold mb-1">Consum</label>
-                            <div class="d-flex flex-wrap gap-3">
-                              <label class="form-check form-check-inline m-0">
-                                <input class="form-check-input" type="radio" name="consume_mode" value="FULL" checked>
-                                <span class="form-check-label">1 placă (FULL)</span>
-                              </label>
-                              <label class="form-check form-check-inline m-0">
-                                <input class="form-check-input" type="radio" name="consume_mode" value="HALF">
-                                <span class="form-check-label">1/2 placă</span>
-                              </label>
-                            </div>
-                            <div class="text-muted small mt-1">Pentru REST se alocă întotdeauna integral (FULL).</div>
-                          </div>
-
                           <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold mb-1">Placă / piesă</label>
                             <select class="form-select form-select-sm js-pp-hpl-piece" name="piece_id" data-project-id="<?= (int)$project['id'] ?>" style="width:100%"></select>
+                          </div>
+
+                          <div class="col-12 col-md-4 js-pp-hpl-consume-wrap">
+                            <label class="form-label fw-semibold mb-1">Consum</label>
+                            <input type="hidden" name="consume_mode" value="FULL" class="js-pp-hpl-consume-hidden">
+                            <label class="form-check m-0">
+                              <input class="form-check-input js-pp-hpl-half" type="checkbox" value="HALF">
+                              <span class="form-check-label">1/2 placă (din FULL)</span>
+                            </label>
+                            <div class="text-muted small mt-1">Disponibil doar pentru plăci FULL din proiect.</div>
                           </div>
 
                           <div class="col-12 d-flex justify-content-end">
@@ -1052,7 +1172,7 @@ ob_start();
 
                     <div class="collapse mt-3" id="ppAcc<?= $ppId ?>">
                       <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
-                        <div class="fw-semibold">Accesorii (rezervate pentru această piesă)</div>
+                        <div class="fw-semibold">Accesorii (rezervate pentru acest produs)</div>
                         <div class="text-muted small">Se rezervă automat. La “Gata de livrare” se consumă din stoc.</div>
                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/create')) ?>" class="row g-2 mt-2">
                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
@@ -1067,6 +1187,59 @@ ob_start();
                           <div class="col-12 d-flex justify-content-end">
                             <button class="btn btn-primary btn-sm" type="submit">
                               <i class="bi bi-plus-lg me-1"></i> Adaugă
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                    <div class="collapse mt-3" id="ppBill<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Facturare & livrare</div>
+                        <div class="text-muted small">Alege firma de facturare și adresa de livrare pentru acest produs.</div>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/billing/update')) ?>" class="row g-2 mt-2">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold mb-1">Firmă facturare</label>
+                            <select class="form-select form-select-sm js-pp-bill-client" name="invoice_client_id"
+                                    data-addr-target="ppBillAddr<?= $ppId ?>" data-default-addr="<?= (int)$defaultAddrId ?>"
+                                    <?= $billingClients ? '' : 'disabled' ?>>
+                              <?php if (!$billingClients): ?>
+                                <option value="">Nu există firme</option>
+                              <?php else: ?>
+                                <option value="">—</option>
+                                <?php foreach ($billingClients as $bc): ?>
+                                  <?php $bcId = (int)($bc['id'] ?? 0); ?>
+                                  <option value="<?= $bcId ?>" <?= $bcId > 0 && $bcId === (int)$invoiceClientId ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)($bc['name'] ?? '')) ?>
+                                  </option>
+                                <?php endforeach; ?>
+                              <?php endif; ?>
+                            </select>
+                          </div>
+                          <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold mb-1">Adresă livrare</label>
+                            <select class="form-select form-select-sm" name="delivery_address_id" id="ppBillAddr<?= $ppId ?>" <?= $billingClients ? '' : 'disabled' ?>>
+                              <?php if (!$addrList): ?>
+                                <option value="">Nu există adrese</option>
+                              <?php else: ?>
+                                <option value="">—</option>
+                                <?php foreach ($addrList as $addrRow): ?>
+                                  <?php
+                                    $addrId = (int)($addrRow['id'] ?? 0);
+                                    $addrLabel = trim((string)($addrRow['label'] ?? ''));
+                                    $addrText = trim((string)($addrRow['address'] ?? ''));
+                                    $addrFull = trim($addrLabel !== '' ? ($addrLabel . ' · ' . $addrText) : $addrText);
+                                  ?>
+                                  <option value="<?= $addrId ?>" <?= $addrId > 0 && $addrId === (int)$defaultAddrId ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($addrFull !== '' ? $addrFull : ('Adresă #' . $addrId)) ?>
+                                  </option>
+                                <?php endforeach; ?>
+                              <?php endif; ?>
+                            </select>
+                          </div>
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-save me-1"></i> Salvează
                             </button>
                           </div>
                         </form>
@@ -1171,6 +1344,58 @@ ob_start();
         <?php endif; ?>
       </div>
     </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function(){
+        const addrMap = <?= json_encode($billingAddresses ?? [], JSON_UNESCAPED_UNICODE) ?>;
+        function addrLabel(a){
+          const label = a && a.label ? String(a.label) : '';
+          const addr = a && a.address ? String(a.address) : '';
+          return (label && addr) ? (label + ' · ' + addr) : (label || addr);
+        }
+        function buildAddrOptions(select, clientId, selectedId){
+          if (!select) return;
+          const list = (clientId && addrMap && addrMap[clientId]) ? addrMap[clientId] : [];
+          let selected = String(selectedId || '');
+          if (!selected && list && list.length) {
+            const def = list.find(a => a && String(a.is_default || '') === '1');
+            if (def && def.id) selected = String(def.id);
+          }
+          select.innerHTML = '';
+          if (!list || !list.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Nu există adrese';
+            select.appendChild(opt);
+            select.disabled = true;
+            return;
+          }
+          select.disabled = false;
+          const empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = '—';
+          select.appendChild(empty);
+          list.forEach(function(a){
+            const opt = document.createElement('option');
+            const id = a && a.id ? String(a.id) : '';
+            opt.value = id;
+            opt.textContent = addrLabel(a) || ('Adresă #' + id);
+            if (id !== '' && selected === id) opt.selected = true;
+            select.appendChild(opt);
+          });
+        }
+        document.querySelectorAll('.js-pp-bill-client').forEach(function(sel){
+          const targetId = sel.getAttribute('data-addr-target') || '';
+          const addrSel = targetId ? document.getElementById(targetId) : null;
+          if (!addrSel) return;
+          const defaultAddr = sel.getAttribute('data-default-addr') || '';
+          buildAddrOptions(addrSel, sel.value, defaultAddr);
+          sel.addEventListener('change', function(){
+            buildAddrOptions(addrSel, sel.value, '');
+          });
+        });
+      });
+    </script>
 
     <div class="col-12">
       <div class="card app-card p-3 mb-3">
@@ -1317,7 +1542,7 @@ ob_start();
   <?php if ($consumTab === 'accesorii'): ?>
     <div class="card app-card p-3">
         <div class="h5 m-0">Consum Magazie (accesorii)</div>
-        <div class="text-muted">Rezervat/Consumat — legabil la produs</div>
+        <div class="text-muted">Rezervat — legabil la produs</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/create')) ?>" class="row g-2 mt-2">
@@ -1332,14 +1557,7 @@ ob_start();
               <label class="form-label fw-semibold">Cantitate</label>
               <input class="form-control" type="number" step="0.001" min="0.001" name="qty" value="1">
             </div>
-            <div class="col-6"></div>
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Mod</label>
-              <select class="form-select" name="mode">
-                <option value="CONSUMED">consumat</option>
-                <option value="RESERVED">rezervat</option>
-              </select>
-            </div>
+            <input type="hidden" name="mode" value="RESERVED">
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Produs (opțional)</label>
               <select class="form-select" name="project_product_id">
@@ -1531,12 +1749,13 @@ ob_start();
   <?php else: ?>
     <div class="card app-card p-3">
         <div class="h5 m-0">Consum HPL</div>
-        <div class="text-muted">Rezervat/Consumat (plăci întregi / resturi)</div>
+        <div class="text-muted">Rezervat (plăci întregi / resturi)</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/hpl/create')) ?>" class="row g-2 mt-2">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
             <input type="hidden" name="consum_tab" value="hpl">
+            <input type="hidden" name="mode" value="RESERVED">
             <div class="col-12">
               <label class="form-label fw-semibold">Placă HPL</label>
               <select class="form-select" name="board_id" id="hplBoardSelect" style="width:100%"></select>
@@ -1553,13 +1772,7 @@ ob_start();
               <label class="form-label fw-semibold" id="hplQtyLabel">Plăci (buc)</label>
               <input class="form-control" type="number" step="1" min="1" name="qty_boards" value="1" id="hplQtyBoards">
             </div>
-            <div class="col-6">
-              <label class="form-label fw-semibold">Mod</label>
-              <select class="form-select" name="mode">
-                <option value="RESERVED">rezervat</option>
-                <option value="CONSUMED">consumat</option>
-              </select>
-            </div>
+            <div class="col-6"></div>
             <div class="col-12">
               <label class="form-label fw-semibold">Notă</label>
               <input class="form-control" name="note" maxlength="255" placeholder="opțional…">
@@ -1864,7 +2077,7 @@ ob_start();
                       $isReturnable = ($pstatus === 'RESERVED' && $qty > 0);
                       $isReturnableStock = ($isReturnable && $ptype === 'FULL');
                       $isReturnableRest = ($isReturnable && $isAcc === 0);
-                      $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
+                      $isReturnableOffcut = ($isReturnable && $ptype === 'OFFCUT' && $isAcc !== 0);
                     ?>
                     <tr>
                       <td class="fw-semibold">
@@ -1886,22 +2099,37 @@ ob_start();
                       <?php if ($canMoveHpl): ?>
                         <td class="text-end">
                           <?php if ($isReturnableRest && $bid > 0 && $pid > 0): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
-                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hpl/pieces/' . $pid . '/return')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end js-return-note-form"
+                                  onsubmit="return window.appReturnNote ? window.appReturnNote.handleSubmit(this) : confirm('Revii în stoc (Depozit/Disponibil) această piesă REST?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <input type="hidden" name="consum_tab" value="hpl">
+                              <input type="hidden" name="note_user" value="">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
                                 <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
                               </button>
                             </form>
                           <?php elseif ($isReturnableStock && $bid > 0 && $pid > 0 && $qty > 0): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end"
-                                  onsubmit="return confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end js-return-note-form"
+                                  onsubmit="return window.appReturnNote ? window.appReturnNote.handleSubmit(this) : confirm('Revii în stoc (Depozit/Disponibil) această placă?');">
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
                               <input type="hidden" name="to_location" value="Depozit">
                               <input type="hidden" name="to_status" value="AVAILABLE">
-                              <input type="hidden" name="note" value="<?= htmlspecialchars('Revenire în stoc din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . (int)($project['id'] ?? 0)))) ?>">
+                              <input type="hidden" name="note_user" value="">
+                              <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
+                                     name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
+                              <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Revenire stoc
+                              </button>
+                            </form>
+                          <?php elseif ($isReturnableOffcut && $bid > 0 && $pid > 0 && $qty > 0): ?>
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid . '/pieces/move')) ?>" class="d-inline-flex gap-2 align-items-center justify-content-end js-return-note-form"
+                                  onsubmit="return window.appReturnNote ? window.appReturnNote.handleSubmit(this) : confirm('Revii în stoc (Depozit/Disponibil) această piesă OFFCUT?');">
+                              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <input type="hidden" name="from_piece_id" value="<?= (int)$pid ?>">
+                              <input type="hidden" name="to_location" value="Depozit">
+                              <input type="hidden" name="to_status" value="AVAILABLE">
+                              <input type="hidden" name="note_user" value="">
                               <input class="form-control form-control-sm text-end" type="number" min="1" max="<?= (int)$qty ?>" step="1"
                                      name="qty" value="<?= min(1, (int)$qty) ?>" style="width:90px" title="Bucăți de returnat">
                               <button class="btn btn-outline-secondary btn-sm" type="submit">
@@ -2424,7 +2652,19 @@ ob_start();
                 <td><?= htmlspecialchars((string)($h['message'] ?? '')) ?></td>
                 <td class="text-muted"><?= htmlspecialchars((string)($h['note'] ?? '')) ?></td>
                 <td class="text-muted">
-                  <?= htmlspecialchars((string)($h['entity_type'] ?? '')) ?>#<?= htmlspecialchars((string)($h['entity_id'] ?? '')) ?>
+                  <?php
+                    $etype = (string)($h['entity_type'] ?? '');
+                    $eid = isset($h['entity_id']) && is_numeric($h['entity_id']) ? (int)$h['entity_id'] : 0;
+                    $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
+                    if ($etype === 'projects') {
+                      echo 'Proiect ' . htmlspecialchars($projLabel !== '' ? $projLabel : ('#' . $eid));
+                    } elseif ($etype === 'project_products' && $eid > 0 && isset($projectProductLabels[$eid])) {
+                      echo 'Produs ' . htmlspecialchars((string)$projectProductLabels[$eid]);
+                    } else {
+                      echo htmlspecialchars($etype !== '' ? $etype : '—');
+                      if ($eid > 0) echo ' #' . htmlspecialchars((string)$eid);
+                    }
+                  ?>
                 </td>
               </tr>
             <?php endforeach; ?>
@@ -2502,6 +2742,200 @@ ob_start();
     <div class="text-muted mt-1">Acest tab va fi completat în pasul următor.</div>
   </div>
 <?php endif; ?>
+
+<div class="modal fade" id="avizNumberModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Număr aviz</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="avizNumberInput" class="form-label fw-semibold">Introdu numărul de aviz</label>
+        <input class="form-control" id="avizNumberInput" maxlength="40" placeholder="ex: AVZ-10234">
+        <div class="invalid-feedback">Introdu un număr de aviz.</div>
+        <div class="text-muted small mt-2">Numărul de aviz va fi afișat jos pe Deviz și Bonul de consum.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+        <button type="button" class="btn btn-primary" id="avizNumberConfirm">Continuă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="returnNoteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Notă pentru revenire în stoc</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="returnNoteText" class="form-label fw-semibold">Notă (opțional)</label>
+        <textarea class="form-control" id="returnNoteText" rows="3" maxlength="500" placeholder="Scrie o notă pentru această revenire..."></textarea>
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="returnNoteSkip">
+          <label class="form-check-label" for="returnNoteSkip">Nu doresc să adaug notă</label>
+        </div>
+        <div class="text-muted small mt-2">Nota introdusă va fi adăugată după nota automată.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+        <button type="button" class="btn btn-primary" id="returnNoteConfirm">Continuă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('returnNoteModal');
+    const modal = (modalEl && window.bootstrap && window.bootstrap.Modal)
+      ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
+      : null;
+    const noteEl = document.getElementById('returnNoteText');
+    const skipEl = document.getElementById('returnNoteSkip');
+    const confirmBtn = document.getElementById('returnNoteConfirm');
+    let activeForm = null;
+
+    function resetForm() {
+      if (noteEl) noteEl.value = '';
+      if (skipEl) skipEl.checked = false;
+      if (noteEl) noteEl.disabled = false;
+    }
+
+    function openModal(form) {
+      activeForm = form;
+      resetForm();
+      if (modal) {
+        modal.show();
+      } else {
+        const wantNote = window.confirm('Vrei să adaugi o notă pentru această revenire?');
+        if (!wantNote) {
+          applyAndSubmit('');
+          return;
+        }
+        const txt = window.prompt('Notă pentru revenire în stoc:') || '';
+        if (txt === '') return;
+        applyAndSubmit(txt);
+      }
+    }
+
+    function applyAndSubmit(txtOverride) {
+      if (!activeForm) return;
+      const input = activeForm.querySelector('input[name="note_user"]');
+      if (input) {
+        const noteText = typeof txtOverride === 'string' ? txtOverride : '';
+        const value = noteText !== ''
+          ? noteText.trim()
+          : (skipEl && skipEl.checked ? '' : (noteEl ? noteEl.value.trim() : ''));
+        input.value = value;
+      }
+      activeForm.dataset.returnNoteConfirmed = '1';
+      if (modal) modal.hide();
+      activeForm.submit();
+    }
+
+    if (skipEl && noteEl) {
+      skipEl.addEventListener('change', function () {
+        noteEl.disabled = skipEl.checked;
+        if (skipEl.checked) noteEl.value = '';
+      });
+    }
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () {
+        applyAndSubmit('');
+      });
+    }
+
+    window.appReturnNote = {
+      handleSubmit: function (form) {
+        if (!form) return true;
+        if (form.dataset.returnNoteConfirmed === '1') {
+          form.dataset.returnNoteConfirmed = '';
+          return true;
+        }
+        openModal(form);
+        return false;
+      }
+    };
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('avizNumberModal');
+    const modal = (modalEl && window.bootstrap && window.bootstrap.Modal)
+      ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
+      : null;
+    const input = document.getElementById('avizNumberInput');
+    const confirmBtn = document.getElementById('avizNumberConfirm');
+    let activeForm = null;
+
+    function resetInput() {
+      if (input) {
+        input.value = '';
+        input.classList.remove('is-invalid');
+      }
+    }
+
+    function applyAndSubmit(value) {
+      if (!activeForm) return;
+      const target = activeForm.querySelector('input[name="aviz_number"]');
+      if (target) target.value = value;
+      activeForm.dataset.avizConfirmed = '1';
+      if (modal) modal.hide();
+      activeForm.submit();
+    }
+
+    function openModal(form) {
+      activeForm = form;
+      resetInput();
+      if (modal) {
+        modal.show();
+      } else {
+        const txt = window.prompt('Număr de aviz:') || '';
+        const val = txt.trim();
+        if (val === '') return;
+        applyAndSubmit(val);
+      }
+    }
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () {
+        const val = input ? input.value.trim() : '';
+        if (val === '') {
+          if (input) {
+            input.classList.add('is-invalid');
+            input.focus();
+          }
+          return;
+        }
+        applyAndSubmit(val);
+      });
+    }
+
+    if (input) {
+      input.addEventListener('input', function () {
+        input.classList.remove('is-invalid');
+      });
+    }
+
+    document.querySelectorAll('form[data-aviz-required="1"]').forEach(function (form) {
+      form.addEventListener('submit', function (ev) {
+        if (form.dataset.avizConfirmed === '1') {
+          form.dataset.avizConfirmed = '';
+          return;
+        }
+        const current = form.querySelector('input[name="aviz_number"]');
+        if (current && current.value.trim() !== '') return;
+        ev.preventDefault();
+        openModal(form);
+      });
+    });
+  });
+</script>
 
 <?php
 $content = ob_get_clean();

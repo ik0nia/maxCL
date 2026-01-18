@@ -184,5 +184,52 @@ final class StockController
             Response::redirect('/magazie/stoc');
         }
     }
+
+    public static function deleteItem(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $id = (int)($params['id'] ?? 0);
+        if ($id <= 0) {
+            Session::flash('toast_error', 'Produs invalid.');
+            Response::redirect('/magazie/stoc');
+        }
+
+        $u = Auth::user();
+        $role = $u ? (string)($u['role'] ?? '') : '';
+        if ($role !== Auth::ROLE_ADMIN) {
+            Session::flash('toast_error', 'Nu ai drepturi.');
+            Response::redirect('/magazie/stoc');
+        }
+
+        $item = MagazieItem::find($id);
+        if (!$item) {
+            Session::flash('toast_error', 'Produs inexistent.');
+            Response::redirect('/magazie/stoc');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('DELETE FROM project_magazie_consumptions WHERE item_id = ?');
+            $st->execute([$id]);
+            $st2 = $pdo->prepare('DELETE FROM magazie_movements WHERE item_id = ?');
+            $st2->execute([$id]);
+            MagazieItem::delete($id);
+            $pdo->commit();
+
+            Audit::log('MAGAZIE_ITEM_DELETE', 'magazie_items', $id, $item, null, [
+                'item_id' => $id,
+                'winmentor_code' => (string)($item['winmentor_code'] ?? ''),
+                'name' => (string)($item['name'] ?? ''),
+            ]);
+            Session::flash('toast_success', 'Produs șters din Magazie.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot șterge produsul.');
+        }
+
+        Response::redirect('/magazie/stoc');
+    }
 }
 

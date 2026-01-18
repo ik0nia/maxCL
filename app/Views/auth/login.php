@@ -2,15 +2,20 @@
 use App\Core\Csrf;
 use App\Core\Session;
 use App\Core\Url;
+use App\Models\AppSetting;
 
 $toastError = Session::flash('toast_error');
+$brandSettings = AppSetting::getMany(['company_name', 'company_logo_thumb_url', 'company_logo_url']);
+$brandName = trim((string)($brandSettings['company_name'] ?? ''));
+if ($brandName === '') $brandName = 'HPL Manager';
+$brandLogo = (string)($brandSettings['company_logo_thumb_url'] ?? $brandSettings['company_logo_url'] ?? '');
 ?>
 <!doctype html>
 <html lang="ro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Autentificare · HPL Manager</title>
+  <title>Autentificare · <?= htmlspecialchars($brandName) ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
@@ -24,7 +29,13 @@ $toastError = Session::flash('toast_error');
       <div class="col-12 col-md-7 col-lg-5">
         <div class="card app-card p-4">
           <div class="d-flex align-items-center gap-2 mb-3">
-            <span class="app-dot"></span>
+            <?php if ($brandLogo !== ''): ?>
+              <img src="<?= htmlspecialchars($brandLogo) ?>" alt="<?= htmlspecialchars($brandName) ?>" style="height:34px;width:auto;display:block"
+                   onerror="this.style.display='none';const n=this.nextElementSibling;if(n){n.style.display='inline-block';}">
+              <span class="app-dot" style="display:none"></span>
+            <?php else: ?>
+              <span class="app-dot"></span>
+            <?php endif; ?>
             <div>
               <div class="h4 m-0" style="font-weight:700">Autentificare</div>
               <div class="text-muted">Gestiune stoc HPL · atelier producție</div>
@@ -42,9 +53,6 @@ $toastError = Session::flash('toast_error');
               <input type="password" name="password" class="form-control" placeholder="••••••••" required>
             </div>
             <button class="btn btn-primary btn-lg" type="submit">Intră în aplicație</button>
-            <div class="small text-muted">
-              Dacă este prima rulare, mergi la <a href="<?= htmlspecialchars(Url::to('/setup')) ?>">Setup</a> pentru instalare.
-            </div>
           </form>
         </div>
       </div>

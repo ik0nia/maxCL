@@ -86,6 +86,11 @@ h1,h2,h3,h4,h5{color:var(--app-headline); font-weight:700;}
   box-shadow:0 8px 24px rgba(17,17,17,.05);
 }
 
+/* Anchor offset for product cards (fixed header). */
+.app-card[id^="pp-"]{
+  scroll-margin-top:90px;
+}
+
 .app-brand{display:flex; align-items:center; gap:10px;}
 .app-dot{
   width:10px; height:10px; border-radius:999px;

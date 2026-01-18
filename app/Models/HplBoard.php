@@ -227,6 +227,14 @@ final class HplBoard
                 AND (is_accounting = 1 OR is_accounting IS NULL)
               GROUP BY board_id
             ) sfull ON sfull.board_id = b.id
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS offcut_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'OFFCUT'
+                AND status = 'AVAILABLE'
+                AND (is_accounting = 1 OR is_accounting IS NULL)
+              GROUP BY board_id
+            ) soff ON soff.board_id = b.id
         ";
         $stockJoinNoAcc = "
             LEFT JOIN (
@@ -236,6 +244,13 @@ final class HplBoard
                 AND status = 'AVAILABLE'
               GROUP BY board_id
             ) sfull ON sfull.board_id = b.id
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS offcut_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'OFFCUT'
+                AND status = 'AVAILABLE'
+              GROUP BY board_id
+            ) soff ON soff.board_id = b.id
         ";
 
         $sqlBase = "
@@ -246,7 +261,8 @@ final class HplBoard
               fc.thumb_path AS thumb,
               bc.thumb_path AS thumb_back,
               $selTextures,
-              COALESCE(sfull.full_available, 0) AS stock_qty_full_available
+              COALESCE(sfull.full_available, 0) AS stock_qty_full_available,
+              COALESCE(soff.offcut_available, 0) AS stock_qty_offcut_available
             FROM hpl_boards b
             JOIN finishes fc ON fc.id = b.face_color_id
             LEFT JOIN finishes bc ON bc.id = b.back_color_id
@@ -309,6 +325,7 @@ final class HplBoard
                 'std_width_mm' => $w,
                 'std_height_mm' => $h,
                 'stock_qty_full_available' => (int)($r['stock_qty_full_available'] ?? 0),
+                'stock_qty_offcut_available' => (int)($r['stock_qty_offcut_available'] ?? 0),
                 'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
                 'thumb_back' => (isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '') ? (string)$r['thumb_back'] : null,
                 'face_color_code' => $fc !== '' ? $fc : null,
@@ -378,6 +395,14 @@ final class HplBoard
                 AND (is_accounting = 1 OR is_accounting IS NULL)
               GROUP BY board_id
             ) sfull ON sfull.board_id = b.id
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS offcut_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'OFFCUT'
+                AND status = 'AVAILABLE'
+                AND (is_accounting = 1 OR is_accounting IS NULL)
+              GROUP BY board_id
+            ) soff ON soff.board_id = b.id
         ";
         $stockJoinNoAcc = "
             LEFT JOIN (
@@ -387,6 +412,13 @@ final class HplBoard
                 AND status = 'AVAILABLE'
               GROUP BY board_id
             ) sfull ON sfull.board_id = b.id
+            LEFT JOIN (
+              SELECT board_id, COALESCE(SUM(qty),0) AS offcut_available
+              FROM hpl_stock_pieces
+              WHERE piece_type = 'OFFCUT'
+                AND status = 'AVAILABLE'
+              GROUP BY board_id
+            ) soff ON soff.board_id = b.id
         ";
 
         $sqlBase = "
@@ -397,7 +429,8 @@ final class HplBoard
               fc.thumb_path AS thumb,
               bc.thumb_path AS thumb_back,
               $selTextures,
-              COALESCE(sfull.full_available, 0) AS stock_qty_full_available
+              COALESCE(sfull.full_available, 0) AS stock_qty_full_available,
+              COALESCE(soff.offcut_available, 0) AS stock_qty_offcut_available
             FROM project_hpl_consumptions c
             INNER JOIN hpl_boards b ON b.id = c.board_id
             JOIN finishes fc ON fc.id = b.face_color_id
@@ -455,6 +488,7 @@ final class HplBoard
                 'std_width_mm' => $w,
                 'std_height_mm' => $h,
                 'stock_qty_full_available' => (int)($r['stock_qty_full_available'] ?? 0),
+                'stock_qty_offcut_available' => (int)($r['stock_qty_offcut_available'] ?? 0),
                 'thumb' => (isset($r['thumb']) && $r['thumb'] !== null && $r['thumb'] !== '') ? (string)$r['thumb'] : null,
                 'thumb_back' => (isset($r['thumb_back']) && $r['thumb_back'] !== null && $r['thumb_back'] !== '') ? (string)$r['thumb_back'] : null,
                 'face_color_code' => $fc !== '' ? $fc : null,

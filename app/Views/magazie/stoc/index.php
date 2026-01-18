@@ -8,6 +8,7 @@ $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
 $canConsume = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $canSeePrices = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+$canDelete = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 
 $items = $items ?? [];
 $q = trim((string)($q ?? ''));
@@ -95,6 +96,15 @@ ob_start();
               </form>
             <?php else: ?>
               <span class="text-muted">—</span>
+            <?php endif; ?>
+            <?php if ($canDelete): ?>
+              <form method="post" action="<?= htmlspecialchars(Url::to('/magazie/stoc/' . $id . '/delete')) ?>" class="d-inline ms-2"
+                    onsubmit="return confirm('Ștergi definitiv produsul din Magazie? Vor fi șterse și mișcările/consumurile asociate.');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-outline-danger btn-sm" type="submit">
+                  <i class="bi bi-trash me-1"></i> Șterge
+                </button>
+              </form>
             <?php endif; ?>
           </td>
         </tr>

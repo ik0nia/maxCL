@@ -127,6 +127,23 @@ final class ProjectProduct
         ]);
     }
 
+    public static function updateBilling(int $id, ?int $invoiceClientId, ?int $deliveryAddressId): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('
+            UPDATE project_products
+            SET invoice_client_id = :inv,
+                delivery_address_id = :addr
+            WHERE id = :id
+        ');
+        $st->execute([
+            ':id' => $id,
+            ':inv' => ($invoiceClientId !== null && $invoiceClientId > 0) ? $invoiceClientId : null,
+            ':addr' => ($deliveryAddressId !== null && $deliveryAddressId > 0) ? $deliveryAddressId : null,
+        ]);
+    }
+
     public static function updateStatus(int $id, string $status): void
     {
         /** @var PDO $pdo */

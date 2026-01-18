@@ -76,14 +76,16 @@ ob_start();
 <?php if ($tab === 'hpl'): ?>
   <div class="card app-card p-3">
     <div class="h5 m-0">Consum HPL</div>
-    <div class="text-muted">Din `project_hpl_consumptions`</div>
+    <div class="text-muted">Din `project_hpl_consumptions` + `project_product_hpl_consumptions`</div>
     <div class="table-responsive mt-2">
       <table class="table table-hover align-middle mb-0" id="hplTable">
         <thead>
           <tr>
             <th style="width:170px">Data</th>
             <th style="width:110px">Mod</th>
+            <th>Sursă</th>
             <th>Proiect</th>
+            <th>Piesă</th>
             <th>Placă</th>
             <th class="text-end" style="width:110px">Buc</th>
             <th class="text-end" style="width:110px">mp</th>
@@ -97,6 +99,9 @@ ob_start();
               $pid = (int)($r['project_id'] ?? 0);
               $bid = (int)($r['board_id'] ?? 0);
               $pname = trim((string)($r['project_name'] ?? ''));
+              $src = (string)($r['source'] ?? 'PROIECT');
+              $ppId = (int)($r['project_product_id'] ?? 0);
+              $prodName = trim((string)($r['product_name'] ?? ''));
               $btxt = trim((string)($r['board_code'] ?? '') . ' · ' . (string)($r['board_name'] ?? ''));
               $user = trim((string)($r['user_name'] ?? '') . ' ' . (string)($r['user_email'] ?? ''));
               $modeTxt = (string)($r['mode'] ?? '');
@@ -118,11 +123,20 @@ ob_start();
             <tr>
               <td class="text-muted small"><?= htmlspecialchars((string)($r['created_at'] ?? '')) ?></td>
               <td class="fw-semibold"><?= htmlspecialchars($modeTxt) ?></td>
+              <td class="fw-semibold"><?= htmlspecialchars($src) ?></td>
               <td>
                 <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $pid . '?tab=consum')) ?>">
                   <?= htmlspecialchars($pname !== '' ? $pname : ('Proiect #' . $pid)) ?>
                 </a>
                 <div class="text-muted small"><?= htmlspecialchars((string)($r['project_code'] ?? '')) ?></div>
+              </td>
+              <td>
+                <?php if ($ppId > 0): ?>
+                  <div class="fw-semibold"><?= htmlspecialchars($prodName !== '' ? $prodName : ('#' . $ppId)) ?></div>
+                  <div class="text-muted small"><?= htmlspecialchars('Piesă #' . $ppId) ?></div>
+                <?php else: ?>
+                  <span class="text-muted">—</span>
+                <?php endif; ?>
               </td>
               <td>
                 <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/stock/boards/' . $bid)) ?>">

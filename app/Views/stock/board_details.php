@@ -420,8 +420,11 @@ ob_start();
               }
               $pStatus = (string)($p['status'] ?? '');
               $pLoc = (string)($p['location'] ?? '');
-              // Cerință: ascundem notița DOAR când piesa este în Depozit și Disponibilă.
-              $showNote = ($noteShort !== '') && !($pStatus === 'AVAILABLE' && $pLoc === 'Depozit');
+              // Cerință: ascundem notița DOAR când piesa este în Depozit și Disponibilă,
+              // cu excepția revenirilor în stoc (vrem să vedem mesajul de retur).
+              $noteLower = mb_strtolower($noteShort);
+              $isReturnNote = str_contains($noteLower, 'revenire în stoc') || str_contains($noteLower, 'revenire in stoc');
+              $showNote = ($noteShort !== '') && (!($pStatus === 'AVAILABLE' && $pLoc === 'Depozit') || $isReturnNote);
 
               $noteLink = null;
               if ($showNote && preg_match('/consum\s+HPL\s*#\s*(\d+)/i', $noteShort, $mm)) {

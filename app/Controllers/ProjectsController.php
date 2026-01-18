@@ -11,6 +11,7 @@ use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
 use App\Models\Client;
+use App\Models\ClientAddress;
 use App\Models\ClientGroup;
 use App\Models\HplBoard;
 use App\Models\HplStockPiece;
@@ -107,6 +108,37 @@ final class ProjectsController
         if ($dt === '') return null;
         $t = strtotime($dt);
         return $t !== false ? (int)$t : null;
+    }
+
+    private static function formatLabel(string $code, string $name, string $fallback): string
+    {
+        $code = trim($code);
+        $name = trim($name);
+        if ($code !== '' && $name !== '') return $code . ' · ' . $name;
+        if ($code !== '') return $code;
+        if ($name !== '') return $name;
+        return $fallback;
+    }
+
+    private static function projectLabel(?array $project): string
+    {
+        if (!$project) return 'Proiect';
+        return self::formatLabel((string)($project['code'] ?? ''), (string)($project['name'] ?? ''), 'Proiect');
+    }
+
+    private static function productLabelFromRow(?array $product): string
+    {
+        if (!$product) return 'Produs';
+        return self::formatLabel((string)($product['code'] ?? ''), (string)($product['name'] ?? ''), 'Produs');
+    }
+
+    private static function productLabelFromProjectProduct(?array $pp): string
+    {
+        if (!$pp) return 'Produs';
+        $productId = (int)($pp['product_id'] ?? 0);
+        if ($productId <= 0) return 'Produs';
+        $product = Product::find($productId);
+        return self::productLabelFromRow($product);
     }
 
     private static function isFinalProductStatus(string $st): bool
@@ -364,6 +396,608 @@ final class ProjectsController
             $res[$ppId] = array_values($rows);
         }
         return $res;
+    }
+
+    private static function fmtQty(float $qty, int $dec = 3): string
+    {
+        $txt = number_format($qty, $dec, '.', '');
+        $txt = rtrim(rtrim($txt, '0'), '.');
+        return $txt !== '' ? $txt : '0';
+    }
+
+    private static function fmtMoney(float $amount): string
+    {
+        return number_format($amount, 2, '.', '');
+    }
+
+    private static function nextDocNumber(string $key, int $startAt = 10000): int
+    {
+        $key = trim($key);
+        if ($key === '') {
+            throw new \RuntimeException('Cheie document invalidă.');
+        }
+        $startAt = max(1, (int)$startAt);
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('SELECT value FROM app_settings WHERE `key` = ? FOR UPDATE');
+            $st->execute([$key]);
+            $row = $st->fetch();
+            $last = ($row && isset($row['value']) && is_numeric($row['value'])) ? (int)$row['value'] : 0;
+            $next = $last >= $startAt ? ($last + 1) : $startAt;
+            if ($row) {
+                $st2 = $pdo->prepare('UPDATE app_settings SET value = ?, updated_by = ? WHERE `key` = ?');
+                $st2->execute([(string)$next, Auth::id(), $key]);
+            } else {
+                $st2 = $pdo->prepare('INSERT INTO app_settings (`key`, value, updated_by) VALUES (?,?,?)');
+                $st2->execute([$key, (string)$next, Auth::id()]);
+            }
+            $pdo->commit();
+            return $next;
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            throw $e;
+        }
+    }
+
+    /** @return array<string,string> */
+    private static function companySettingsForDocs(): array
+    {
+        $keys = [
+            'company_name',
+            'company_cui',
+            'company_reg',
+            'company_address',
+            'company_phone',
+            'company_email',
+            'company_contact_name',
+            'company_contact_phone',
+            'company_contact_email',
+            'company_contact_position',
+            'company_logo_url',
+            'company_logo_thumb_url',
+        ];
+        $vals = AppSetting::getMany($keys);
+        $name = trim((string)($vals['company_name'] ?? ''));
+        if ($name === '') $name = 'HPL Manager';
+        return [
+            'name' => $name,
+            'cui' => trim((string)($vals['company_cui'] ?? '')),
+            'reg' => trim((string)($vals['company_reg'] ?? '')),
+            'address' => trim((string)($vals['company_address'] ?? '')),
+            'phone' => trim((string)($vals['company_phone'] ?? '')),
+            'email' => trim((string)($vals['company_email'] ?? '')),
+            'contact_name' => trim((string)($vals['company_contact_name'] ?? '')),
+            'contact_phone' => trim((string)($vals['company_contact_phone'] ?? '')),
+            'contact_email' => trim((string)($vals['company_contact_email'] ?? '')),
+            'contact_position' => trim((string)($vals['company_contact_position'] ?? '')),
+            'logo_url' => trim((string)($vals['company_logo_url'] ?? '')),
+            'logo_thumb' => trim((string)($vals['company_logo_thumb_url'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<int, array{item_id:int,mode:string,src:string,code:string,name:string,unit:string,qty:float,unit_price:?float}> $rows
+     * @return array<int, array{item_id:int,code:string,name:string,unit:string,qty:float}>
+     */
+    private static function aggregateAccessories(array $rows, ?string $mode = null): array
+    {
+        $out = [];
+        $mode = $mode !== null ? strtoupper($mode) : null;
+        foreach ($rows as $r) {
+            $rowMode = strtoupper((string)($r['mode'] ?? ''));
+            if ($mode !== null && $rowMode !== $mode) continue;
+            $itemId = (int)($r['item_id'] ?? 0);
+            if ($itemId <= 0) continue;
+            $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+            if ($qty <= 0) continue;
+            $code = trim((string)($r['code'] ?? ''));
+            $name = trim((string)($r['name'] ?? ''));
+            $unit = trim((string)($r['unit'] ?? ''));
+            if (!isset($out[$itemId])) {
+                $out[$itemId] = [
+                    'item_id' => $itemId,
+                    'code' => $code,
+                    'name' => $name,
+                    'unit' => $unit,
+                    'qty' => 0.0,
+                ];
+            }
+            $out[$itemId]['qty'] += $qty;
+            if ($out[$itemId]['code'] === '' && $code !== '') $out[$itemId]['code'] = $code;
+            if ($out[$itemId]['name'] === '' && $name !== '') $out[$itemId]['name'] = $name;
+            if ($out[$itemId]['unit'] === '' && $unit !== '') $out[$itemId]['unit'] = $unit;
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $rows
+     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int}>
+     */
+    private static function aggregateConsumedHpl(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $r) {
+            if ((string)($r['status'] ?? '') !== 'CONSUMED') continue;
+            $pt = (string)($r['consumed_piece_type'] ?? '');
+            $pw = (int)($r['consumed_piece_width_mm'] ?? 0);
+            $ph = (int)($r['consumed_piece_height_mm'] ?? 0);
+            $qty = (int)($r['consumed_piece_qty'] ?? 0);
+            if ($pt === '' && $pw === 0 && $ph === 0) {
+                $pt = (string)($r['piece_type'] ?? '');
+                $pw = (int)($r['piece_width_mm'] ?? 0);
+                $ph = (int)($r['piece_height_mm'] ?? 0);
+                $qty = (int)($r['piece_qty'] ?? 0);
+            }
+            if ($qty <= 0) $qty = 1;
+            $bcode = trim((string)($r['board_code'] ?? ''));
+            $bname = trim((string)($r['board_name'] ?? ''));
+            $key = $bcode . '|' . $bname . '|' . $pt . '|' . $pw . '|' . $ph;
+            if (!isset($out[$key])) {
+                $out[$key] = [
+                    'board_code' => $bcode,
+                    'board_name' => $bname,
+                    'piece_type' => $pt,
+                    'width_mm' => $pw,
+                    'height_mm' => $ph,
+                    'qty' => 0,
+                ];
+            }
+            $out[$key]['qty'] += $qty;
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @return array{stored_name:string,size_bytes:int,mime:string}
+     */
+    private static function saveHtmlDocument(string $storedName, string $html): array
+    {
+        $safe = preg_replace('/[^a-zA-Z0-9_\-\.]+/', '_', $storedName) ?? 'document.html';
+        if (!str_ends_with(strtolower($safe), '.html')) {
+            $safe .= '.html';
+        }
+        $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException('Nu pot crea directorul de documente.');
+        }
+        $path = $dir . '/' . $safe;
+        $suffix = 0;
+        while (is_file($path)) {
+            $suffix++;
+            $path = $dir . '/' . preg_replace('/\.html$/', '', $safe) . '-' . $suffix . '.html';
+        }
+        if (file_put_contents($path, $html) === false) {
+            throw new \RuntimeException('Nu pot salva documentul pe server.');
+        }
+        $size = filesize($path);
+        return [
+            'stored_name' => basename($path),
+            'size_bytes' => $size !== false ? (int)$size : 0,
+            'mime' => 'text/html',
+        ];
+    }
+
+    /** @param array<string,mixed> $ctx */
+    private static function renderDevizHtml(array $ctx): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $company = $ctx['company'] ?? [];
+        $client = $ctx['client'] ?? [];
+        $delivery = $ctx['delivery'] ?? [];
+        $product = $ctx['product'] ?? [];
+        $accessories = is_array($ctx['accessories'] ?? null) ? $ctx['accessories'] : [];
+        $docNumber = (string)($ctx['doc_number'] ?? '');
+        $docDate = (string)($ctx['doc_date'] ?? '');
+        $projectLabel = (string)($ctx['project_label'] ?? '');
+        $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
+        $qty = (float)($product['qty'] ?? 0.0);
+        $unit = (string)($product['unit'] ?? '');
+        $unitPrice = (float)($product['unit_price'] ?? 0.0);
+        $lineTotal = $qty * $unitPrice;
+        $accLines = [];
+        foreach ($accessories as $a) {
+            $name = trim((string)($a['name'] ?? ''));
+            $code = trim((string)($a['code'] ?? ''));
+            $qtyA = isset($a['qty']) ? (float)($a['qty'] ?? 0) : 0.0;
+            if ($qtyA <= 0) continue;
+            $unitA = trim((string)($a['unit'] ?? ''));
+            $label = $code !== '' ? ($code . ' · ' . ($name !== '' ? $name : 'Accesoriu')) : ($name !== '' ? $name : 'Accesoriu');
+            $accLines[] = $label . ' — ' . self::fmtQty($qtyA) . ($unitA !== '' ? (' ' . $unitA) : '');
+        }
+        $logo = (string)($company['logo_url'] ?? '');
+        if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
+
+        ob_start();
+        ?>
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Deviz <?= $esc($docNumber) ?></title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#111; font-size:13px; margin:24px; }
+    h1 { font-size:20px; margin:0 0 6px; }
+    .muted { color:#666; }
+    .header { display:flex; justify-content:space-between; gap:24px; }
+    .company-name { font-weight:700; font-size:16px; }
+    .doc-title { font-size:18px; font-weight:700; }
+    .box { border:1px solid #ddd; padding:10px 12px; border-radius:6px; }
+    .grid { display:flex; gap:16px; margin-top:14px; }
+    .grid > div { flex:1; }
+    table { width:100%; border-collapse:collapse; margin-top:16px; }
+    th, td { border:1px solid #ddd; padding:8px; vertical-align:top; }
+    th { background:#f6f7f8; text-align:left; font-size:12px; }
+    .small { font-size:12px; }
+    .title { font-weight:700; }
+    .total { margin-top:12px; text-align:right; font-weight:700; font-size:14px; }
+    .logo { max-height:50px; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <?php if ($logo !== ''): ?>
+        <img src="<?= $esc($logo) ?>" class="logo" alt="Logo">
+      <?php endif; ?>
+      <div class="company-name"><?= $esc($company['name'] ?? '') ?></div>
+      <div class="muted small">
+        <?php if (!empty($company['cui'])): ?>CUI: <?= $esc($company['cui']) ?><?php endif; ?>
+        <?php if (!empty($company['reg'])): ?> · Reg. Com.: <?= $esc($company['reg']) ?><?php endif; ?>
+      </div>
+      <?php if (!empty($company['address'])): ?>
+        <div class="small"><?= $esc($company['address']) ?></div>
+      <?php endif; ?>
+      <div class="small">
+        <?php if (!empty($company['phone'])): ?>Tel: <?= $esc($company['phone']) ?><?php endif; ?>
+        <?php if (!empty($company['email'])): ?> · Email: <?= $esc($company['email']) ?><?php endif; ?>
+      </div>
+      <?php if (!empty($company['contact_name']) || !empty($company['contact_phone']) || !empty($company['contact_email'])): ?>
+        <div class="small muted">
+          Contact: <?= $esc(trim((string)($company['contact_name'] ?? '') . (isset($company['contact_position']) && $company['contact_position'] !== '' ? (' · ' . $company['contact_position']) : ''))) ?>
+          <?php if (!empty($company['contact_phone'])): ?> · <?= $esc($company['contact_phone']) ?><?php endif; ?>
+          <?php if (!empty($company['contact_email'])): ?> · <?= $esc($company['contact_email']) ?><?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+    <div class="box">
+      <div class="doc-title">Deviz nr. <?= $esc($docNumber) ?></div>
+      <div class="small">Data: <?= $esc($docDate) ?></div>
+      <?php if ($projectLabel !== ''): ?>
+        <div class="small">Proiect: <?= $esc($projectLabel) ?></div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="box">
+      <div class="title">Facturare</div>
+      <div><?= $esc($client['name'] ?? '') ?></div>
+      <?php if (!empty($client['cui'])): ?><div class="small">CUI: <?= $esc($client['cui']) ?></div><?php endif; ?>
+      <?php if (!empty($client['address'])): ?><div class="small"><?= $esc($client['address']) ?></div><?php endif; ?>
+      <?php if (!empty($client['contact_person'])): ?><div class="small">Contact: <?= $esc($client['contact_person']) ?></div><?php endif; ?>
+      <div class="small">
+        <?php if (!empty($client['phone'])): ?>Tel: <?= $esc($client['phone']) ?><?php endif; ?>
+        <?php if (!empty($client['email'])): ?> · Email: <?= $esc($client['email']) ?><?php endif; ?>
+      </div>
+    </div>
+    <div class="box">
+      <div class="title">Livrare</div>
+      <div><?= $esc($delivery['label'] ?? '') ?></div>
+      <?php if (!empty($delivery['address'])): ?><div class="small"><?= $esc($delivery['address']) ?></div><?php endif; ?>
+      <?php if (!empty($delivery['notes'])): ?><div class="small muted"><?= $esc($delivery['notes']) ?></div><?php endif; ?>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Produs / descriere</th>
+        <th style="width:110px">Cantitate</th>
+        <th style="width:120px">Preț/buc</th>
+        <th style="width:120px">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="title"><?= $esc($product['name'] ?? '') ?></div>
+          <?php if (!empty($product['description'])): ?>
+            <div class="small"><?= $esc($product['description']) ?></div>
+          <?php endif; ?>
+          <?php if ($accLines): ?>
+            <div class="small muted" style="margin-top:6px;">Accesorii incluse:</div>
+            <div class="small">
+              <?php foreach ($accLines as $line): ?>
+                <div><?= $esc($line) ?></div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </td>
+        <td><?= $esc(self::fmtQty($qty)) ?><?= $unit !== '' ? (' ' . $esc($unit)) : '' ?></td>
+        <td><?= $esc(self::fmtMoney($unitPrice)) ?></td>
+        <td><?= $esc(self::fmtMoney($lineTotal)) ?></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="total">Total: <?= $esc(self::fmtMoney($lineTotal)) ?></div>
+  <?php if ($avizNumber !== ''): ?>
+    <div class="small muted" style="margin-top:6px;">Număr aviz: <?= $esc($avizNumber) ?></div>
+  <?php endif; ?>
+</body>
+</html>
+        <?php
+        return (string)ob_get_clean();
+    }
+
+    /** @param array<string,mixed> $ctx */
+    private static function renderBonConsumHtml(array $ctx): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $company = $ctx['company'] ?? [];
+        $product = $ctx['product'] ?? [];
+        $docNumber = (string)($ctx['doc_number'] ?? '');
+        $docDate = (string)($ctx['doc_date'] ?? '');
+        $projectLabel = (string)($ctx['project_label'] ?? '');
+        $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
+        $hplRows = is_array($ctx['hpl_rows'] ?? null) ? $ctx['hpl_rows'] : [];
+        $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
+        $logo = (string)($company['logo_url'] ?? '');
+        if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
+
+        ob_start();
+        ?>
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Bon de consum <?= $esc($docNumber) ?></title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#111; font-size:13px; margin:24px; }
+    .header { display:flex; justify-content:space-between; gap:24px; }
+    .company-name { font-weight:700; font-size:16px; }
+    .doc-title { font-size:18px; font-weight:700; }
+    .box { border:1px solid #ddd; padding:10px 12px; border-radius:6px; }
+    .section { margin-top:16px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { border:1px solid #ddd; padding:7px; vertical-align:top; }
+    th { background:#f6f7f8; text-align:left; font-size:12px; }
+    .muted { color:#666; }
+    .logo { max-height:50px; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <?php if ($logo !== ''): ?>
+        <img src="<?= $esc($logo) ?>" class="logo" alt="Logo">
+      <?php endif; ?>
+      <div class="company-name"><?= $esc($company['name'] ?? '') ?></div>
+      <?php if (!empty($company['address'])): ?>
+        <div class="muted"><?= $esc($company['address']) ?></div>
+      <?php endif; ?>
+      <div class="muted">
+        <?php if (!empty($company['phone'])): ?>Tel: <?= $esc($company['phone']) ?><?php endif; ?>
+        <?php if (!empty($company['email'])): ?> · Email: <?= $esc($company['email']) ?><?php endif; ?>
+      </div>
+    </div>
+    <div class="box">
+      <div class="doc-title">Bon de consum nr. <?= $esc($docNumber) ?></div>
+      <div>Data: <?= $esc($docDate) ?></div>
+      <?php if ($projectLabel !== ''): ?>
+        <div>Proiect: <?= $esc($projectLabel) ?></div>
+      <?php endif; ?>
+      <div>Produs: <?= $esc($product['code'] ?? '') ?><?= (!empty($product['code']) && !empty($product['name'])) ? ' · ' : '' ?><?= $esc($product['name'] ?? '') ?></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="title">Consum HPL</div>
+    <?php if (!$hplRows): ?>
+      <div class="muted">Nu există consum HPL.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Cod placă</th>
+            <th>Denumire</th>
+            <th style="width:110px">Tip</th>
+            <th style="width:160px">Dimensiuni</th>
+            <th style="width:80px">Buc</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($hplRows as $r): ?>
+            <?php
+              $dim = ($r['width_mm'] ?? 0) > 0 && ($r['height_mm'] ?? 0) > 0
+                ? ((int)$r['height_mm'] . ' × ' . (int)$r['width_mm'] . ' mm')
+                : '—';
+            ?>
+            <tr>
+              <td><?= $esc($r['board_code'] ?? '') ?></td>
+              <td><?= $esc($r['board_name'] ?? '') ?></td>
+              <td><?= $esc($r['piece_type'] ?? '') ?></td>
+              <td><?= $esc($dim) ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <div class="title">Consum accesorii</div>
+    <?php if (!$accRows): ?>
+      <div class="muted">Nu există consum accesorii.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Cod</th>
+            <th>Denumire</th>
+            <th style="width:90px">Cantitate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($accRows as $r): ?>
+            <tr>
+              <td><?= $esc($r['code'] ?? '') ?></td>
+              <td><?= $esc($r['name'] ?? '') ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+  <?php if ($avizNumber !== ''): ?>
+    <div class="muted" style="margin-top:12px;">Număr aviz: <?= $esc($avizNumber) ?></div>
+  <?php endif; ?>
+</body>
+</html>
+        <?php
+        return (string)ob_get_clean();
+    }
+
+    /**
+     * @return array{deviz_number:int,bon_number:int}
+     */
+    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before, string $avizNumber): array
+    {
+        $project = Project::find($projectId);
+        if (!$project) {
+            throw new \RuntimeException('Proiect invalid pentru deviz.');
+        }
+
+        $projectProducts = ProjectProduct::forProject($projectId);
+        $ppRow = null;
+        foreach ($projectProducts as $pp) {
+            if ((int)($pp['id'] ?? 0) === $ppId) {
+                $ppRow = $pp;
+                break;
+            }
+        }
+        if (!$ppRow) {
+            throw new \RuntimeException('Produs proiect invalid pentru deviz.');
+        }
+
+        $invoiceClientId = isset($before['invoice_client_id']) ? (int)$before['invoice_client_id'] : 0;
+        $deliveryAddressId = isset($before['delivery_address_id']) ? (int)$before['delivery_address_id'] : 0;
+        $client = $invoiceClientId > 0 ? Client::find($invoiceClientId) : null;
+        $delivery = $deliveryAddressId > 0 ? ClientAddress::find($deliveryAddressId) : null;
+        if (!$client || !$delivery) {
+            throw new \RuntimeException('Date de facturare/livrare invalide pentru deviz.');
+        }
+
+        $magConsum = ProjectMagazieConsumption::forProject($projectId);
+        $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+        $accRows = $accBy[$ppId] ?? [];
+
+        $company = self::companySettingsForDocs();
+        $projectLabel = self::projectLabel($project);
+        $productName = trim((string)($ppRow['product_name'] ?? ''));
+        $productCode = trim((string)($ppRow['product_code'] ?? ''));
+        $productNotes = trim((string)($ppRow['product_notes'] ?? ''));
+        $ppNotes = trim((string)($ppRow['notes'] ?? ''));
+        $description = $productNotes !== '' ? $productNotes : $ppNotes;
+        $qty = (float)($ppRow['qty'] ?? 0);
+        $unit = (string)($ppRow['unit'] ?? '');
+        $unitPrice = isset($ppRow['product_sale_price']) && $ppRow['product_sale_price'] !== null && $ppRow['product_sale_price'] !== '' && is_numeric($ppRow['product_sale_price'])
+            ? (float)$ppRow['product_sale_price']
+            : 0.0;
+
+        try {
+            $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+        }
+        try {
+            $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+        }
+
+        $docDate = date('Y-m-d');
+
+        $devizHtml = self::renderDevizHtml([
+            'company' => $company,
+            'client' => $client,
+            'delivery' => $delivery,
+            'product' => [
+                'name' => $productName !== '' ? $productName : 'Produs',
+                'description' => $description,
+                'qty' => $qty,
+                'unit' => $unit,
+                'unit_price' => $unitPrice,
+            ],
+            'accessories' => self::aggregateAccessories($accRows),
+            'doc_number' => $devizNumber,
+            'doc_date' => $docDate,
+            'project_label' => $projectLabel,
+            'aviz_number' => $avizNumber,
+        ]);
+        $devizFile = self::saveHtmlDocument('deviz-' . $devizNumber . '-pp' . $ppId . '.html', $devizHtml);
+        $devizId = EntityFile::create([
+            'entity_type' => 'projects',
+            'entity_id' => $projectId,
+            'category' => 'Deviz nr. ' . $devizNumber . ' · ' . ($productName !== '' ? $productName : ('Produs #' . $ppId)),
+            'original_name' => 'Deviz ' . $devizNumber . ' - ' . ($productName !== '' ? $productName : ('Produs ' . $ppId)) . '.html',
+            'stored_name' => $devizFile['stored_name'],
+            'mime' => $devizFile['mime'],
+            'size_bytes' => $devizFile['size_bytes'],
+            'uploaded_by' => Auth::id(),
+        ]);
+        Audit::log('DEVIZ_GENERATED', 'entity_files', $devizId, null, null, [
+            'project_id' => $projectId,
+            'project_product_id' => $ppId,
+            'number' => $devizNumber,
+        ]);
+
+        $hplRows = [];
+        try {
+            $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
+        }
+        $bonAccRows = self::aggregateAccessories($accRows, 'CONSUMED');
+        $bonHtml = self::renderBonConsumHtml([
+            'company' => $company,
+            'product' => [
+                'name' => $productName !== '' ? $productName : 'Produs',
+                'code' => $productCode,
+            ],
+            'hpl_rows' => self::aggregateConsumedHpl($hplRows),
+            'acc_rows' => $bonAccRows,
+            'doc_number' => $bonNumber,
+            'doc_date' => $docDate,
+            'project_label' => $projectLabel,
+            'aviz_number' => $avizNumber,
+        ]);
+        $bonFile = self::saveHtmlDocument('bon-consum-' . $bonNumber . '-pp' . $ppId . '.html', $bonHtml);
+        $bonId = EntityFile::create([
+            'entity_type' => 'projects',
+            'entity_id' => $projectId,
+            'category' => 'Bon consum nr. ' . $bonNumber . ' · ' . ($productName !== '' ? $productName : ('Produs #' . $ppId)),
+            'original_name' => 'Bon consum ' . $bonNumber . ' - ' . ($productName !== '' ? $productName : ('Produs ' . $ppId)) . '.html',
+            'stored_name' => $bonFile['stored_name'],
+            'mime' => $bonFile['mime'],
+            'size_bytes' => $bonFile['size_bytes'],
+            'uploaded_by' => Auth::id(),
+        ]);
+        Audit::log('BON_CONSUM_GENERATED', 'entity_files', $bonId, null, null, [
+            'project_id' => $projectId,
+            'project_product_id' => $ppId,
+            'number' => $bonNumber,
+        ]);
+
+        return ['deviz_number' => $devizNumber, 'bon_number' => $bonNumber];
     }
 
     /**
@@ -704,9 +1338,9 @@ final class ProjectsController
         $reservedRemainingM2 = max(0.0, $hplResM2 - $needM2);
         $reservedRemainingCost = ($hplAvgPpm > 0) ? ($reservedRemainingM2 * $hplAvgPpm) : 0.0;
 
-        $hplCostFromConsum = $hplResCost + $hplConCost;
-        if ($hplCostFromConsum > 0) {
-            $hplCost = $hplCostFromConsum;
+        // Cerință: în sumarul de cost folosim doar HPL efectiv consumat.
+        if ($hplConCost > 0) {
+            $hplCost = $hplConCost;
         }
         $totalCost = $laborCost + $magCost + $hplCost;
 
@@ -935,6 +1569,7 @@ final class ProjectsController
             $destLocation = ($toLocation !== null && $toLocation !== '') ? $toLocation : $location;
             $isAcc = (int)($r['is_accounting'] ?? 1);
             $notes = (string)($r['notes'] ?? '');
+            $carryNotes = !($fromStatus === 'AVAILABLE' || $toStatus === 'AVAILABLE');
 
             if ($take === $rowQty) {
                 // Mută întreg rândul: încercăm să cumulăm într-un rând identic în destinație,
@@ -946,11 +1581,24 @@ final class ProjectsController
                     $ident = null;
                 }
                 if ($ident) {
+                    if ($toStatus === 'AVAILABLE') {
+                        $destNote = trim((string)($ident['notes'] ?? ''));
+                        $noteForMatch = trim((string)($noteAppend ?? ''));
+                        if ($noteForMatch === '') {
+                            if ($destNote !== '') $ident = null;
+                        } elseif ($destNote !== $noteForMatch) {
+                            $ident = null;
+                        }
+                    }
                     $destId = (int)($ident['id'] ?? 0);
                     if ($destId > 0) {
                         HplStockPiece::incrementQty($destId, $take);
                         if ($noteAppend) {
-                            HplStockPiece::appendNote($destId, $noteAppend);
+                            if ($carryNotes) {
+                                HplStockPiece::appendNote($destId, $noteAppend);
+                            } else {
+                                try { HplStockPiece::updateFields($destId, ['notes' => $noteAppend]); } catch (\Throwable $e) {}
+                            }
                         }
                         // sincronizare project_id pe destinație
                         try {
@@ -964,12 +1612,16 @@ final class ProjectsController
                         HplStockPiece::delete($id);
                     } else {
                         // fallback: dacă nu avem id valid, mutăm în loc
-                        HplStockPiece::updateFields($id, ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation]);
-                        if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                        $data = ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation];
+                        if ($noteAppend && !$carryNotes) $data['notes'] = $noteAppend;
+                        HplStockPiece::updateFields($id, $data);
+                        if ($noteAppend && $carryNotes) HplStockPiece::appendNote($id, $noteAppend);
                     }
                 } else {
-                    HplStockPiece::updateFields($id, ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation]);
-                    if ($noteAppend) HplStockPiece::appendNote($id, $noteAppend);
+                    $data = ['status' => $toStatus, 'project_id' => ($toStatus === 'AVAILABLE' ? null : $projectId), 'location' => $destLocation];
+                    if ($noteAppend && !$carryNotes) $data['notes'] = $noteAppend;
+                    HplStockPiece::updateFields($id, $data);
+                    if ($noteAppend && $carryNotes) HplStockPiece::appendNote($id, $noteAppend);
                 }
             } else {
                 // scade din rândul sursă
@@ -983,10 +1635,25 @@ final class ProjectsController
                     $ident = null;
                 }
                 if ($ident) {
+                    if ($toStatus === 'AVAILABLE') {
+                        $destNote = trim((string)($ident['notes'] ?? ''));
+                        $noteForMatch = trim((string)($noteAppend ?? ''));
+                        if ($noteForMatch === '') {
+                            if ($destNote !== '') $ident = null;
+                        } elseif ($destNote !== $noteForMatch) {
+                            $ident = null;
+                        }
+                    }
                     HplStockPiece::incrementQty((int)$ident['id'], $take);
-                    if ($noteAppend) HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
+                    if ($noteAppend) {
+                        if ($carryNotes) {
+                            HplStockPiece::appendNote((int)$ident['id'], $noteAppend);
+                        } else {
+                            try { HplStockPiece::updateFields((int)$ident['id'], ['notes' => $noteAppend]); } catch (\Throwable $e) {}
+                        }
+                    }
                 } else {
-                    $newNotes = trim($notes);
+                    $newNotes = $carryNotes ? trim($notes) : '';
                     if ($noteAppend) $newNotes = trim($newNotes . ($newNotes !== '' ? "\n" : '') . $noteAppend);
                     HplStockPiece::create([
                         'board_id' => $boardId,
@@ -1360,12 +2027,124 @@ final class ProjectsController
 
         try {
             $rows = Project::all($q !== '' ? $q : null, $status !== '' ? $status : null, 800);
+            $projectMeta = [];
+            $projectIds = [];
+            foreach ($rows as $r) {
+                $pid = (int)($r['id'] ?? 0);
+                if ($pid <= 0) continue;
+                $projectIds[] = $pid;
+                $projectMeta[$pid] = [
+                    'products_count' => 0,
+                    'all_delivered' => false,
+                    'reserved_any' => false,
+                ];
+            }
+            $projectIds = array_values(array_unique($projectIds));
+            if ($projectIds) {
+                $pdo = \App\Core\DB::pdo();
+                $in = implode(',', array_fill(0, count($projectIds), '?'));
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id,
+                               COUNT(*) AS cnt,
+                               SUM(CASE
+                                     WHEN production_status = "LIVRAT"
+                                       OR qty <= delivered_qty + 1e-9
+                                     THEN 1 ELSE 0 END) AS delivered_cnt
+                        FROM project_products
+                        WHERE project_id IN (' . $in . ')
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (!isset($projectMeta[$pid])) continue;
+                        $cnt = (int)($row['cnt'] ?? 0);
+                        $delCnt = (int)($row['delivered_cnt'] ?? 0);
+                        $projectMeta[$pid]['products_count'] = $cnt;
+                        $projectMeta[$pid]['all_delivered'] = ($cnt > 0 && $delCnt >= $cnt);
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM project_magazie_consumptions
+                        WHERE project_id IN (' . $in . ')
+                          AND mode = "RESERVED"
+                          AND qty > 0
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM project_product_hpl_consumptions
+                        WHERE project_id IN (' . $in . ')
+                          AND status = "RESERVED"
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM hpl_stock_pieces
+                        WHERE project_id IN (' . $in . ')
+                          AND status = "RESERVED"
+                          AND qty > 0
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM project_hpl_consumptions
+                        WHERE project_id IN (' . $in . ')
+                          AND mode = "RESERVED"
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
             echo View::render('projects/index', [
                 'title' => 'Proiecte',
                 'rows' => $rows,
                 'q' => $q,
                 'status' => $status,
                 'statuses' => self::statuses(),
+                'projectMeta' => $projectMeta,
             ]);
         } catch (\Throwable $e) {
             echo View::render('system/placeholder', [
@@ -1534,6 +2313,48 @@ final class ProjectsController
                     try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
                     $projectHplPieces = [];
                     try { $projectHplPieces = HplStockPiece::forProject($id); } catch (\Throwable $e) { $projectHplPieces = []; }
+                    $billingClients = [];
+                    $billingAddresses = [];
+                    $billingClientIds = [];
+                    $projectClientId = (int)($project['client_id'] ?? 0);
+                    $projectGroupId = (int)($project['client_group_id'] ?? 0);
+                    $addBillingClient = function (?array $c) use (&$billingClients, &$billingClientIds): void {
+                        $cid = $c ? (int)($c['id'] ?? 0) : 0;
+                        if ($cid <= 0 || isset($billingClientIds[$cid])) return;
+                        $billingClientIds[$cid] = true;
+                        $billingClients[] = [
+                            'id' => $cid,
+                            'name' => (string)($c['name'] ?? ''),
+                            'type' => (string)($c['type'] ?? ''),
+                        ];
+                    };
+                    if ($projectClientId > 0) {
+                        try { $addBillingClient(Client::find($projectClientId)); } catch (\Throwable $e) {}
+                    }
+                    if ($projectGroupId > 0) {
+                        try {
+                            $others = Client::othersInGroup($projectClientId, $projectGroupId);
+                            foreach ($others as $oc) $addBillingClient($oc);
+                        } catch (\Throwable $e) {}
+                    }
+                    foreach ($projectProducts as $ppRow) {
+                        $cid = (int)($ppRow['invoice_client_id'] ?? 0);
+                        if ($cid <= 0) continue;
+                        try { $addBillingClient(Client::find($cid)); } catch (\Throwable $e) {}
+                    }
+                    if (!$billingClients) {
+                        try {
+                            $all = Client::allWithProjects();
+                            foreach ($all as $c) $addBillingClient($c);
+                        } catch (\Throwable $e) {}
+                    }
+                    foreach (array_keys($billingClientIds) as $cid) {
+                        try {
+                            $billingAddresses[$cid] = ClientAddress::forClient($cid);
+                        } catch (\Throwable $e) {
+                            $billingAddresses[$cid] = [];
+                        }
+                    }
                     $ppHplByProduct = [];
                     foreach ($projectProducts as $ppRow) {
                         $ppId = (int)($ppRow['id'] ?? 0);
@@ -1559,7 +2380,7 @@ final class ProjectsController
                             'hpl_rows' => $ppHplByProduct[$ppId] ?? [],
                         ];
                     }
-            $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum, $projectHplPieces);
+                    $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum, $projectHplPieces);
                 } elseif ($tab === 'consum') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
@@ -1607,8 +2428,22 @@ final class ProjectsController
                 }
 
                 $history = [];
+                $projectProductLabels = [];
                 if ($tab === 'history') {
                     try { $history = AuditLog::forProject($id, 300); } catch (\Throwable $e) { $history = []; }
+                    try {
+                        $ppRows = ProjectProduct::forProject($id);
+                        foreach ($ppRows as $pp) {
+                            $ppId = (int)($pp['id'] ?? 0);
+                            if ($ppId <= 0) continue;
+                            $name = trim((string)($pp['product_name'] ?? ''));
+                            $code = trim((string)($pp['product_code'] ?? ''));
+                            $label = $code !== '' ? ($code . ' · ' . $name) : ($name !== '' ? $name : ('#' . $ppId));
+                            $projectProductLabels[$ppId] = $label;
+                        }
+                    } catch (\Throwable $e) {
+                        $projectProductLabels = [];
+                    }
                 }
 
                 echo View::render('projects/show', [
@@ -1629,12 +2464,15 @@ final class ProjectsController
                     'laborByProduct' => $laborByProduct,
                     'materialsByProduct' => $materialsByProduct,
                     'projectCostSummary' => $projectCostSummary,
+                    'billingClients' => $billingClients ?? [],
+                    'billingAddresses' => $billingAddresses ?? [],
                     'discussions' => $discussions,
                     'costSettings' => [
                         'labor' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
                         'cnc' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
                     ],
                     'history' => $history,
+                    'projectProductLabels' => $projectProductLabels,
                     'projectLabels' => $projectLabels,
                     'cncFiles' => $cncFiles,
                     'statuses' => self::statuses(),
@@ -1880,7 +2718,7 @@ final class ProjectsController
             ['value' => 'CNC', 'label' => 'CNC'],
             ['value' => 'MONTAJ', 'label' => 'Montaj'],
             ['value' => 'GATA_DE_LIVRARE', 'label' => 'Gata de livrare'],
-            ['value' => 'AVIZAT', 'label' => 'Avizat'],
+            ['value' => 'AVIZAT', 'label' => 'Avizare'],
             ['value' => 'LIVRAT', 'label' => 'Livrat'],
         ];
     }
@@ -1903,6 +2741,8 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $projLabel = self::projectLabel($project);
+        $projLabel = self::projectLabel($project);
 
         $productId = Validator::int(trim((string)($_POST['product_id'] ?? '')), 1);
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
@@ -2195,7 +3035,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -2290,6 +3130,71 @@ final class ProjectsController
         Response::redirect('/projects/' . $projectId . '?tab=products');
     }
 
+    public static function updateProjectProductBilling(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+
+        $before = ProjectProduct::find($ppId);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        // Cerință: după Gata de livrare, OPERATOR nu mai poate edita nimic.
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($before['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        $invRaw = trim((string)($_POST['invoice_client_id'] ?? ''));
+        $addrRaw = trim((string)($_POST['delivery_address_id'] ?? ''));
+        $invoiceClientId = $invRaw !== '' ? (Validator::int($invRaw, 1) ?? null) : null;
+        $deliveryAddressId = $addrRaw !== '' ? (Validator::int($addrRaw, 1) ?? null) : null;
+
+        $errors = [];
+        if ($invoiceClientId !== null) {
+            $client = null;
+            try { $client = Client::find($invoiceClientId); } catch (\Throwable $e) {}
+            if (!$client) $errors['invoice_client_id'] = 'Firmă invalidă.';
+        }
+        if ($deliveryAddressId !== null) {
+            if ($invoiceClientId === null) {
+                $errors['delivery_address_id'] = 'Alege firma înainte de adresă.';
+            } else {
+                $addr = null;
+                try { $addr = ClientAddress::find($deliveryAddressId); } catch (\Throwable $e) {}
+                if (!$addr || (int)($addr['client_id'] ?? 0) !== (int)$invoiceClientId) {
+                    $errors['delivery_address_id'] = 'Adresă invalidă pentru firma selectată.';
+                }
+            }
+        }
+        if ($errors) {
+            Session::flash('toast_error', implode(' ', array_values($errors)));
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+
+        try {
+            ProjectProduct::updateBilling($ppId, $invoiceClientId, $deliveryAddressId);
+            Audit::log('PROJECT_PRODUCT_BILLING_UPDATE', 'project_products', $ppId, $before, null, [
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'invoice_client_id' => $invoiceClientId,
+                'delivery_address_id' => $deliveryAddressId,
+            ]);
+            Session::flash('toast_success', 'Datele de facturare/livrare au fost salvate.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot salva datele. Rulează Update DB dacă lipsesc coloanele.');
+        }
+
+        Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+    }
+
     public static function updateProjectProductStatus(array $params): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);
@@ -2315,16 +3220,17 @@ final class ProjectsController
         if ($idx === false) $idx = 0;
         $next = $flow[$idx + 1] ?? null;
         if ($next === null) {
-            Session::flash('toast_success', 'Piesa este deja la ultimul status.');
+            Session::flash('toast_success', 'Produsul este deja la ultimul status.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
         $allowed = self::allowedProjectProductStatusesForCurrentUser();
         if (!in_array($next, $allowed, true)) {
-            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Avizat/Livrat sunt doar pentru Admin/Gestionar).');
+            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Avizare/Livrat sunt doar pentru Admin/Gestionar).');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
+        $avizNumber = '';
         try {
             // Statusurile piesei nu mai modifică automat locația/statusul HPL-ului.
             // CNC -> Montaj: blocăm până când toate plăcile/piesele HPL alocate pe piesă sunt "Debitat" (consumate manual).
@@ -2362,34 +3268,128 @@ final class ProjectsController
                     $items = array_values(array_unique($items));
                     $more = count($items) > 4;
                     $items = array_slice($items, 0, 4);
-                    $msg = 'Nu poți trece la Montaj: mai ai ' . count($reserved) . ' alocări HPL ne-debitate pe această piesă. '
+                    $msg = 'Nu poți trece la Montaj: mai ai ' . count($reserved) . ' alocări HPL ne-debitate pe acest produs. '
                          . 'Debitează (sau Renunță) din tabelul HPL.'
                          . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
                     Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products');
                 }
             }
 
-            // Montaj -> Gata de livrare: consumăm automat accesoriile rezervate pe piesă (Magazie)
+            // Gata de livrare: blocăm dacă există accesorii rezervate neconsumate pe piesă (DIRECT sau PROIECT).
             if ($next === 'GATA_DE_LIVRARE') {
+                $projectProducts = [];
+                $magConsum = [];
+                try { $projectProducts = ProjectProduct::forProject($projectId); } catch (\Throwable $e) { $projectProducts = []; }
                 try {
-                    self::autoConsumeMagazieOnReadyToDeliver($projectId, $ppId);
+                    $magConsum = ProjectMagazieConsumption::forProject($projectId);
                 } catch (\Throwable $e) {
-                    Session::flash('toast_error', $e->getMessage());
+                    try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                    try { $magConsum = ProjectMagazieConsumption::forProject($projectId); } catch (\Throwable $e3) { $magConsum = []; }
+                }
+                $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+                $accRows = $accBy[$ppId] ?? [];
+                $agg = [];
+                foreach ($accRows as $r) {
+                    if ((string)($r['mode'] ?? '') !== 'RESERVED') continue;
+                    $iid = (int)($r['item_id'] ?? 0);
+                    if ($iid <= 0) continue;
+                    $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+                    if ($qty <= 0) continue;
+                    $unit = (string)($r['unit'] ?? '');
+                    $code = trim((string)($r['code'] ?? ''));
+                    $name = trim((string)($r['name'] ?? ''));
+                    $label = trim($code . ' · ' . $name);
+                    if ($label === '·' || $label === '· ') $label = $name !== '' ? $name : ($code !== '' ? $code : 'Accesoriu');
+                    if (!isset($agg[$iid])) {
+                        $agg[$iid] = ['label' => $label !== '' ? $label : 'Accesoriu', 'qty' => 0.0, 'unit' => $unit];
+                    }
+                    $agg[$iid]['qty'] += $qty;
+                    if ($agg[$iid]['unit'] === '' && $unit !== '') $agg[$iid]['unit'] = $unit;
+                }
+                if ($agg) {
+                    $items = [];
+                    foreach ($agg as $a) {
+                        $qtyTxt = number_format((float)($a['qty'] ?? 0), 3, '.', '');
+                        $unit = (string)($a['unit'] ?? '');
+                        $items[] = trim((string)($a['label'] ?? 'Accesoriu') . ' · ' . $qtyTxt . ($unit !== '' ? (' ' . $unit) : ''));
+                    }
+                    $more = count($items) > 4;
+                    $items = array_slice($items, 0, 4);
+                    $cnt = count($agg);
+                    $msg = 'Nu poți trece la Gata de livrare: mai ai ' . $cnt . ' accesorii rezervate neconsumate pe acest produs. '
+                         . 'Dă în consum accesoriile din secțiunea Accesorii.'
+                         . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products');
                 }
+            }
+
+            if ($next === 'AVIZAT') {
+                $invoiceClientId = isset($before['invoice_client_id']) ? (int)$before['invoice_client_id'] : 0;
+                $deliveryAddressId = isset($before['delivery_address_id']) ? (int)$before['delivery_address_id'] : 0;
+                if ($invoiceClientId <= 0 || $deliveryAddressId <= 0) {
+                    $msg = 'Nu poți trece la Avizare: setează firma de facturare și adresa de livrare în Facturare/Livrare.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $prodId = isset($before['product_id']) ? (int)$before['product_id'] : 0;
+                $prod = $prodId > 0 ? Product::find($prodId) : null;
+                $saleRaw = $prod && isset($prod['sale_price']) ? $prod['sale_price'] : null;
+                $sale = ($saleRaw !== null && $saleRaw !== '' && is_numeric($saleRaw)) ? (float)$saleRaw : null;
+                if ($sale === null || $sale <= 0) {
+                    $msg = 'Nu poți trece la Avizare: completează prețul de vânzare al produsului.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $avizNumber = trim((string)($_POST['aviz_number'] ?? ''));
+                if ($avizNumber === '') {
+                    $msg = 'Nu poți trece la Avizare: completează numărul de aviz.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $avizNumber = mb_substr($avizNumber, 0, 40);
+            }
+
+            $docInfo = null;
+            if ($next === 'AVIZAT') {
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber);
             }
 
             ProjectProduct::updateStatus($ppId, $next);
             $after = $before;
             $after['production_status'] = $next;
             Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [
-                'message' => 'Schimbare status piesă: ' . $old . ' → ' . $next,
+                'message' => 'Schimbare status produs: ' . $old . ' → ' . $next,
                 'project_id' => $projectId,
                 'old_status' => $old,
                 'new_status' => $next,
             ]);
-            Session::flash('toast_success', 'Status piesă actualizat.');
+            $msg = 'Status produs actualizat.';
+            if (is_array($docInfo) && isset($docInfo['deviz_number'], $docInfo['bon_number'])) {
+                $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
+            }
+            Session::flash('toast_success', $msg);
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot schimba statusul: ' . $e->getMessage());
         }
@@ -2439,6 +3439,10 @@ final class ProjectsController
                 $pname = $p ? (string)($p['name'] ?? '') : '';
             }
         } catch (\Throwable $e) {}
+        $project = null;
+        try { $project = Project::find($projectId); } catch (\Throwable $e) {}
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::formatLabel('', $pname, 'Produs');
 
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
@@ -2446,7 +3450,7 @@ final class ProjectsController
         try {
             [$hmm, $wmm] = self::boardStdDimsMm($boardId);
             $halfHmm = (int)floor(((float)$hmm) / 2.0);
-            $note = 'TRANSFER_CNC · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '');
+            $note = 'TRANSFER_CNC · Proiect: ' . $projLabel . ' · Produs: ' . $prodLabel;
 
             if (abs($sval - 0.5) < 1e-9 && $halfHmm > 0 && $wmm > 0) {
                 // întâi încercăm să mutăm un rest jumătate (OFFCUT)
@@ -2467,15 +3471,19 @@ final class ProjectsController
     }
 
     /**
-     * Automat: când piesa trece la "Gata de livrare", consumăm accesoriile rezervate pe ea.
+     * Consumă accesoriile rezervate pe piesă (manual, din buton).
      * - reserved (fără scădere stoc) -> consumed (OUT din stoc + mișcare)
      * - fără notă (cerință)
+     *
+     * @param array<int,float> $needByItem
      */
-    private static function autoConsumeMagazieOnReadyToDeliver(int $projectId, int $projectProductId): void
+    private static function consumeReservedMagazieForProjectProduct(int $projectId, int $projectProductId, array $needByItem): void
     {
         if ($projectId <= 0 || $projectProductId <= 0) return;
         $project = Project::find($projectId);
         if (!$project) throw new \RuntimeException('Proiect inexistent.');
+        $needByItem = array_filter($needByItem, fn($v) => is_numeric($v) && (float)$v > 0.0);
+        if (!$needByItem) return;
 
         $rows = [];
         try {
@@ -2483,38 +3491,52 @@ final class ProjectsController
         } catch (\Throwable $e) {
             $rows = [];
         }
-        if (!$rows) return;
+        $directByItem = [];
+        foreach ($rows as $r) {
+            $iid = (int)($r['item_id'] ?? 0);
+            $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+            if ($iid <= 0 || $qty <= 0) continue;
+            $directByItem[$iid] = ($directByItem[$iid] ?? 0.0) + $qty;
+        }
+        foreach ($directByItem as $iid => $qty) {
+            if (!isset($needByItem[$iid]) || (float)$needByItem[$iid] < $qty) {
+                $needByItem[$iid] = $qty;
+            }
+        }
+        $projNeedByItem = [];
+        foreach ($needByItem as $iid => $need) {
+            $directQty = (float)($directByItem[$iid] ?? 0.0);
+            $rem = (float)$need - $directQty;
+            if ($rem > 0.000001) {
+                $projNeedByItem[(int)$iid] = $rem;
+            }
+        }
 
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
         $pdo->beginTransaction();
         try {
             // 1) verificăm stoc suficient per item (agregat)
-            $needByItem = [];
-            foreach ($rows as $r) {
-                $iid = (int)($r['item_id'] ?? 0);
-                $q = isset($r['qty']) ? (float)$r['qty'] : 0.0;
-                if ($iid <= 0 || $q <= 0) continue;
-                $needByItem[$iid] = ($needByItem[$iid] ?? 0.0) + $q;
-            }
+            $lockedItems = [];
             foreach ($needByItem as $iid => $need) {
                 $beforeItem = MagazieItem::findForUpdate((int)$iid);
                 if (!$beforeItem) {
                     throw new \RuntimeException('Accesoriu inexistent (id=' . (int)$iid . ').');
                 }
                 $stock = (float)($beforeItem['stock_qty'] ?? 0.0);
-                if ($need > $stock + 1e-9) {
+                if ((float)$need > $stock + 1e-9) {
                     $code = (string)($beforeItem['winmentor_code'] ?? '');
                     $name = (string)($beforeItem['name'] ?? '');
-                    throw new \RuntimeException('Stoc insuficient pentru accesoriu: ' . trim($code . ' · ' . $name) . ' (necesar ' . number_format($need, 3, '.', '') . ', stoc ' . number_format($stock, 3, '.', '') . ').');
+                    throw new \RuntimeException('Stoc insuficient pentru accesoriu: ' . trim($code . ' · ' . $name) . ' (necesar ' . number_format((float)$need, 3, '.', '') . ', stoc ' . number_format($stock, 3, '.', '') . ').');
                 }
+                $lockedItems[(int)$iid] = $beforeItem;
             }
 
-            // 2) procesăm fiecare rezervare: update mode + OUT din stoc
+            // 2) procesăm rezervările DIRECT: update mode + OUT din stoc
             foreach ($rows as $r) {
                 $cid = (int)($r['id'] ?? 0);
                 $iid = (int)($r['item_id'] ?? 0);
-                $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
+                $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
                 if ($cid <= 0 || $iid <= 0 || $qty <= 0) continue;
 
                 $beforeRow = ProjectMagazieConsumption::find($cid);
@@ -2560,12 +3582,98 @@ final class ProjectsController
                 $afterRow['mode'] = 'CONSUMED';
                 $afterRow['note'] = null;
                 Audit::log('PROJECT_CONSUMPTION_UPDATE', 'project_magazie_consumptions', $cid, $beforeRow, $afterRow, [
-                    'message' => 'Consum Magazie auto (Gata de livrare).',
+                    'message' => 'Consum Magazie manual (buton).',
                     'project_id' => $projectId,
                     'project_product_id' => $projectProductId,
                     'item_id' => $iid,
                     'qty' => (float)$qty,
                 ]);
+            }
+
+            // 3) consumăm din rezervările la nivel de proiect (PROIECT) pe baza alocării curente.
+            foreach ($projNeedByItem as $iid => $need) {
+                $need = (float)$need;
+                if ($need <= 0) continue;
+                $stProj = $pdo->prepare("
+                    SELECT id, qty, unit
+                    FROM project_magazie_consumptions
+                    WHERE project_id = ?
+                      AND (project_product_id IS NULL OR project_product_id = 0)
+                      AND item_id = ?
+                      AND mode = 'RESERVED'
+                    ORDER BY created_at ASC, id ASC
+                    FOR UPDATE
+                ");
+                $stProj->execute([$projectId, (int)$iid]);
+                $projRows = $stProj->fetchAll();
+                if (!$projRows) {
+                    throw new \RuntimeException('Nu există rezervări de proiect pentru acest accesoriu.');
+                }
+                $remaining = $need;
+                foreach ($projRows as $pr) {
+                    if ($remaining <= 0.000001) break;
+                    $rid = (int)($pr['id'] ?? 0);
+                    $q = isset($pr['qty']) ? (float)($pr['qty'] ?? 0) : 0.0;
+                    if ($rid <= 0 || $q <= 0) continue;
+                    $take = min($q, $remaining);
+                    $newQ = $q - $take;
+                    if ($newQ <= 0.000001) {
+                        $pdo->prepare("DELETE FROM project_magazie_consumptions WHERE id = ?")->execute([$rid]);
+                    } else {
+                        $pdo->prepare("UPDATE project_magazie_consumptions SET qty = ? WHERE id = ?")->execute([$newQ, $rid]);
+                    }
+
+                    if (!MagazieItem::adjustStock($iid, -(float)$take)) {
+                        throw new \RuntimeException('Nu pot scădea stocul (concurență / stoc insuficient).');
+                    }
+
+                    $unit = (string)($pr['unit'] ?? ($lockedItems[$iid]['unit'] ?? 'buc'));
+                    $cid = ProjectMagazieConsumption::create([
+                        'project_id' => $projectId,
+                        'project_product_id' => $projectProductId,
+                        'item_id' => (int)$iid,
+                        'qty' => (float)$take,
+                        'unit' => $unit !== '' ? $unit : 'buc',
+                        'mode' => 'CONSUMED',
+                        'note' => null,
+                        'created_by' => Auth::id(),
+                    ]);
+
+                    $beforeItem = $lockedItems[$iid] ?? MagazieItem::findForUpdate($iid);
+                    $movementId = \App\Models\MagazieMovement::create([
+                        'item_id' => (int)$iid,
+                        'direction' => 'OUT',
+                        'qty' => (float)$take,
+                        'unit_price' => ($beforeItem && isset($beforeItem['unit_price']) && $beforeItem['unit_price'] !== '' && is_numeric($beforeItem['unit_price'])) ? (float)$beforeItem['unit_price'] : null,
+                        'project_id' => $projectId,
+                        'project_code' => (string)($project['code'] ?? null),
+                        'note' => null,
+                        'created_by' => Auth::id(),
+                    ]);
+                    $afterItem = MagazieItem::findForUpdate((int)$iid) ?: $beforeItem;
+                    if ($beforeItem) {
+                        Audit::log('MAGAZIE_OUT', 'magazie_items', (int)$iid, $beforeItem, $afterItem, [
+                            'movement_id' => $movementId,
+                            'project_id' => $projectId,
+                            'project_code' => (string)($project['code'] ?? ''),
+                            'project_product_id' => $projectProductId,
+                            'qty' => (float)$take,
+                        ]);
+                    }
+                    Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_magazie_consumptions', $cid, null, null, [
+                        'message' => 'Consum Magazie manual (buton).',
+                        'project_id' => $projectId,
+                        'project_product_id' => $projectProductId,
+                        'item_id' => (int)$iid,
+                        'qty' => (float)$take,
+                        'unit' => $unit,
+                    ]);
+
+                    $remaining -= $take;
+                }
+                if ($remaining > 0.000001) {
+                    throw new \RuntimeException('Rezervarea de proiect este insuficientă pentru cantitatea cerută.');
+                }
             }
 
             $pdo->commit();
@@ -2610,6 +3718,10 @@ final class ProjectsController
         } catch (\Throwable $e) {}
         $projCode = $project ? (string)($project['code'] ?? '') : '';
         $projName = $project ? (string)($project['name'] ?? '') : '';
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::formatLabel('', $pname, 'Produs');
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
 
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
@@ -2624,7 +3736,7 @@ final class ProjectsController
             if (abs($sval - 1.0) < 1e-9) {
                 // Asigurăm materialul în Producție înainte de consum (Depozit -> Producție).
                 try {
-                    self::moveFullBoards($boardId, 1, 'RESERVED', 'RESERVED', 'TRANSFER_MONTAJ · piesă #' . $ppId, $projectId, 'Depozit', 'Producție');
+                    self::moveFullBoards($boardId, 1, 'RESERVED', 'RESERVED', 'TRANSFER_MONTAJ · ' . $projNote . ' · ' . $prodNote, $projectId, 'Depozit', 'Producție');
                 } catch (\Throwable $e) {}
                 // 1 placă: consumăm 1 buc din rezervarea full
                 if (!self::takeReservedFullBoard($pdo, $projectId, $boardId, $fullM2)) {
@@ -2638,7 +3750,7 @@ final class ProjectsController
                         1,
                         'RESERVED',
                         'CONSUMED',
-                        self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''),
+                        self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · ' . $projNote . ' · ' . $prodNote,
                         $projectId,
                         'Producție',
                         'Producție'
@@ -2646,13 +3758,13 @@ final class ProjectsController
                 } catch (\Throwable $e) {
                     // fallback: dacă nu era în Producție, încercăm să transferăm și apoi să consumăm.
                     try {
-                        self::moveFullBoards($boardId, 1, 'RESERVED', 'RESERVED', 'TRANSFER_MONTAJ · piesă #' . $ppId, $projectId, 'Depozit', 'Producție');
+                        self::moveFullBoards($boardId, 1, 'RESERVED', 'RESERVED', 'TRANSFER_MONTAJ · ' . $projNote . ' · ' . $prodNote, $projectId, 'Depozit', 'Producție');
                         self::moveFullBoards(
                             $boardId,
                             1,
                             'RESERVED',
                             'CONSUMED',
-                            self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''),
+                            self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · ' . $projNote . ' · ' . $prodNote,
                             $projectId,
                             'Producție',
                             'Producție'
@@ -2663,9 +3775,9 @@ final class ProjectsController
                     }
                 }
                 self::insertProjectHplConsumption($pdo, $projectId, $boardId, 1, $fullM2, 'CONSUMED',
-                    self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                    self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · ' . $projNote . ' · ' . $prodNote, Auth::id());
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                    'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · produs ' . $prodLabel .
                         ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                     'board_id' => $boardId,
                     'project_id' => $projectId,
@@ -2684,17 +3796,17 @@ final class ProjectsController
                 // 1/2 placă
                 if (self::takeReservedHalfRemainder($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, $halfM2)) {
                     // mutăm restul în Producție înainte de consum (Depozit -> Producție)
-                    try { self::moveReservedOffcutHalfToLocation($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, 1, 'Depozit', 'Producție', 'TRANSFER_MONTAJ · piesă #' . $ppId); } catch (\Throwable $e) {}
+                    try { self::moveReservedOffcutHalfToLocation($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, 1, 'Depozit', 'Producție', 'TRANSFER_MONTAJ · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
                     // consumăm 1 buc dintr-un offcut rezervat (jumătate), dacă există
                     if (!self::consumeReservedHalfOffcut($pdo, $projectId, $boardId, $halfHmm, (int)$wmm,
-                        self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''))) {
+                        self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · ' . $projNote . ' · ' . $prodNote)) {
                         $pdo->rollBack();
                         return 'Nu pot consuma 1/2 placă din Producție. Verifică dacă restul (jumătate) a fost mutat în Producție.';
                     }
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
-                        self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : ''), Auth::id());
+                        self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · ' . $projNote . ' · ' . $prodNote, Auth::id());
                     Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · produs ' . $prodLabel .
                             ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                         'board_id' => $boardId,
                         'project_id' => $projectId,
@@ -2713,7 +3825,7 @@ final class ProjectsController
                 } else {
                     // nu avem jumătate -> luăm 1 placă full rezervată
                     // asigurăm full-ul în Producție (Depozit -> Producție) înainte de tăiere/consum
-                    try { self::moveFullBoards($boardId, 1, 'RESERVED', 'RESERVED', 'TRANSFER_MONTAJ · piesă #' . $ppId, $projectId, 'Depozit', 'Producție'); } catch (\Throwable $e) {}
+                    try { self::moveFullBoards($boardId, 1, 'RESERVED', 'RESERVED', 'TRANSFER_MONTAJ · ' . $projNote . ' · ' . $prodNote, $projectId, 'Depozit', 'Producție'); } catch (\Throwable $e) {}
                     if (!self::takeReservedFullBoard($pdo, $projectId, $boardId, $fullM2)) {
                         $pdo->rollBack();
                         return 'Nu există placă rezervată disponibilă în proiect pentru a tăia 1/2 placă.';
@@ -2727,8 +3839,8 @@ final class ProjectsController
                     // - una CONSUMED (jumătatea folosită)
                     // - una AVAILABLE/RESERVED (restul, după alegere)
                     $remStatus = ($ra === 'KEEP') ? 'RESERVED' : 'AVAILABLE';
-                    $remNote = self::HPL_NOTE_HALF_REMAINDER . ' · 1 buc · ' . $halfHmm . '×' . (int)$wmm . ' mm · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '');
-                    $consNote = self::HPL_NOTE_AUTO_CONSUME . ' · 1 buc · ' . $halfHmm . '×' . (int)$wmm . ' mm · piesă #' . $ppId . ' · rest=' . $ra . ($pname !== '' ? (' · ' . $pname) : '');
+                    $remNote = self::HPL_NOTE_HALF_REMAINDER . ' · 1 buc · ' . $halfHmm . '×' . (int)$wmm . ' mm · ' . $projNote . ' · ' . $prodNote;
+                    $consNote = self::HPL_NOTE_AUTO_CONSUME . ' · 1 buc · ' . $halfHmm . '×' . (int)$wmm . ' mm · rest=' . $ra . ' · ' . $projNote . ' · ' . $prodNote;
                     if (!self::cutOneReservedFullIntoHalves($pdo, $projectId, $boardId, $halfHmm, (int)$wmm, $remStatus, $remNote, $consNote)) {
                         $pdo->rollBack();
                         return 'Nu pot găsi o placă FULL rezervată în stoc pentru tăiere (1/2).';
@@ -2740,7 +3852,7 @@ final class ProjectsController
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         $consNote, Auth::id());
                     Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · produs ' . $prodLabel .
                             ' · rest=' . $ra .
                             ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                         'board_id' => $boardId,
@@ -3269,6 +4381,15 @@ final class ProjectsController
         if ($source !== 'PROJECT' && $source !== 'REST') $source = 'PROJECT';
         if ($source === 'REST') $consumeMode = 'FULL';
 
+        $project = null;
+        $pp = null;
+        try { $project = Project::find($projectId); } catch (\Throwable $e) {}
+        try { $pp = ProjectProduct::find($projectProductId); } catch (\Throwable $e) {}
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
+
         $st = $pdo->prepare("SELECT * FROM hpl_stock_pieces WHERE id = ? FOR UPDATE");
         $st->execute([$pieceId]);
         $p = $st->fetch();
@@ -3299,8 +4420,8 @@ final class ProjectsController
             if ($qty === 1) HplStockPiece::delete($pieceId);
             else HplStockPiece::updateQty($pieceId, $qty - 1);
 
-            $noteBase = 'Consum HPL 1/2 · piesă #' . $projectProductId . ' · proiect #' . $projectId;
-            if ($source === 'REST') $noteBase = 'Consum HPL REST 1/2 · piesă #' . $projectProductId . ' · proiect #' . $projectId;
+            $noteBase = 'Consum HPL 1/2 · ' . $projNote . ' · ' . $prodNote;
+            if ($source === 'REST') $noteBase = 'Consum HPL REST 1/2 · ' . $projNote . ' · ' . $prodNote;
 
             // jumătatea consumată
             $consumedId = HplStockPiece::create([
@@ -3342,8 +4463,8 @@ final class ProjectsController
         $take = 1;
         if ($take > $qty) return ['error' => 'Stoc insuficient (buc).', 'consumed_piece_id' => null];
 
-        $note = 'Consum HPL · piesă #' . $projectProductId . ' · proiect #' . $projectId;
-        if ($source === 'REST') $note = 'Consum HPL REST · piesă #' . $projectProductId . ' · proiect #' . $projectId;
+        $note = 'Consum HPL · ' . $projNote . ' · ' . $prodNote;
+        if ($source === 'REST') $note = 'Consum HPL REST · ' . $projNote . ' · ' . $prodNote;
 
         if ($qty === $take) {
             HplStockPiece::updateFields($pieceId, ['status' => 'CONSUMED', 'project_id' => $projectId, 'location' => $loc]);
@@ -3398,6 +4519,9 @@ final class ProjectsController
             Response::redirect($consumRedirect);
         }
         if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'CONSUMED';
+        if ($consumTab === 'accesorii') {
+            $mode = 'RESERVED';
+        }
 
         $item = MagazieItem::find((int)$itemId);
         if (!$item) {
@@ -3487,12 +4611,24 @@ final class ProjectsController
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
         // Cerință: după Gata de livrare, OPERATOR nu mai poate adăuga/edita consumuri pe piesă.
         $u = Auth::user();
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3528,7 +4664,7 @@ final class ProjectsController
             $pdo->commit();
 
             Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_magazie_consumptions', $cid, null, null, [
-                'message' => 'Accesoriu rezervat pe piesă: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'message' => 'Accesoriu rezervat pe produs: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'item_id' => (int)$itemId,
@@ -3536,10 +4672,76 @@ final class ProjectsController
                 'unit' => $unit,
                 'mode' => 'RESERVED',
             ]);
-            Session::flash('toast_success', 'Accesoriu rezervat pe piesă.');
+            Session::flash('toast_success', 'Accesoriu rezervat pe produs.');
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva accesoriul: ' . $e->getMessage());
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
+     * Consumă accesoriile rezervate pe piesă (manual, din buton).
+     */
+    public static function consumeMagazieForProjectProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        if ($projectId <= 0 || $ppId <= 0) {
+            Session::flash('toast_error', 'Parametri invalizi.');
+            Response::redirect('/projects');
+        }
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        // OPERATOR lock after final status
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($pp['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        $projectProducts = [];
+        $magConsum = [];
+        try { $projectProducts = ProjectProduct::forProject($projectId); } catch (\Throwable $e) { $projectProducts = []; }
+        try {
+            $magConsum = ProjectMagazieConsumption::forProject($projectId);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            try { $magConsum = ProjectMagazieConsumption::forProject($projectId); } catch (\Throwable $e3) { $magConsum = []; }
+        }
+        $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+        $accRows = $accBy[$ppId] ?? [];
+        $needByItem = [];
+        foreach ($accRows as $r) {
+            if ((string)($r['mode'] ?? '') !== 'RESERVED') continue;
+            $iid = (int)($r['item_id'] ?? 0);
+            if ($iid <= 0) continue;
+            $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+            if ($qty <= 0) continue;
+            $needByItem[$iid] = ($needByItem[$iid] ?? 0.0) + $qty;
+        }
+        if (!$needByItem) {
+            Session::flash('toast_error', 'Nu există accesorii rezervate pentru consum.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        try {
+            self::consumeReservedMagazieForProjectProduct($projectId, $ppId, $needByItem);
+            Session::flash('toast_success', 'Accesoriile au fost date în consum.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot da în consum accesoriile: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
     }
@@ -3576,7 +4778,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3586,6 +4788,10 @@ final class ProjectsController
             Session::flash('toast_error', 'Accesoriu inexistent.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
+
+        $src = strtoupper(trim((string)($_POST['src'] ?? 'DIRECT')));
+        $qtyReq = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        if ($qtyReq !== null && $qtyReq < 0) $qtyReq = null;
 
         /** @var \PDO $pdo */
         $pdo = \App\Core\DB::pdo();
@@ -3601,33 +4807,72 @@ final class ProjectsController
             ");
             $stSel->execute([$projectId, $ppId, $itemId]);
             $rows = $stSel->fetchAll();
-            if (!$rows) {
-                throw new \RuntimeException('Nu există rezervări de anulat.');
-            }
             $sumQty = 0.0;
             $unit = '';
-            foreach ($rows as $r) {
-                $sumQty += (float)($r['qty'] ?? 0);
-                $unit = (string)($r['unit'] ?? $unit);
-            }
+            if ($rows) {
+                // DIRECT: ștergem rezervările de pe piesă (nu afectează stocul)
+                foreach ($rows as $r) {
+                    $sumQty += (float)($r['qty'] ?? 0);
+                    $unit = (string)($r['unit'] ?? $unit);
+                }
+                $stDel = $pdo->prepare("
+                    DELETE FROM project_magazie_consumptions
+                    WHERE project_id = ?
+                      AND project_product_id = ?
+                      AND item_id = ?
+                      AND mode = 'RESERVED'
+                ");
+                $stDel->execute([$projectId, $ppId, $itemId]);
+            } else {
+                // PROIECT: anulăm (scădem) din rezervarea la nivel de proiect cu cantitatea alocată acestei piese în UI.
+                if ($src !== 'PROIECT') throw new \RuntimeException('Nu există rezervări directe de anulat.');
+                if ($qtyReq === null || $qtyReq <= 0) throw new \RuntimeException('Cantitate invalidă pentru renunțare.');
 
-            $stDel = $pdo->prepare("
-                DELETE FROM project_magazie_consumptions
-                WHERE project_id = ?
-                  AND project_product_id = ?
-                  AND item_id = ?
-                  AND mode = 'RESERVED'
-            ");
-            $stDel->execute([$projectId, $ppId, $itemId]);
+                $stProj = $pdo->prepare("
+                    SELECT id, qty, unit
+                    FROM project_magazie_consumptions
+                    WHERE project_id = ?
+                      AND (project_product_id IS NULL OR project_product_id = 0)
+                      AND item_id = ?
+                      AND mode = 'RESERVED'
+                    ORDER BY created_at ASC, id ASC
+                    FOR UPDATE
+                ");
+                $stProj->execute([$projectId, $itemId]);
+                $projRows = $stProj->fetchAll();
+                if (!$projRows) throw new \RuntimeException('Nu există rezervări de proiect pentru acest accesoriu.');
+
+                $need = (float)$qtyReq;
+                $unit = (string)($projRows[0]['unit'] ?? '');
+                foreach ($projRows as $r) {
+                    if ($need <= 1e-9) break;
+                    $rid = (int)($r['id'] ?? 0);
+                    $q = (float)($r['qty'] ?? 0);
+                    if ($rid <= 0 || $q <= 0) continue;
+                    $take = min($q, $need);
+                    $newQ = $q - $take;
+                    if ($newQ <= 1e-9) {
+                        $pdo->prepare("DELETE FROM project_magazie_consumptions WHERE id = ?")->execute([$rid]);
+                    } else {
+                        $pdo->prepare("UPDATE project_magazie_consumptions SET qty = ? WHERE id = ?")->execute([$newQ, $rid]);
+                    }
+                    $sumQty += $take;
+                    $need -= $take;
+                }
+                if ($need > 1e-6) {
+                    throw new \RuntimeException('Rezervarea de proiect este insuficientă pentru cantitatea cerută.');
+                }
+            }
 
             $pdo->commit();
             Audit::log('PROJECT_PRODUCT_MAGAZIE_UNALLOCATE', 'project_magazie_consumptions', 0, null, null, [
-                'message' => 'Anulat accesoriu rezervat pe piesă: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'message' => 'Anulat accesoriu rezervat pe produs: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'item_id' => $itemId,
                 'qty' => $sumQty,
                 'unit' => $unit,
+                'src' => $rows ? 'DIRECT' : 'PROIECT',
             ]);
             Session::flash('toast_success', 'Rezervarea de accesoriu a fost anulată.');
         } catch (\Throwable $e) {
@@ -3663,12 +4908,16 @@ final class ProjectsController
             Session::flash('toast_error', 'Produs proiect invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
         // lock OPERATOR after final status
         $u = Auth::user();
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3731,6 +4980,16 @@ final class ProjectsController
                     $notes = (string)($piece['notes'] ?? '');
                     $notesL = mb_strtolower($notes);
                     $ok = str_contains($notesL, 'proiect ' . (string)$projectId) || str_contains($notesL, 'proiect #' . (string)$projectId);
+                    $projCode = trim((string)($project['code'] ?? ''));
+                    $projName = trim((string)($project['name'] ?? ''));
+                    if (!$ok && $projCode !== '') {
+                        $projCodeL = mb_strtolower($projCode);
+                        $ok = str_contains($notesL, 'proiect: ' . $projCodeL) || str_contains($notesL, 'proiect ' . $projCodeL);
+                    }
+                    if (!$ok && $projName !== '') {
+                        $projNameL = mb_strtolower($projName);
+                        $ok = str_contains($notesL, 'proiect: ' . $projNameL) || str_contains($notesL, 'proiect ' . $projNameL);
+                    }
                     if (!$ok) {
                         throw new \RuntimeException('Piesa selectată nu aparține acestui proiect.');
                     }
@@ -3742,10 +5001,8 @@ final class ProjectsController
                 if ($isAcc !== 0) throw new \RuntimeException('Piesa REST trebuie să fie „nestocată”.');
                 if ($status !== 'AVAILABLE') throw new \RuntimeException('Placa REST nu este disponibilă.');
                 // rezervăm pe proiect ca să nu mai fie disponibilă
-                HplStockPiece::updateFields((int)$pieceId, ['status' => 'RESERVED', 'project_id' => $projectId]);
-                try {
-                    HplStockPiece::appendNote((int)$pieceId, 'REST rezervat pe proiect #' . $projectId . ' · piesă #' . $ppId);
-                } catch (\Throwable $e) {}
+                $restNote = 'REST rezervat · ' . $projNote . ' · ' . $prodNote;
+                HplStockPiece::updateFields((int)$pieceId, ['status' => 'RESERVED', 'project_id' => $projectId, 'notes' => $restNote]);
             }
 
             // Pentru alocare, lucrăm ideal cu qty=1 per rând (mai simplu pentru FULL/HALF).
@@ -3785,7 +5042,7 @@ final class ProjectsController
                     // Transformăm piesa curentă în "jumătatea rămasă" (OFFCUT)
                     $stUpd = $pdo->prepare("UPDATE hpl_stock_pieces SET piece_type='OFFCUT', height_mm=?, width_mm=?, qty=1 WHERE id=?");
                     $stUpd->execute([$halfH, $w, (int)$allocPieceId]);
-                    try { HplStockPiece::appendNote((int)$allocPieceId, 'Jumătate rămasă (alocare piesă #' . $ppId . ')'); } catch (\Throwable $e) {}
+                    try { HplStockPiece::appendNote((int)$allocPieceId, 'Jumătate rămasă (alocare) · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
 
                     // Creăm "jumătatea alocată" (OFFCUT) ca piesă separată pentru această piesă de proiect.
                     $allocPieceId = HplStockPiece::create([
@@ -3800,14 +5057,14 @@ final class ProjectsController
                         'location' => $loc,
                         'notes' => null,
                     ]);
-                    try { HplStockPiece::appendNote((int)$allocPieceId, 'Alocat (1/2) pe piesă #' . $ppId); } catch (\Throwable $e) {}
+                    try { HplStockPiece::appendNote((int)$allocPieceId, 'Alocat (1/2) · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
                 } else {
-                    try { HplStockPiece::appendNote((int)$allocPieceId, 'Alocat (FULL) pe piesă #' . $ppId); } catch (\Throwable $e) {}
+                    try { HplStockPiece::appendNote((int)$allocPieceId, 'Alocat (FULL) · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
                 }
             } else {
                 // REST: alocăm integral piesa selectată (rămâne RESERVED pe proiect până la "Debitat")
                 try { HplStockPiece::updateFields((int)$allocPieceId, ['project_id' => $projectId, 'status' => 'RESERVED']); } catch (\Throwable $e) {}
-                try { HplStockPiece::appendNote((int)$allocPieceId, 'Alocat (REST) pe piesă #' . $ppId); } catch (\Throwable $e) {}
+                try { HplStockPiece::appendNote((int)$allocPieceId, 'Alocat (REST) · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
             }
 
             // Compat: dacă tabela nu există încă, încercăm auto-migrate și reîncercăm.
@@ -3836,7 +5093,7 @@ final class ProjectsController
                 ]);
             }
             Audit::log('PROJECT_PRODUCT_HPL_RESERVE', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'HPL alocat pe piesă (' . $source . ', ' . $consumeMode . ')',
+                'message' => 'HPL alocat pe produs (' . $source . ', ' . $consumeMode . ')',
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'stock_piece_id' => (int)$allocPieceId,
@@ -3846,7 +5103,7 @@ final class ProjectsController
             ]);
 
             $pdo->commit();
-            Session::flash('toast_success', 'HPL alocat pe piesă.');
+            Session::flash('toast_success', 'HPL alocat pe produs.');
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva consumul HPL: ' . $e->getMessage());
@@ -3881,12 +5138,17 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
+
         // lock OPERATOR after final status
         $u = Auth::user();
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3931,8 +5193,8 @@ final class ProjectsController
             // Cerință: la "Debitat" trecem materialul în Producție și apoi îl consumăm,
             // astfel încât consumul să apară pe locația Producție.
             $prodLoc = 'Producție';
-            $noteMove = 'TRANSFER · Debitat -> Producție · piesă #' . $ppId . ' · HPL #' . $cid;
-            $note = 'CONSUMED · Debitat pe piesă #' . $ppId . ' · HPL #' . $cid;
+            $noteMove = 'TRANSFER · Debitat -> Producție · ' . $projNote . ' · ' . $prodNote;
+            $note = 'CONSUMED · Debitat · ' . $projNote . ' · ' . $prodNote;
 
             if ($qty === 1) {
                 $pdo->prepare("UPDATE hpl_stock_pieces SET location=?, status='CONSUMED' WHERE id=?")->execute([$prodLoc, (int)$pieceId]);
@@ -3960,7 +5222,7 @@ final class ProjectsController
             ProjectProductHplConsumption::setConsumedPiece((int)$cid, (int)$consumedPieceId);
 
             Audit::log('PROJECT_PRODUCT_HPL_CONSUME', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'HPL debitat pe piesă.',
+                'message' => 'HPL debitat pe produs.',
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'board_id' => (int)($c['board_id'] ?? 0),
@@ -3971,7 +5233,7 @@ final class ProjectsController
             ]);
             if ($boardId > 0) {
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                    'message' => 'Consumat (Debitat) pe piesă #' . $ppId . ' · Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
+                    'message' => 'Consumat (Debitat) pe produs ' . $prodLabel . ' · Proiect ' . $projLabel,
                     'board_id' => $boardId,
                     'project_id' => $projectId,
                     'project_code' => (string)($project['code'] ?? ''),
@@ -4023,7 +5285,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4063,7 +5325,7 @@ final class ProjectsController
 
             if ($isAcc === 0) {
                 // REST -> return to general stock
-                $note = 'Revenire (renunțat) din piesă #' . $ppId . ' · Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? '');
+                $note = 'Revenire (renunțat) · ' . $projNote . ' · ' . $prodNote;
                 $ident = null;
                 try {
                     $ident = HplStockPiece::findIdentical($boardId, $ptype !== '' ? $ptype : 'OFFCUT', 'AVAILABLE', $w, $h, 'Depozit', 0, null, $pieceId);
@@ -4093,12 +5355,12 @@ final class ProjectsController
                     // ensure it's visible in project stock
                     HplStockPiece::updateFields($pieceId, ['project_id' => $projectId, 'status' => 'RESERVED']);
                 }
-                try { HplStockPiece::appendNote((int)$pieceId, 'Renunțat de pe piesă #' . $ppId); } catch (\Throwable $e) {}
+                try { HplStockPiece::appendNote((int)$pieceId, 'Renunțat de pe produs · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
             }
 
             $pdo->commit();
             Audit::log('PROJECT_PRODUCT_HPL_UNALLOCATE', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'Renunțat la HPL alocat pe piesă (neconsumat).',
+                'message' => 'Renunțat la HPL alocat pe produs (neconsumat).',
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'board_id' => (int)($c['board_id'] ?? 0),
@@ -4133,6 +5395,7 @@ final class ProjectsController
             Session::flash('toast_error', 'Proiect inexistent.');
             Response::redirect('/projects');
         }
+        $projLabel = self::projectLabel($project);
         $consumTab = trim((string)($_POST['consum_tab'] ?? 'hpl'));
         if (!in_array($consumTab, ['accesorii', 'hpl'], true)) $consumTab = 'hpl';
         $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
@@ -4160,7 +5423,18 @@ final class ProjectsController
             if ($status !== 'RESERVED') throw new \RuntimeException('Piesa nu este rezervată.');
             if ($proj !== $projectId) {
                 $notes = mb_strtolower((string)($p['notes'] ?? ''));
-                if (!str_contains($notes, 'proiect #' . (string)$projectId) && !str_contains($notes, 'proiect ' . (string)$projectId)) {
+                $ok = str_contains($notes, 'proiect #' . (string)$projectId) || str_contains($notes, 'proiect ' . (string)$projectId);
+                $projCode = trim((string)($project['code'] ?? ''));
+                $projName = trim((string)($project['name'] ?? ''));
+                if (!$ok && $projCode !== '') {
+                    $projCodeL = mb_strtolower($projCode);
+                    $ok = str_contains($notes, 'proiect: ' . $projCodeL) || str_contains($notes, 'proiect ' . $projCodeL);
+                }
+                if (!$ok && $projName !== '') {
+                    $projNameL = mb_strtolower($projName);
+                    $ok = str_contains($notes, 'proiect: ' . $projNameL) || str_contains($notes, 'proiect ' . $projNameL);
+                }
+                if (!$ok) {
                     throw new \RuntimeException('Piesa nu aparține acestui proiect.');
                 }
             }
@@ -4172,8 +5446,10 @@ final class ProjectsController
             $qty = (int)($p['qty'] ?? 0);
             if ($boardId <= 0 || $qty <= 0) throw new \RuntimeException('Stoc insuficient.');
 
-            $projLabel = trim((string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''));
-            $note = 'Revenire în stoc (REST) din proiect: ' . ($projLabel !== '' ? $projLabel : ('#' . $projectId));
+            $userNote = trim((string)($_POST['note_user'] ?? ''));
+            $note = $userNote;
+            $noteForMatch = $note;
+            if ($note === '') $noteForMatch = '';
 
             // merge with identical AVAILABLE row, else update in place
             $ident = null;
@@ -4183,13 +5459,24 @@ final class ProjectsController
                 $ident = null;
             }
             if ($ident && (int)($ident['id'] ?? 0) > 0) {
+                $destNote = trim((string)($ident['notes'] ?? ''));
+                if ($noteForMatch === '') {
+                    if ($destNote !== '') $ident = null;
+                } elseif ($destNote !== $noteForMatch) {
+                    $ident = null;
+                }
+            }
+            if ($ident && (int)($ident['id'] ?? 0) > 0) {
                 $destId = (int)$ident['id'];
                 HplStockPiece::incrementQty($destId, $qty);
-                try { HplStockPiece::appendNote($destId, $note); } catch (\Throwable $e) {}
+                if ($note !== '') {
+                    try { HplStockPiece::appendNote($destId, $note); } catch (\Throwable $e) {}
+                }
                 HplStockPiece::delete($pieceId);
             } else {
-                HplStockPiece::updateFields($pieceId, ['status' => 'AVAILABLE', 'project_id' => null, 'location' => 'Depozit']);
-                try { HplStockPiece::appendNote($pieceId, $note); } catch (\Throwable $e) {}
+                $fields = ['status' => 'AVAILABLE', 'project_id' => null, 'location' => 'Depozit'];
+                $fields['notes'] = $note !== '' ? $note : null;
+                HplStockPiece::updateFields($pieceId, $fields);
             }
 
             // eliminăm rezervările pe produse pentru această piesă (ca să nu mai fie consumată ulterior)
@@ -4322,9 +5609,10 @@ final class ProjectsController
             $target = $mode === 'CONSUMED' ? 'CONSUMED' : 'RESERVED';
             $projCode = (string)($project['code'] ?? '');
             $projName = (string)($project['name'] ?? '');
+            $projLabel = self::projectLabel($project);
             // IMPORTANT (cerință): nota afișată pe piesa din stoc trebuie să coincidă cu nota din proiect.
             // Păstrăm mesajul tehnic (proiect/consumption id) în Audit, nu în notes.
-            $noteAppend = ($note !== '') ? $note : ('Proiect ' . $projCode . ' · consum HPL #' . $cid);
+            $noteAppend = ($note !== '') ? $note : ('Proiect: ' . $projLabel . ' · consum HPL');
             if ($isOffcut) {
                 self::moveOffcutPieces((int)$boardId, (int)$offcutW, (int)$offcutH, (int)$qtyBoards, 'AVAILABLE', $target, $noteAppend, $projectId);
             } else {
@@ -4544,7 +5832,7 @@ final class ProjectsController
             $qtyBoards = (int)($before['qty_boards'] ?? 0);
             if ($qtyBoards > 0) {
                 try {
-                    self::moveFullBoards((int)($before['board_id'] ?? 0), $qtyBoards, $from, 'AVAILABLE', 'Anulare consum HPL #' . $cid, $projectId);
+                    self::moveFullBoards((int)($before['board_id'] ?? 0), $qtyBoards, $from, 'AVAILABLE', 'Anulare consum HPL · Proiect: ' . $projLabel, $projectId);
                 } catch (\Throwable $e) {
                     // ignore
                 }

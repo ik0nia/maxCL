@@ -92,6 +92,7 @@ final class HplOffcuts
             LEFT JOIN finishes bc ON bc.id = b.back_color_id
             %s
             WHERE (sp.width_mm <> b.std_width_mm OR sp.height_mm <> b.std_height_mm)
+              AND sp.status <> 'CONSUMED'
             ORDER BY sp.created_at DESC
             LIMIT $limit
         ";

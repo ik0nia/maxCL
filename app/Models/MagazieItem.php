@@ -205,5 +205,13 @@ final class MagazieItem
         $st->execute([$delta, $id, $delta]);
         return $st->rowCount() > 0;
     }
+
+    public static function delete(int $id): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('DELETE FROM magazie_items WHERE id = ?');
+        $st->execute([$id]);
+    }
 }
 

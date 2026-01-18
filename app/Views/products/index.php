@@ -3,6 +3,7 @@ use App\Core\Url;
 use App\Core\View;
 
 $rows = $rows ?? [];
+$docsByPp = is_array($docsByPp ?? null) ? $docsByPp : [];
 $q = trim((string)($q ?? ''));
 $label = trim((string)($label ?? ''));
 $stLbl = [
@@ -11,7 +12,7 @@ $stLbl = [
   'CNC' => 'CNC',
   'MONTAJ' => 'Montaj',
   'GATA_DE_LIVRARE' => 'Gata de livrare',
-  'AVIZAT' => 'Avizat',
+  'AVIZAT' => 'Avizare',
   'LIVRAT' => 'Livrat',
 ];
 
@@ -20,7 +21,7 @@ ob_start();
 <div class="app-page-title">
   <div>
     <h1 class="m-0">Produse</h1>
-    <div class="text-muted">Produsele sunt piesele folosite în proiecte (status controlat din proiect)</div>
+    <div class="text-muted">Produsele sunt folosite în proiecte (status controlat din proiect)</div>
   </div>
 </div>
 
@@ -59,16 +60,42 @@ ob_start();
     </thead>
     <tbody>
       <?php foreach ($rows as $r): ?>
-        <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0) . '?tab=products')) ?>" role="button" tabindex="0">
+        <?php
+          $ppId = (int)($r['project_product_id'] ?? 0);
+          $projId = (int)($r['project_id'] ?? 0);
+          $cardUrl = Url::to('/projects/' . $projId . '?tab=products#pp-' . $ppId);
+          $docLinks = $ppId > 0 && isset($docsByPp[$ppId]) && is_array($docsByPp[$ppId]) ? $docsByPp[$ppId] : [];
+        ?>
+        <tr class="js-row-link" data-href="<?= htmlspecialchars($cardUrl) ?>" role="button" tabindex="0">
           <td>
-            <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . (int)($r['project_id'] ?? 0) . '?tab=products')) ?>">
+            <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars($cardUrl) ?>">
               <?= htmlspecialchars((string)($r['project_name'] ?? '')) ?>
             </a>
             <div class="text-muted small"><?= htmlspecialchars((string)($r['project_status'] ?? '')) ?></div>
           </td>
           <td>
-            <div class="fw-semibold"><?= htmlspecialchars((string)($r['product_name'] ?? '')) ?></div>
+            <div class="fw-semibold">
+              <a class="text-decoration-none" href="<?= htmlspecialchars($cardUrl) ?>">
+                <?= htmlspecialchars((string)($r['product_name'] ?? '')) ?>
+              </a>
+            </div>
             <div class="text-muted small"><?= htmlspecialchars((string)($r['product_code'] ?? '')) ?></div>
+            <?php if ($docLinks): ?>
+              <div class="small mt-1">
+                <?php if (isset($docLinks['deviz'])): ?>
+                  <?php $d = $docLinks['deviz']; ?>
+                  <a class="text-decoration-none me-2" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($d['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                    <i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars((string)($d['label'] ?? 'Deviz')) ?>
+                  </a>
+                <?php endif; ?>
+                <?php if (isset($docLinks['bon'])): ?>
+                  <?php $b = $docLinks['bon']; ?>
+                  <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($b['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                    <i class="bi bi-receipt me-1"></i><?= htmlspecialchars((string)($b['label'] ?? 'Bon consum')) ?>
+                  </a>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
           </td>
           <?php $sv = (string)($r['production_status'] ?? ''); ?>
           <td class="fw-semibold"><?= htmlspecialchars($stLbl[$sv] ?? $sv) ?></td>
