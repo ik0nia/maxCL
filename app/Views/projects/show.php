@@ -1649,6 +1649,10 @@ ob_start();
                   ? parseInt(String(opt.stock_qty_full_available), 10)
                   : NaN;
                 const stockTxt = Number.isFinite(stock) ? stock : null;
+                const offcut = (opt.stock_qty_offcut_available !== undefined && opt.stock_qty_offcut_available !== null)
+                  ? parseInt(String(opt.stock_qty_offcut_available), 10)
+                  : NaN;
+                const offcutTxt = Number.isFinite(offcut) ? offcut : null;
 
                 if (!thumb && !thumbBack && !colors && !th && !name && !dim && !tex && stockTxt === null) return opt.text;
                 const $row = $('<span class="s2-row"></span>');
@@ -1662,6 +1666,7 @@ ob_start();
                 if (dim) base += (base ? ' · ' : '') + esc(dim);
                 if (tex) base += (base ? ' · ' : '') + esc(tex);
                 if (stockTxt !== null) base += ' · <span class="text-muted">stoc: <strong>' + esc(String(stockTxt)) + '</strong> buc</span>';
+                if (offcutTxt !== null && offcutTxt > 0) base += ' · <span class="text-muted">rest: <strong>' + esc(String(offcutTxt)) + '</strong> buc</span>';
 
                 if (colors) {
                   $txt.html('<strong>' + esc(colors) + '</strong> · ' + base);
