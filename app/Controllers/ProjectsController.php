@@ -3218,6 +3218,19 @@ final class ProjectsController
                     ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
                 }
+                $prodId = isset($before['product_id']) ? (int)$before['product_id'] : 0;
+                $prod = $prodId > 0 ? Product::find($prodId) : null;
+                $saleRaw = $prod && isset($prod['sale_price']) ? $prod['sale_price'] : null;
+                $sale = ($saleRaw !== null && $saleRaw !== '' && is_numeric($saleRaw)) ? (float)$saleRaw : null;
+                if ($sale === null || $sale <= 0) {
+                    $msg = 'Nu poți trece la Avizare: completează prețul de vânzare al produsului.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
                 $avizNumber = trim((string)($_POST['aviz_number'] ?? ''));
                 if ($avizNumber === '') {
                     $msg = 'Nu poți trece la Avizare: completează numărul de aviz.';
