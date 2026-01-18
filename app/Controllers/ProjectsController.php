@@ -398,6 +398,598 @@ final class ProjectsController
         return $res;
     }
 
+    private static function fmtQty(float $qty, int $dec = 3): string
+    {
+        $txt = number_format($qty, $dec, '.', '');
+        $txt = rtrim(rtrim($txt, '0'), '.');
+        return $txt !== '' ? $txt : '0';
+    }
+
+    private static function fmtMoney(float $amount): string
+    {
+        return number_format($amount, 2, '.', '');
+    }
+
+    private static function nextDocNumber(string $key, int $startAt = 10000): int
+    {
+        $key = trim($key);
+        if ($key === '') {
+            throw new \RuntimeException('Cheie document invalidă.');
+        }
+        $startAt = max(1, (int)$startAt);
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('SELECT value FROM app_settings WHERE `key` = ? FOR UPDATE');
+            $st->execute([$key]);
+            $row = $st->fetch();
+            $last = ($row && isset($row['value']) && is_numeric($row['value'])) ? (int)$row['value'] : 0;
+            $next = $last >= $startAt ? ($last + 1) : $startAt;
+            if ($row) {
+                $st2 = $pdo->prepare('UPDATE app_settings SET value = ?, updated_by = ? WHERE `key` = ?');
+                $st2->execute([(string)$next, Auth::id(), $key]);
+            } else {
+                $st2 = $pdo->prepare('INSERT INTO app_settings (`key`, value, updated_by) VALUES (?,?,?)');
+                $st2->execute([$key, (string)$next, Auth::id()]);
+            }
+            $pdo->commit();
+            return $next;
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            throw $e;
+        }
+    }
+
+    /** @return array<string,string> */
+    private static function companySettingsForDocs(): array
+    {
+        $keys = [
+            'company_name',
+            'company_cui',
+            'company_reg',
+            'company_address',
+            'company_phone',
+            'company_email',
+            'company_contact_name',
+            'company_contact_phone',
+            'company_contact_email',
+            'company_contact_position',
+            'company_logo_url',
+            'company_logo_thumb_url',
+        ];
+        $vals = AppSetting::getMany($keys);
+        $name = trim((string)($vals['company_name'] ?? ''));
+        if ($name === '') $name = 'HPL Manager';
+        return [
+            'name' => $name,
+            'cui' => trim((string)($vals['company_cui'] ?? '')),
+            'reg' => trim((string)($vals['company_reg'] ?? '')),
+            'address' => trim((string)($vals['company_address'] ?? '')),
+            'phone' => trim((string)($vals['company_phone'] ?? '')),
+            'email' => trim((string)($vals['company_email'] ?? '')),
+            'contact_name' => trim((string)($vals['company_contact_name'] ?? '')),
+            'contact_phone' => trim((string)($vals['company_contact_phone'] ?? '')),
+            'contact_email' => trim((string)($vals['company_contact_email'] ?? '')),
+            'contact_position' => trim((string)($vals['company_contact_position'] ?? '')),
+            'logo_url' => trim((string)($vals['company_logo_url'] ?? '')),
+            'logo_thumb' => trim((string)($vals['company_logo_thumb_url'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<int, array{item_id:int,mode:string,src:string,code:string,name:string,unit:string,qty:float,unit_price:?float}> $rows
+     * @return array<int, array{item_id:int,code:string,name:string,unit:string,qty:float}>
+     */
+    private static function aggregateAccessories(array $rows, ?string $mode = null): array
+    {
+        $out = [];
+        $mode = $mode !== null ? strtoupper($mode) : null;
+        foreach ($rows as $r) {
+            $rowMode = strtoupper((string)($r['mode'] ?? ''));
+            if ($mode !== null && $rowMode !== $mode) continue;
+            $itemId = (int)($r['item_id'] ?? 0);
+            if ($itemId <= 0) continue;
+            $qty = isset($r['qty']) ? (float)($r['qty'] ?? 0) : 0.0;
+            if ($qty <= 0) continue;
+            $code = trim((string)($r['code'] ?? ''));
+            $name = trim((string)($r['name'] ?? ''));
+            $unit = trim((string)($r['unit'] ?? ''));
+            if (!isset($out[$itemId])) {
+                $out[$itemId] = [
+                    'item_id' => $itemId,
+                    'code' => $code,
+                    'name' => $name,
+                    'unit' => $unit,
+                    'qty' => 0.0,
+                ];
+            }
+            $out[$itemId]['qty'] += $qty;
+            if ($out[$itemId]['code'] === '' && $code !== '') $out[$itemId]['code'] = $code;
+            if ($out[$itemId]['name'] === '' && $name !== '') $out[$itemId]['name'] = $name;
+            if ($out[$itemId]['unit'] === '' && $unit !== '') $out[$itemId]['unit'] = $unit;
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $rows
+     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int}>
+     */
+    private static function aggregateConsumedHpl(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $r) {
+            if ((string)($r['status'] ?? '') !== 'CONSUMED') continue;
+            $pt = (string)($r['consumed_piece_type'] ?? '');
+            $pw = (int)($r['consumed_piece_width_mm'] ?? 0);
+            $ph = (int)($r['consumed_piece_height_mm'] ?? 0);
+            $qty = (int)($r['consumed_piece_qty'] ?? 0);
+            if ($pt === '' && $pw === 0 && $ph === 0) {
+                $pt = (string)($r['piece_type'] ?? '');
+                $pw = (int)($r['piece_width_mm'] ?? 0);
+                $ph = (int)($r['piece_height_mm'] ?? 0);
+                $qty = (int)($r['piece_qty'] ?? 0);
+            }
+            if ($qty <= 0) $qty = 1;
+            $bcode = trim((string)($r['board_code'] ?? ''));
+            $bname = trim((string)($r['board_name'] ?? ''));
+            $key = $bcode . '|' . $bname . '|' . $pt . '|' . $pw . '|' . $ph;
+            if (!isset($out[$key])) {
+                $out[$key] = [
+                    'board_code' => $bcode,
+                    'board_name' => $bname,
+                    'piece_type' => $pt,
+                    'width_mm' => $pw,
+                    'height_mm' => $ph,
+                    'qty' => 0,
+                ];
+            }
+            $out[$key]['qty'] += $qty;
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @return array{stored_name:string,size_bytes:int,mime:string}
+     */
+    private static function saveHtmlDocument(string $storedName, string $html): array
+    {
+        $safe = preg_replace('/[^a-zA-Z0-9_\-\.]+/', '_', $storedName) ?? 'document.html';
+        if (!str_ends_with(strtolower($safe), '.html')) {
+            $safe .= '.html';
+        }
+        $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException('Nu pot crea directorul de documente.');
+        }
+        $path = $dir . '/' . $safe;
+        $suffix = 0;
+        while (is_file($path)) {
+            $suffix++;
+            $path = $dir . '/' . preg_replace('/\.html$/', '', $safe) . '-' . $suffix . '.html';
+        }
+        if (file_put_contents($path, $html) === false) {
+            throw new \RuntimeException('Nu pot salva documentul pe server.');
+        }
+        $size = filesize($path);
+        return [
+            'stored_name' => basename($path),
+            'size_bytes' => $size !== false ? (int)$size : 0,
+            'mime' => 'text/html',
+        ];
+    }
+
+    /** @param array<string,mixed> $ctx */
+    private static function renderDevizHtml(array $ctx): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $company = $ctx['company'] ?? [];
+        $client = $ctx['client'] ?? [];
+        $delivery = $ctx['delivery'] ?? [];
+        $product = $ctx['product'] ?? [];
+        $accessories = is_array($ctx['accessories'] ?? null) ? $ctx['accessories'] : [];
+        $docNumber = (string)($ctx['doc_number'] ?? '');
+        $docDate = (string)($ctx['doc_date'] ?? '');
+        $projectLabel = (string)($ctx['project_label'] ?? '');
+        $qty = (float)($product['qty'] ?? 0.0);
+        $unit = (string)($product['unit'] ?? '');
+        $unitPrice = (float)($product['unit_price'] ?? 0.0);
+        $lineTotal = $qty * $unitPrice;
+        $accLines = [];
+        foreach ($accessories as $a) {
+            $name = trim((string)($a['name'] ?? ''));
+            $code = trim((string)($a['code'] ?? ''));
+            $qtyA = isset($a['qty']) ? (float)($a['qty'] ?? 0) : 0.0;
+            if ($qtyA <= 0) continue;
+            $unitA = trim((string)($a['unit'] ?? ''));
+            $label = $code !== '' ? ($code . ' · ' . ($name !== '' ? $name : 'Accesoriu')) : ($name !== '' ? $name : 'Accesoriu');
+            $accLines[] = $label . ' — ' . self::fmtQty($qtyA) . ($unitA !== '' ? (' ' . $unitA) : '');
+        }
+        $logo = (string)($company['logo_url'] ?? '');
+        if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
+
+        ob_start();
+        ?>
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Deviz <?= $esc($docNumber) ?></title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#111; font-size:13px; margin:24px; }
+    h1 { font-size:20px; margin:0 0 6px; }
+    .muted { color:#666; }
+    .header { display:flex; justify-content:space-between; gap:24px; }
+    .company-name { font-weight:700; font-size:16px; }
+    .doc-title { font-size:18px; font-weight:700; }
+    .box { border:1px solid #ddd; padding:10px 12px; border-radius:6px; }
+    .grid { display:flex; gap:16px; margin-top:14px; }
+    .grid > div { flex:1; }
+    table { width:100%; border-collapse:collapse; margin-top:16px; }
+    th, td { border:1px solid #ddd; padding:8px; vertical-align:top; }
+    th { background:#f6f7f8; text-align:left; font-size:12px; }
+    .small { font-size:12px; }
+    .title { font-weight:700; }
+    .total { margin-top:12px; text-align:right; font-weight:700; font-size:14px; }
+    .logo { max-height:50px; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <?php if ($logo !== ''): ?>
+        <img src="<?= $esc($logo) ?>" class="logo" alt="Logo">
+      <?php endif; ?>
+      <div class="company-name"><?= $esc($company['name'] ?? '') ?></div>
+      <div class="muted small">
+        <?php if (!empty($company['cui'])): ?>CUI: <?= $esc($company['cui']) ?><?php endif; ?>
+        <?php if (!empty($company['reg'])): ?> · Reg. Com.: <?= $esc($company['reg']) ?><?php endif; ?>
+      </div>
+      <?php if (!empty($company['address'])): ?>
+        <div class="small"><?= $esc($company['address']) ?></div>
+      <?php endif; ?>
+      <div class="small">
+        <?php if (!empty($company['phone'])): ?>Tel: <?= $esc($company['phone']) ?><?php endif; ?>
+        <?php if (!empty($company['email'])): ?> · Email: <?= $esc($company['email']) ?><?php endif; ?>
+      </div>
+      <?php if (!empty($company['contact_name']) || !empty($company['contact_phone']) || !empty($company['contact_email'])): ?>
+        <div class="small muted">
+          Contact: <?= $esc(trim((string)($company['contact_name'] ?? '') . (isset($company['contact_position']) && $company['contact_position'] !== '' ? (' · ' . $company['contact_position']) : ''))) ?>
+          <?php if (!empty($company['contact_phone'])): ?> · <?= $esc($company['contact_phone']) ?><?php endif; ?>
+          <?php if (!empty($company['contact_email'])): ?> · <?= $esc($company['contact_email']) ?><?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+    <div class="box">
+      <div class="doc-title">Deviz nr. <?= $esc($docNumber) ?></div>
+      <div class="small">Data: <?= $esc($docDate) ?></div>
+      <?php if ($projectLabel !== ''): ?>
+        <div class="small">Proiect: <?= $esc($projectLabel) ?></div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="box">
+      <div class="title">Facturare</div>
+      <div><?= $esc($client['name'] ?? '') ?></div>
+      <?php if (!empty($client['cui'])): ?><div class="small">CUI: <?= $esc($client['cui']) ?></div><?php endif; ?>
+      <?php if (!empty($client['address'])): ?><div class="small"><?= $esc($client['address']) ?></div><?php endif; ?>
+      <?php if (!empty($client['contact_person'])): ?><div class="small">Contact: <?= $esc($client['contact_person']) ?></div><?php endif; ?>
+      <div class="small">
+        <?php if (!empty($client['phone'])): ?>Tel: <?= $esc($client['phone']) ?><?php endif; ?>
+        <?php if (!empty($client['email'])): ?> · Email: <?= $esc($client['email']) ?><?php endif; ?>
+      </div>
+    </div>
+    <div class="box">
+      <div class="title">Livrare</div>
+      <div><?= $esc($delivery['label'] ?? '') ?></div>
+      <?php if (!empty($delivery['address'])): ?><div class="small"><?= $esc($delivery['address']) ?></div><?php endif; ?>
+      <?php if (!empty($delivery['notes'])): ?><div class="small muted"><?= $esc($delivery['notes']) ?></div><?php endif; ?>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Produs / descriere</th>
+        <th style="width:110px">Cantitate</th>
+        <th style="width:120px">Preț/buc</th>
+        <th style="width:120px">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="title"><?= $esc($product['name'] ?? '') ?></div>
+          <?php if (!empty($product['description'])): ?>
+            <div class="small"><?= $esc($product['description']) ?></div>
+          <?php endif; ?>
+          <?php if ($accLines): ?>
+            <div class="small muted" style="margin-top:6px;">Accesorii incluse:</div>
+            <div class="small">
+              <?php foreach ($accLines as $line): ?>
+                <div><?= $esc($line) ?></div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </td>
+        <td><?= $esc(self::fmtQty($qty)) ?><?= $unit !== '' ? (' ' . $esc($unit)) : '' ?></td>
+        <td><?= $esc(self::fmtMoney($unitPrice)) ?></td>
+        <td><?= $esc(self::fmtMoney($lineTotal)) ?></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="total">Total: <?= $esc(self::fmtMoney($lineTotal)) ?></div>
+</body>
+</html>
+        <?php
+        return (string)ob_get_clean();
+    }
+
+    /** @param array<string,mixed> $ctx */
+    private static function renderBonConsumHtml(array $ctx): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $company = $ctx['company'] ?? [];
+        $product = $ctx['product'] ?? [];
+        $docNumber = (string)($ctx['doc_number'] ?? '');
+        $docDate = (string)($ctx['doc_date'] ?? '');
+        $projectLabel = (string)($ctx['project_label'] ?? '');
+        $hplRows = is_array($ctx['hpl_rows'] ?? null) ? $ctx['hpl_rows'] : [];
+        $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
+        $logo = (string)($company['logo_url'] ?? '');
+        if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
+
+        ob_start();
+        ?>
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Bon de consum <?= $esc($docNumber) ?></title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#111; font-size:13px; margin:24px; }
+    .header { display:flex; justify-content:space-between; gap:24px; }
+    .company-name { font-weight:700; font-size:16px; }
+    .doc-title { font-size:18px; font-weight:700; }
+    .box { border:1px solid #ddd; padding:10px 12px; border-radius:6px; }
+    .section { margin-top:16px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { border:1px solid #ddd; padding:7px; vertical-align:top; }
+    th { background:#f6f7f8; text-align:left; font-size:12px; }
+    .muted { color:#666; }
+    .logo { max-height:50px; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <?php if ($logo !== ''): ?>
+        <img src="<?= $esc($logo) ?>" class="logo" alt="Logo">
+      <?php endif; ?>
+      <div class="company-name"><?= $esc($company['name'] ?? '') ?></div>
+      <?php if (!empty($company['address'])): ?>
+        <div class="muted"><?= $esc($company['address']) ?></div>
+      <?php endif; ?>
+      <div class="muted">
+        <?php if (!empty($company['phone'])): ?>Tel: <?= $esc($company['phone']) ?><?php endif; ?>
+        <?php if (!empty($company['email'])): ?> · Email: <?= $esc($company['email']) ?><?php endif; ?>
+      </div>
+    </div>
+    <div class="box">
+      <div class="doc-title">Bon de consum nr. <?= $esc($docNumber) ?></div>
+      <div>Data: <?= $esc($docDate) ?></div>
+      <?php if ($projectLabel !== ''): ?>
+        <div>Proiect: <?= $esc($projectLabel) ?></div>
+      <?php endif; ?>
+      <div>Produs: <?= $esc($product['code'] ?? '') ?><?= (!empty($product['code']) && !empty($product['name'])) ? ' · ' : '' ?><?= $esc($product['name'] ?? '') ?></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="title">Consum HPL</div>
+    <?php if (!$hplRows): ?>
+      <div class="muted">Nu există consum HPL.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Cod placă</th>
+            <th>Denumire</th>
+            <th style="width:110px">Tip</th>
+            <th style="width:160px">Dimensiuni</th>
+            <th style="width:80px">Buc</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($hplRows as $r): ?>
+            <?php
+              $dim = ($r['width_mm'] ?? 0) > 0 && ($r['height_mm'] ?? 0) > 0
+                ? ((int)$r['height_mm'] . ' × ' . (int)$r['width_mm'] . ' mm')
+                : '—';
+            ?>
+            <tr>
+              <td><?= $esc($r['board_code'] ?? '') ?></td>
+              <td><?= $esc($r['board_name'] ?? '') ?></td>
+              <td><?= $esc($r['piece_type'] ?? '') ?></td>
+              <td><?= $esc($dim) ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <div class="title">Consum accesorii</div>
+    <?php if (!$accRows): ?>
+      <div class="muted">Nu există consum accesorii.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Cod</th>
+            <th>Denumire</th>
+            <th style="width:90px">Cantitate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($accRows as $r): ?>
+            <tr>
+              <td><?= $esc($r['code'] ?? '') ?></td>
+              <td><?= $esc($r['name'] ?? '') ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+</body>
+</html>
+        <?php
+        return (string)ob_get_clean();
+    }
+
+    /**
+     * @return array{deviz_number:int,bon_number:int}
+     */
+    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before): array
+    {
+        $project = Project::find($projectId);
+        if (!$project) {
+            throw new \RuntimeException('Proiect invalid pentru deviz.');
+        }
+
+        $projectProducts = ProjectProduct::forProject($projectId);
+        $ppRow = null;
+        foreach ($projectProducts as $pp) {
+            if ((int)($pp['id'] ?? 0) === $ppId) {
+                $ppRow = $pp;
+                break;
+            }
+        }
+        if (!$ppRow) {
+            throw new \RuntimeException('Produs proiect invalid pentru deviz.');
+        }
+
+        $invoiceClientId = isset($before['invoice_client_id']) ? (int)$before['invoice_client_id'] : 0;
+        $deliveryAddressId = isset($before['delivery_address_id']) ? (int)$before['delivery_address_id'] : 0;
+        $client = $invoiceClientId > 0 ? Client::find($invoiceClientId) : null;
+        $delivery = $deliveryAddressId > 0 ? ClientAddress::find($deliveryAddressId) : null;
+        if (!$client || !$delivery) {
+            throw new \RuntimeException('Date de facturare/livrare invalide pentru deviz.');
+        }
+
+        $magConsum = ProjectMagazieConsumption::forProject($projectId);
+        $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+        $accRows = $accBy[$ppId] ?? [];
+
+        $company = self::companySettingsForDocs();
+        $projectLabel = self::projectLabel($project);
+        $productName = trim((string)($ppRow['product_name'] ?? ''));
+        $productCode = trim((string)($ppRow['product_code'] ?? ''));
+        $productNotes = trim((string)($ppRow['product_notes'] ?? ''));
+        $ppNotes = trim((string)($ppRow['notes'] ?? ''));
+        $description = $productNotes !== '' ? $productNotes : $ppNotes;
+        $qty = (float)($ppRow['qty'] ?? 0);
+        $unit = (string)($ppRow['unit'] ?? '');
+        $unitPrice = isset($ppRow['product_sale_price']) && $ppRow['product_sale_price'] !== null && $ppRow['product_sale_price'] !== '' && is_numeric($ppRow['product_sale_price'])
+            ? (float)$ppRow['product_sale_price']
+            : 0.0;
+
+        try {
+            $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+        }
+        try {
+            $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+        }
+
+        $docDate = date('Y-m-d');
+
+        $devizHtml = self::renderDevizHtml([
+            'company' => $company,
+            'client' => $client,
+            'delivery' => $delivery,
+            'product' => [
+                'name' => $productName !== '' ? $productName : 'Produs',
+                'description' => $description,
+                'qty' => $qty,
+                'unit' => $unit,
+                'unit_price' => $unitPrice,
+            ],
+            'accessories' => self::aggregateAccessories($accRows),
+            'doc_number' => $devizNumber,
+            'doc_date' => $docDate,
+            'project_label' => $projectLabel,
+        ]);
+        $devizFile = self::saveHtmlDocument('deviz-' . $devizNumber . '-pp' . $ppId . '.html', $devizHtml);
+        $devizId = EntityFile::create([
+            'entity_type' => 'projects',
+            'entity_id' => $projectId,
+            'category' => 'Deviz nr. ' . $devizNumber . ' · ' . ($productName !== '' ? $productName : ('Produs #' . $ppId)),
+            'original_name' => 'Deviz ' . $devizNumber . ' - ' . ($productName !== '' ? $productName : ('Produs ' . $ppId)) . '.html',
+            'stored_name' => $devizFile['stored_name'],
+            'mime' => $devizFile['mime'],
+            'size_bytes' => $devizFile['size_bytes'],
+            'uploaded_by' => Auth::id(),
+        ]);
+        Audit::log('DEVIZ_GENERATED', 'entity_files', $devizId, null, null, [
+            'project_id' => $projectId,
+            'project_product_id' => $ppId,
+            'number' => $devizNumber,
+        ]);
+
+        $hplRows = [];
+        try {
+            $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
+        }
+        $bonAccRows = self::aggregateAccessories($accRows, 'CONSUMED');
+        $bonHtml = self::renderBonConsumHtml([
+            'company' => $company,
+            'product' => [
+                'name' => $productName !== '' ? $productName : 'Produs',
+                'code' => $productCode,
+            ],
+            'hpl_rows' => self::aggregateConsumedHpl($hplRows),
+            'acc_rows' => $bonAccRows,
+            'doc_number' => $bonNumber,
+            'doc_date' => $docDate,
+            'project_label' => $projectLabel,
+        ]);
+        $bonFile = self::saveHtmlDocument('bon-consum-' . $bonNumber . '-pp' . $ppId . '.html', $bonHtml);
+        $bonId = EntityFile::create([
+            'entity_type' => 'projects',
+            'entity_id' => $projectId,
+            'category' => 'Bon consum nr. ' . $bonNumber . ' · ' . ($productName !== '' ? $productName : ('Produs #' . $ppId)),
+            'original_name' => 'Bon consum ' . $bonNumber . ' - ' . ($productName !== '' ? $productName : ('Produs ' . $ppId)) . '.html',
+            'stored_name' => $bonFile['stored_name'],
+            'mime' => $bonFile['mime'],
+            'size_bytes' => $bonFile['size_bytes'],
+            'uploaded_by' => Auth::id(),
+        ]);
+        Audit::log('BON_CONSUM_GENERATED', 'entity_files', $bonId, null, null, [
+            'project_id' => $projectId,
+            'project_product_id' => $ppId,
+            'number' => $bonNumber,
+        ]);
+
+        return ['deviz_number' => $devizNumber, 'bon_number' => $bonNumber];
+    }
+
     /**
      * HPL cost (fără alocare automată pe produse):
      * costul unui produs se calculează doar din placa selectată pe produs (hpl_board_id)
@@ -2617,6 +3209,11 @@ final class ProjectsController
                 }
             }
 
+            $docInfo = null;
+            if ($next === 'AVIZAT') {
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before);
+            }
+
             ProjectProduct::updateStatus($ppId, $next);
             $after = $before;
             $after['production_status'] = $next;
@@ -2626,7 +3223,11 @@ final class ProjectsController
                 'old_status' => $old,
                 'new_status' => $next,
             ]);
-            Session::flash('toast_success', 'Status piesă actualizat.');
+            $msg = 'Status piesă actualizat.';
+            if (is_array($docInfo) && isset($docInfo['deviz_number'], $docInfo['bon_number'])) {
+                $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
+            }
+            Session::flash('toast_success', $msg);
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot schimba statusul: ' . $e->getMessage());
         }

@@ -194,6 +194,7 @@ $router->get('/uploads/files/{name}', function (array $params) {
         'jpg','jpeg' => 'image/jpeg',
         'png' => 'image/png',
         'webp' => 'image/webp',
+        'html','htm' => 'text/html; charset=utf-8',
         'dxf' => 'application/dxf',
         'nc','gcode','tap' => 'text/plain',
         default => 'application/octet-stream',
