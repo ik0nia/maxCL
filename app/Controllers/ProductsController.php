@@ -44,12 +44,78 @@ final class ProductsController
             $st = $pdo->prepare($sql);
             $st->execute($params);
             $rows = $st->fetchAll();
+            $docsByPp = [];
+            $ppIds = [];
+            foreach ($rows as $r) {
+                $ppId = (int)($r['project_product_id'] ?? 0);
+                if ($ppId > 0) $ppIds[] = $ppId;
+            }
+            $ppIds = array_values(array_unique($ppIds));
+            if ($ppIds) {
+                $ppIdSet = array_fill_keys($ppIds, true);
+                $in = implode(',', array_fill(0, count($ppIds), '?'));
+                $sqlFiles = '
+                    SELECT id, entity_type, entity_id, category, original_name, stored_name, created_at
+                    FROM entity_files
+                    WHERE (entity_type = "project_products" AND entity_id IN (' . $in . '))
+                       OR (entity_type = "projects" AND (
+                            stored_name LIKE "deviz-%-pp%.html"
+                            OR stored_name LIKE "bon-consum-%-pp%.html"
+                          ))
+                    ORDER BY created_at DESC, id DESC
+                ';
+                try {
+                    $stFiles = $pdo->prepare($sqlFiles);
+                    $stFiles->execute($ppIds);
+                    $files = $stFiles->fetchAll();
+                } catch (\Throwable $e) {
+                    $files = [];
+                }
+                foreach ($files as $f) {
+                    $etype = (string)($f['entity_type'] ?? '');
+                    $stored = (string)($f['stored_name'] ?? '');
+                    $category = (string)($f['category'] ?? '');
+                    $ppId = 0;
+                    if ($etype === 'project_products') {
+                        $ppId = (int)($f['entity_id'] ?? 0);
+                    } else {
+                        if (preg_match('/-pp(\d+)\.html$/', $stored, $m)) {
+                            $ppId = (int)$m[1];
+                        }
+                    }
+                    if ($ppId <= 0 || !isset($ppIdSet[$ppId])) continue;
+
+                    $type = null;
+                    if (str_starts_with($stored, 'deviz-') || stripos($category, 'deviz') !== false) {
+                        $type = 'deviz';
+                    } elseif (str_starts_with($stored, 'bon-consum-') || stripos($category, 'bon consum') !== false) {
+                        $type = 'bon';
+                    }
+                    if ($type === null) continue;
+                    if (isset($docsByPp[$ppId][$type])) continue;
+
+                    $label = $type === 'deviz' ? 'Deviz' : 'Bon consum';
+                    $num = '';
+                    if (preg_match('/nr\.?\s*([0-9]+)/i', $category, $m)) {
+                        $num = (string)$m[1];
+                    } elseif (preg_match('/^(deviz|bon-consum)-(\d+)/', $stored, $m)) {
+                        $num = (string)$m[2];
+                    }
+                    if ($num !== '') $label .= ' ' . $num;
+
+                    $docsByPp[$ppId][$type] = [
+                        'stored_name' => $stored,
+                        'label' => $label,
+                    ];
+                }
+            }
 
             echo View::render('products/index', [
                 'title' => 'Produse',
                 'rows' => $rows,
                 'q' => $q,
                 'label' => $label,
+                'docsByPp' => $docsByPp,
             ]);
         } catch (\Throwable $e) {
             echo View::render('system/placeholder', [
