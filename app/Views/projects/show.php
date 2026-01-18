@@ -740,8 +740,12 @@ ob_start();
                           <?php if (!$isVisible) continue; ?>
 
                           <?php if ($isNext && $canAdvance): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0">
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0"
+                                  <?= $nextVal === 'AVIZAT' ? 'data-aviz-required="1"' : '' ?>>
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                              <?php if ($nextVal === 'AVIZAT'): ?>
+                                <input type="hidden" name="aviz_number" value="">
+                              <?php endif; ?>
                               <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
                                 <?= htmlspecialchars($lbl) ?>
                               </button>
@@ -2736,6 +2740,27 @@ ob_start();
   </div>
 <?php endif; ?>
 
+<div class="modal fade" id="avizNumberModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Număr aviz</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="avizNumberInput" class="form-label fw-semibold">Introdu numărul de aviz</label>
+        <input class="form-control" id="avizNumberInput" maxlength="40" placeholder="ex: AVZ-10234">
+        <div class="invalid-feedback">Introdu un număr de aviz.</div>
+        <div class="text-muted small mt-2">Numărul de aviz va fi afișat jos pe Deviz și Bonul de consum.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+        <button type="button" class="btn btn-primary" id="avizNumberConfirm">Continuă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="returnNoteModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -2832,6 +2857,80 @@ ob_start();
         return false;
       }
     };
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('avizNumberModal');
+    const modal = (modalEl && window.bootstrap && window.bootstrap.Modal)
+      ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
+      : null;
+    const input = document.getElementById('avizNumberInput');
+    const confirmBtn = document.getElementById('avizNumberConfirm');
+    let activeForm = null;
+
+    function resetInput() {
+      if (input) {
+        input.value = '';
+        input.classList.remove('is-invalid');
+      }
+    }
+
+    function applyAndSubmit(value) {
+      if (!activeForm) return;
+      const target = activeForm.querySelector('input[name="aviz_number"]');
+      if (target) target.value = value;
+      activeForm.dataset.avizConfirmed = '1';
+      if (modal) modal.hide();
+      activeForm.submit();
+    }
+
+    function openModal(form) {
+      activeForm = form;
+      resetInput();
+      if (modal) {
+        modal.show();
+      } else {
+        const txt = window.prompt('Număr de aviz:') || '';
+        const val = txt.trim();
+        if (val === '') return;
+        applyAndSubmit(val);
+      }
+    }
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () {
+        const val = input ? input.value.trim() : '';
+        if (val === '') {
+          if (input) {
+            input.classList.add('is-invalid');
+            input.focus();
+          }
+          return;
+        }
+        applyAndSubmit(val);
+      });
+    }
+
+    if (input) {
+      input.addEventListener('input', function () {
+        input.classList.remove('is-invalid');
+      });
+    }
+
+    document.querySelectorAll('form[data-aviz-required="1"]').forEach(function (form) {
+      form.addEventListener('submit', function (ev) {
+        if (form.dataset.avizConfirmed === '1') {
+          form.dataset.avizConfirmed = '';
+          return;
+        }
+        const current = form.querySelector('input[name="aviz_number"]');
+        if (current && current.value.trim() !== '') return;
+        ev.preventDefault();
+        openModal(form);
+      });
+    });
   });
 </script>
 

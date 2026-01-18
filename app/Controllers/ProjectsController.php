@@ -592,6 +592,7 @@ final class ProjectsController
         $docNumber = (string)($ctx['doc_number'] ?? '');
         $docDate = (string)($ctx['doc_date'] ?? '');
         $projectLabel = (string)($ctx['project_label'] ?? '');
+        $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
         $qty = (float)($product['qty'] ?? 0.0);
         $unit = (string)($product['unit'] ?? '');
         $unitPrice = (float)($product['unit_price'] ?? 0.0);
@@ -723,6 +724,9 @@ final class ProjectsController
   </table>
 
   <div class="total">Total: <?= $esc(self::fmtMoney($lineTotal)) ?></div>
+  <?php if ($avizNumber !== ''): ?>
+    <div class="small muted" style="margin-top:6px;">Număr aviz: <?= $esc($avizNumber) ?></div>
+  <?php endif; ?>
 </body>
 </html>
         <?php
@@ -738,6 +742,7 @@ final class ProjectsController
         $docNumber = (string)($ctx['doc_number'] ?? '');
         $docDate = (string)($ctx['doc_date'] ?? '');
         $projectLabel = (string)($ctx['project_label'] ?? '');
+        $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
         $hplRows = is_array($ctx['hpl_rows'] ?? null) ? $ctx['hpl_rows'] : [];
         $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
         $logo = (string)($company['logo_url'] ?? '');
@@ -849,6 +854,9 @@ final class ProjectsController
       </table>
     <?php endif; ?>
   </div>
+  <?php if ($avizNumber !== ''): ?>
+    <div class="muted" style="margin-top:12px;">Număr aviz: <?= $esc($avizNumber) ?></div>
+  <?php endif; ?>
 </body>
 </html>
         <?php
@@ -858,7 +866,7 @@ final class ProjectsController
     /**
      * @return array{deviz_number:int,bon_number:int}
      */
-    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before): array
+    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before, string $avizNumber): array
     {
         $project = Project::find($projectId);
         if (!$project) {
@@ -932,6 +940,7 @@ final class ProjectsController
             'doc_number' => $devizNumber,
             'doc_date' => $docDate,
             'project_label' => $projectLabel,
+            'aviz_number' => $avizNumber,
         ]);
         $devizFile = self::saveHtmlDocument('deviz-' . $devizNumber . '-pp' . $ppId . '.html', $devizHtml);
         $devizId = EntityFile::create([
@@ -969,6 +978,7 @@ final class ProjectsController
             'doc_number' => $bonNumber,
             'doc_date' => $docDate,
             'project_label' => $projectLabel,
+            'aviz_number' => $avizNumber,
         ]);
         $bonFile = self::saveHtmlDocument('bon-consum-' . $bonNumber . '-pp' . $ppId . '.html', $bonHtml);
         $bonId = EntityFile::create([
@@ -3093,6 +3103,7 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
+        $avizNumber = '';
         try {
             // Statusurile piesei nu mai modifică automat locația/statusul HPL-ului.
             // CNC -> Montaj: blocăm până când toate plăcile/piesele HPL alocate pe piesă sunt "Debitat" (consumate manual).
@@ -3207,11 +3218,22 @@ final class ProjectsController
                     ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
                 }
+                $avizNumber = trim((string)($_POST['aviz_number'] ?? ''));
+                if ($avizNumber === '') {
+                    $msg = 'Nu poți trece la Avizare: completează numărul de aviz.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $avizNumber = mb_substr($avizNumber, 0, 40);
             }
 
             $docInfo = null;
             if ($next === 'AVIZAT') {
-                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before);
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber);
             }
 
             ProjectProduct::updateStatus($ppId, $next);
