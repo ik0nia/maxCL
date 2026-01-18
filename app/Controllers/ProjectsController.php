@@ -2047,7 +2047,10 @@ final class ProjectsController
                     $st = $pdo->prepare('
                         SELECT project_id,
                                COUNT(*) AS cnt,
-                               SUM(CASE WHEN qty <= delivered_qty + 1e-9 THEN 1 ELSE 0 END) AS delivered_cnt
+                               SUM(CASE
+                                     WHEN production_status = "LIVRAT"
+                                       OR qty <= delivered_qty + 1e-9
+                                     THEN 1 ELSE 0 END) AS delivered_cnt
                         FROM project_products
                         WHERE project_id IN (' . $in . ')
                         GROUP BY project_id
@@ -2089,6 +2092,24 @@ final class ProjectsController
                         FROM project_product_hpl_consumptions
                         WHERE project_id IN (' . $in . ')
                           AND status = "RESERVED"
+                        GROUP BY project_id
+                    ');
+                    $st->execute($projectIds);
+                    foreach ($st->fetchAll() as $row) {
+                        $pid = (int)($row['project_id'] ?? 0);
+                        if (isset($projectMeta[$pid])) $projectMeta[$pid]['reserved_any'] = true;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                try {
+                    $st = $pdo->prepare('
+                        SELECT project_id
+                        FROM hpl_stock_pieces
+                        WHERE project_id IN (' . $in . ')
+                          AND status = "RESERVED"
+                          AND qty > 0
                         GROUP BY project_id
                     ');
                     $st->execute($projectIds);
