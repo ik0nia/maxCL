@@ -1297,11 +1297,11 @@ ob_start();
 <?php elseif ($tab === 'consum'): ?>
   <?php
     $consumTabs = [
-      'accesorii' => 'Consum accesorii',
       'hpl' => 'Consum HPL',
+      'accesorii' => 'Consum accesorii',
     ];
-    $consumTab = isset($_GET['consum_tab']) ? trim((string)$_GET['consum_tab']) : 'accesorii';
-    if (!isset($consumTabs[$consumTab])) $consumTab = 'accesorii';
+    $consumTab = isset($_GET['consum_tab']) ? trim((string)$_GET['consum_tab']) : 'hpl';
+    if (!isset($consumTabs[$consumTab])) $consumTab = 'hpl';
   ?>
   <ul class="nav nav-tabs mb-3">
     <?php foreach ($consumTabs as $k => $label): ?>
