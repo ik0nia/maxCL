@@ -613,9 +613,14 @@ final class StockController
         $toStatus = trim((string)($_POST['to_status'] ?? ''));
         $note = trim((string)($_POST['note'] ?? ''));
         $noteUser = trim((string)($_POST['note_user'] ?? ''));
+        $hasNoteUserField = array_key_exists('note_user', $_POST);
         $noteCombined = $note;
         if ($noteUser !== '') {
             $noteCombined = trim($noteCombined . ($noteCombined !== '' ? "\n" : '') . $noteUser);
+        }
+        $noteForMatch = $noteCombined;
+        if ($toStatus === 'AVAILABLE' && $hasNoteUserField && $noteUser === '') {
+            $noteForMatch = '';
         }
 
         if ($fromId === null) $errors['from_piece_id'] = 'Selectează piesa sursă.';
@@ -671,6 +676,14 @@ final class StockController
                 ($toStatus === 'AVAILABLE') ? null : (isset($from['project_id']) ? (int)$from['project_id'] : null),
                 (int)$from['id']
             );
+            if ($toStatus === 'AVAILABLE' && $destExisting) {
+                $destNote = trim((string)($destExisting['notes'] ?? ''));
+                if ($noteForMatch === '') {
+                    if ($destNote !== '') $destExisting = null;
+                } elseif ($destNote !== $noteForMatch) {
+                    $destExisting = null;
+                }
+            }
 
             if ($qty < $fromQty) {
                 // Split: scade din sursă + creează/actualizează destinație

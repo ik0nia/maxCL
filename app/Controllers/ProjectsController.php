@@ -806,6 +806,15 @@ final class ProjectsController
                     $ident = null;
                 }
                 if ($ident) {
+                    if ($toStatus === 'AVAILABLE') {
+                        $destNote = trim((string)($ident['notes'] ?? ''));
+                        $noteForMatch = trim((string)($noteAppend ?? ''));
+                        if ($noteForMatch === '') {
+                            if ($destNote !== '') $ident = null;
+                        } elseif ($destNote !== $noteForMatch) {
+                            $ident = null;
+                        }
+                    }
                     $destId = (int)($ident['id'] ?? 0);
                     if ($destId > 0) {
                         HplStockPiece::incrementQty($destId, $take);
@@ -851,6 +860,15 @@ final class ProjectsController
                     $ident = null;
                 }
                 if ($ident) {
+                    if ($toStatus === 'AVAILABLE') {
+                        $destNote = trim((string)($ident['notes'] ?? ''));
+                        $noteForMatch = trim((string)($noteAppend ?? ''));
+                        if ($noteForMatch === '') {
+                            if ($destNote !== '') $ident = null;
+                        } elseif ($destNote !== $noteForMatch) {
+                            $ident = null;
+                        }
+                    }
                     HplStockPiece::incrementQty((int)$ident['id'], $take);
                     if ($noteAppend) {
                         if ($carryNotes) {
@@ -4158,6 +4176,10 @@ final class ProjectsController
             if ($userNote !== '') {
                 $note = trim($note . "\n" . $userNote);
             }
+            $noteForMatch = $note;
+            if ($userNote === '') {
+                $noteForMatch = '';
+            }
 
             // merge with identical AVAILABLE row, else update in place
             $ident = null;
@@ -4165,6 +4187,14 @@ final class ProjectsController
                 $ident = HplStockPiece::findIdentical($boardId, $ptype !== '' ? $ptype : 'OFFCUT', 'AVAILABLE', $w, $h, 'Depozit', 0, null, $pieceId);
             } catch (\Throwable $e) {
                 $ident = null;
+            }
+            if ($ident && (int)($ident['id'] ?? 0) > 0) {
+                $destNote = trim((string)($ident['notes'] ?? ''));
+                if ($noteForMatch === '') {
+                    if ($destNote !== '') $ident = null;
+                } elseif ($destNote !== $noteForMatch) {
+                    $ident = null;
+                }
             }
             if ($ident && (int)($ident['id'] ?? 0) > 0) {
                 $destId = (int)$ident['id'];
