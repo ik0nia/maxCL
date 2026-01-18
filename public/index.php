@@ -260,6 +260,7 @@ $router->post('/projects/{id}/delete', fn($p) => ProjectsController::delete($p),
 $router->post('/projects/{id}/products/add-existing', fn($p) => ProjectsController::addExistingProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/create', fn($p) => ProjectsController::createProductInProject($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/update', fn($p) => ProjectsController::updateProjectProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/billing/update', fn($p) => ProjectsController::updateProjectProductBilling($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/status', fn($p) => ProjectsController::updateProjectProductStatus($p), $projectsProductStatusMW);
 $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/{ppId}/magazie/create', fn($p) => ProjectsController::addMagazieConsumptionForProduct($p), $projectsProductEditMW);

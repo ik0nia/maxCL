@@ -11,6 +11,7 @@ use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
 use App\Models\Client;
+use App\Models\ClientAddress;
 use App\Models\ClientGroup;
 use App\Models\HplBoard;
 use App\Models\HplStockPiece;
@@ -1598,6 +1599,48 @@ final class ProjectsController
                     try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
                     $projectHplPieces = [];
                     try { $projectHplPieces = HplStockPiece::forProject($id); } catch (\Throwable $e) { $projectHplPieces = []; }
+                    $billingClients = [];
+                    $billingAddresses = [];
+                    $billingClientIds = [];
+                    $projectClientId = (int)($project['client_id'] ?? 0);
+                    $projectGroupId = (int)($project['client_group_id'] ?? 0);
+                    $addBillingClient = function (?array $c) use (&$billingClients, &$billingClientIds): void {
+                        $cid = $c ? (int)($c['id'] ?? 0) : 0;
+                        if ($cid <= 0 || isset($billingClientIds[$cid])) return;
+                        $billingClientIds[$cid] = true;
+                        $billingClients[] = [
+                            'id' => $cid,
+                            'name' => (string)($c['name'] ?? ''),
+                            'type' => (string)($c['type'] ?? ''),
+                        ];
+                    };
+                    if ($projectClientId > 0) {
+                        try { $addBillingClient(Client::find($projectClientId)); } catch (\Throwable $e) {}
+                    }
+                    if ($projectGroupId > 0) {
+                        try {
+                            $others = Client::othersInGroup($projectClientId, $projectGroupId);
+                            foreach ($others as $oc) $addBillingClient($oc);
+                        } catch (\Throwable $e) {}
+                    }
+                    foreach ($projectProducts as $ppRow) {
+                        $cid = (int)($ppRow['invoice_client_id'] ?? 0);
+                        if ($cid <= 0) continue;
+                        try { $addBillingClient(Client::find($cid)); } catch (\Throwable $e) {}
+                    }
+                    if (!$billingClients) {
+                        try {
+                            $all = Client::allWithProjects();
+                            foreach ($all as $c) $addBillingClient($c);
+                        } catch (\Throwable $e) {}
+                    }
+                    foreach (array_keys($billingClientIds) as $cid) {
+                        try {
+                            $billingAddresses[$cid] = ClientAddress::forClient($cid);
+                        } catch (\Throwable $e) {
+                            $billingAddresses[$cid] = [];
+                        }
+                    }
                     $ppHplByProduct = [];
                     foreach ($projectProducts as $ppRow) {
                         $ppId = (int)($ppRow['id'] ?? 0);
@@ -1623,7 +1666,7 @@ final class ProjectsController
                             'hpl_rows' => $ppHplByProduct[$ppId] ?? [],
                         ];
                     }
-            $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum, $projectHplPieces);
+                    $projectCostSummary = self::projectSummaryFromProducts($projectProducts, $laborByProduct, $materialsByProduct, $magazieConsum, $hplConsum, $projectHplPieces);
                 } elseif ($tab === 'consum') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
@@ -1693,6 +1736,8 @@ final class ProjectsController
                     'laborByProduct' => $laborByProduct,
                     'materialsByProduct' => $materialsByProduct,
                     'projectCostSummary' => $projectCostSummary,
+                    'billingClients' => $billingClients ?? [],
+                    'billingAddresses' => $billingAddresses ?? [],
                     'discussions' => $discussions,
                     'costSettings' => [
                         'labor' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
@@ -2354,6 +2399,71 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot actualiza produsul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    public static function updateProjectProductBilling(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+
+        $before = ProjectProduct::find($ppId);
+        if (!$before || (int)($before['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        // Cerință: după Gata de livrare, OPERATOR nu mai poate edita nimic.
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($before['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizat/Livrat). Doar Admin/Gestionar poate edita.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        $invRaw = trim((string)($_POST['invoice_client_id'] ?? ''));
+        $addrRaw = trim((string)($_POST['delivery_address_id'] ?? ''));
+        $invoiceClientId = $invRaw !== '' ? (Validator::int($invRaw, 1) ?? null) : null;
+        $deliveryAddressId = $addrRaw !== '' ? (Validator::int($addrRaw, 1) ?? null) : null;
+
+        $errors = [];
+        if ($invoiceClientId !== null) {
+            $client = null;
+            try { $client = Client::find($invoiceClientId); } catch (\Throwable $e) {}
+            if (!$client) $errors['invoice_client_id'] = 'Firmă invalidă.';
+        }
+        if ($deliveryAddressId !== null) {
+            if ($invoiceClientId === null) {
+                $errors['delivery_address_id'] = 'Alege firma înainte de adresă.';
+            } else {
+                $addr = null;
+                try { $addr = ClientAddress::find($deliveryAddressId); } catch (\Throwable $e) {}
+                if (!$addr || (int)($addr['client_id'] ?? 0) !== (int)$invoiceClientId) {
+                    $errors['delivery_address_id'] = 'Adresă invalidă pentru firma selectată.';
+                }
+            }
+        }
+        if ($errors) {
+            Session::flash('toast_error', implode(' ', array_values($errors)));
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+
+        try {
+            ProjectProduct::updateBilling($ppId, $invoiceClientId, $deliveryAddressId);
+            Audit::log('PROJECT_PRODUCT_BILLING_UPDATE', 'project_products', $ppId, $before, null, [
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'invoice_client_id' => $invoiceClientId,
+                'delivery_address_id' => $deliveryAddressId,
+            ]);
+            Session::flash('toast_success', 'Datele de facturare/livrare au fost salvate.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot salva datele. Rulează Update DB dacă lipsesc coloanele.');
+        }
+
+        Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
     }
 
     public static function updateProjectProductStatus(array $params): void

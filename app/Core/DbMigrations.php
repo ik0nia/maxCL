@@ -1066,6 +1066,39 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-18_01_project_products_billing',
+                'label' => 'ALTER project_products ADD invoice_client_id + delivery_address_id',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::columnExists($pdo, 'project_products', 'invoice_client_id')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN invoice_client_id INT UNSIGNED NULL AFTER project_id");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                        try { $pdo->exec("ALTER TABLE project_products ADD KEY idx_pp_invoice_client (invoice_client_id)"); } catch (\Throwable $e) {}
+                        try {
+                            if (self::tableExists($pdo, 'clients')) {
+                                $pdo->exec("ALTER TABLE project_products ADD CONSTRAINT fk_pp_invoice_client FOREIGN KEY (invoice_client_id) REFERENCES clients(id) ON DELETE SET NULL");
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                    if (!self::columnExists($pdo, 'project_products', 'delivery_address_id')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN delivery_address_id INT UNSIGNED NULL AFTER invoice_client_id");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                        try { $pdo->exec("ALTER TABLE project_products ADD KEY idx_pp_delivery_addr (delivery_address_id)"); } catch (\Throwable $e) {}
+                        try {
+                            if (self::tableExists($pdo, 'client_addresses')) {
+                                $pdo->exec("ALTER TABLE project_products ADD CONSTRAINT fk_pp_delivery_addr FOREIGN KEY (delivery_address_id) REFERENCES client_addresses(id) ON DELETE SET NULL");
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                },
+            ],
         ];
     }
 

@@ -29,6 +29,8 @@ $discussions = $discussions ?? [];
 $laborByProduct = $laborByProduct ?? [];
 $materialsByProduct = $materialsByProduct ?? [];
 $projectCostSummary = $projectCostSummary ?? [];
+$billingClients = $billingClients ?? [];
+$billingAddresses = $billingAddresses ?? [];
 $projectLabels = $projectLabels ?? [];
 $cncFiles = $cncFiles ?? [];
 $statuses = $statuses ?? [];
@@ -662,6 +664,24 @@ ob_start();
                 $matCost = $magCost + $hplCost;
                 $totalEst = $manCost + $matCost;
 
+                $projectClientId = (int)($project['client_id'] ?? 0);
+                $invoiceClientId = isset($pp['invoice_client_id']) ? (int)$pp['invoice_client_id'] : 0;
+                if ($invoiceClientId <= 0) $invoiceClientId = $projectClientId;
+                $deliveryAddressId = isset($pp['delivery_address_id']) ? (int)$pp['delivery_address_id'] : 0;
+                $addrList = is_array(($billingAddresses[$invoiceClientId] ?? null)) ? $billingAddresses[$invoiceClientId] : [];
+                $defaultAddrId = $deliveryAddressId;
+                if ($defaultAddrId <= 0 && $addrList) {
+                  foreach ($addrList as $addrRow) {
+                    if ((int)($addrRow['is_default'] ?? 0) === 1) {
+                      $defaultAddrId = (int)($addrRow['id'] ?? 0);
+                      break;
+                    }
+                  }
+                  if ($defaultAddrId <= 0) {
+                    $defaultAddrId = (int)($addrList[0]['id'] ?? 0);
+                  }
+                }
+
                 $qtyUnits = ($qty > 0.0) ? $qty : 0.0;
                 $showPerUnit = ($qtyUnits > 1.0001);
                 $cncHUnit = $showPerUnit ? ($cncH / $qtyUnits) : $cncH;
@@ -1084,6 +1104,9 @@ ob_start();
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAcc<?= $ppId ?>">
                         <i class="bi bi-box-seam me-1"></i> Adaugă accesorii
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppBill<?= $ppId ?>">
+                        <i class="bi bi-receipt me-1"></i> Facturare/Livrare
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
                         <i class="bi bi-pencil me-1"></i> Editează
                       </button>
@@ -1159,6 +1182,59 @@ ob_start();
                           <div class="col-12 d-flex justify-content-end">
                             <button class="btn btn-primary btn-sm" type="submit">
                               <i class="bi bi-plus-lg me-1"></i> Adaugă
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                    <div class="collapse mt-3" id="ppBill<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Facturare & livrare</div>
+                        <div class="text-muted small">Alege firma de facturare și adresa de livrare pentru acest produs.</div>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/billing/update')) ?>" class="row g-2 mt-2">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold mb-1">Firmă facturare</label>
+                            <select class="form-select form-select-sm js-pp-bill-client" name="invoice_client_id"
+                                    data-addr-target="ppBillAddr<?= $ppId ?>" data-default-addr="<?= (int)$defaultAddrId ?>"
+                                    <?= $billingClients ? '' : 'disabled' ?>>
+                              <?php if (!$billingClients): ?>
+                                <option value="">Nu există firme</option>
+                              <?php else: ?>
+                                <option value="">—</option>
+                                <?php foreach ($billingClients as $bc): ?>
+                                  <?php $bcId = (int)($bc['id'] ?? 0); ?>
+                                  <option value="<?= $bcId ?>" <?= $bcId > 0 && $bcId === (int)$invoiceClientId ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string)($bc['name'] ?? '')) ?>
+                                  </option>
+                                <?php endforeach; ?>
+                              <?php endif; ?>
+                            </select>
+                          </div>
+                          <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold mb-1">Adresă livrare</label>
+                            <select class="form-select form-select-sm" name="delivery_address_id" id="ppBillAddr<?= $ppId ?>" <?= $billingClients ? '' : 'disabled' ?>>
+                              <?php if (!$addrList): ?>
+                                <option value="">Nu există adrese</option>
+                              <?php else: ?>
+                                <option value="">—</option>
+                                <?php foreach ($addrList as $addrRow): ?>
+                                  <?php
+                                    $addrId = (int)($addrRow['id'] ?? 0);
+                                    $addrLabel = trim((string)($addrRow['label'] ?? ''));
+                                    $addrText = trim((string)($addrRow['address'] ?? ''));
+                                    $addrFull = trim($addrLabel !== '' ? ($addrLabel . ' · ' . $addrText) : $addrText);
+                                  ?>
+                                  <option value="<?= $addrId ?>" <?= $addrId > 0 && $addrId === (int)$defaultAddrId ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($addrFull !== '' ? $addrFull : ('Adresă #' . $addrId)) ?>
+                                  </option>
+                                <?php endforeach; ?>
+                              <?php endif; ?>
+                            </select>
+                          </div>
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-save me-1"></i> Salvează
                             </button>
                           </div>
                         </form>
@@ -1263,6 +1339,53 @@ ob_start();
         <?php endif; ?>
       </div>
     </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function(){
+        const addrMap = <?= json_encode($billingAddresses ?? [], JSON_UNESCAPED_UNICODE) ?>;
+        function addrLabel(a){
+          const label = a && a.label ? String(a.label) : '';
+          const addr = a && a.address ? String(a.address) : '';
+          return (label && addr) ? (label + ' · ' + addr) : (label || addr);
+        }
+        function buildAddrOptions(select, clientId, selectedId){
+          if (!select) return;
+          const list = (clientId && addrMap && addrMap[clientId]) ? addrMap[clientId] : [];
+          select.innerHTML = '';
+          if (!list || !list.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Nu există adrese';
+            select.appendChild(opt);
+            select.disabled = true;
+            return;
+          }
+          select.disabled = false;
+          const empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = '—';
+          select.appendChild(empty);
+          list.forEach(function(a){
+            const opt = document.createElement('option');
+            const id = a && a.id ? String(a.id) : '';
+            opt.value = id;
+            opt.textContent = addrLabel(a) || ('Adresă #' + id);
+            if (id !== '' && String(selectedId || '') === id) opt.selected = true;
+            select.appendChild(opt);
+          });
+        }
+        document.querySelectorAll('.js-pp-bill-client').forEach(function(sel){
+          const targetId = sel.getAttribute('data-addr-target') || '';
+          const addrSel = targetId ? document.getElementById(targetId) : null;
+          if (!addrSel) return;
+          const defaultAddr = sel.getAttribute('data-default-addr') || '';
+          buildAddrOptions(addrSel, sel.value, defaultAddr);
+          sel.addEventListener('change', function(){
+            buildAddrOptions(addrSel, sel.value, '');
+          });
+        });
+      });
+    </script>
 
     <div class="col-12">
       <div class="card app-card p-3 mb-3">
