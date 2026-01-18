@@ -618,6 +618,9 @@ final class StockController
         if ($noteUser !== '') {
             $noteCombined = trim($noteCombined . ($noteCombined !== '' ? "\n" : '') . $noteUser);
         }
+        if ($toStatus === 'AVAILABLE' && $hasNoteUserField) {
+            $noteCombined = $noteUser !== '' ? $noteUser : '';
+        }
         $noteForMatch = $noteCombined;
         if ($toStatus === 'AVAILABLE' && $hasNoteUserField && $noteUser === '') {
             $noteForMatch = '';
@@ -632,7 +635,9 @@ final class StockController
             $toStatus = 'RESERVED';
         }
         if ($toStatus === '' || !in_array($toStatus, $allowedStatuses, true)) $errors['to_status'] = 'Status invalid.';
-        if ($noteCombined === '') $errors['note'] = 'Notița este obligatorie.';
+        if ($noteCombined === '' && !($toStatus === 'AVAILABLE' && $hasNoteUserField)) {
+            $errors['note'] = 'Notița este obligatorie.';
+        }
 
         if ($errors) {
             Session::flash('toast_error', 'Completează corect câmpurile pentru mutare.');

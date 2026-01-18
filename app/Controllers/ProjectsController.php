@@ -5426,15 +5426,10 @@ final class ProjectsController
             $qty = (int)($p['qty'] ?? 0);
             if ($boardId <= 0 || $qty <= 0) throw new \RuntimeException('Stoc insuficient.');
 
-            $note = 'Revenire în stoc (REST) din proiect: ' . $projLabel;
             $userNote = trim((string)($_POST['note_user'] ?? ''));
-            if ($userNote !== '') {
-                $note = trim($note . "\n" . $userNote);
-            }
+            $note = $userNote;
             $noteForMatch = $note;
-            if ($userNote === '') {
-                $noteForMatch = '';
-            }
+            if ($note === '') $noteForMatch = '';
 
             // merge with identical AVAILABLE row, else update in place
             $ident = null;
@@ -5454,11 +5449,14 @@ final class ProjectsController
             if ($ident && (int)($ident['id'] ?? 0) > 0) {
                 $destId = (int)$ident['id'];
                 HplStockPiece::incrementQty($destId, $qty);
-                try { HplStockPiece::appendNote($destId, $note); } catch (\Throwable $e) {}
+                if ($note !== '') {
+                    try { HplStockPiece::appendNote($destId, $note); } catch (\Throwable $e) {}
+                }
                 HplStockPiece::delete($pieceId);
             } else {
-                HplStockPiece::updateFields($pieceId, ['status' => 'AVAILABLE', 'project_id' => null, 'location' => 'Depozit']);
-                try { HplStockPiece::appendNote($pieceId, $note); } catch (\Throwable $e) {}
+                $fields = ['status' => 'AVAILABLE', 'project_id' => null, 'location' => 'Depozit'];
+                $fields['notes'] = $note !== '' ? $note : null;
+                HplStockPiece::updateFields($pieceId, $fields);
             }
 
             // eliminăm rezervările pe produse pentru această piesă (ca să nu mai fie consumată ulterior)
