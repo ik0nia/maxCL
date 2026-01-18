@@ -138,7 +138,7 @@ ob_start();
         pageLength: 50,
         lengthMenu: [[25, 50, 100], [25, 50, 100]],
         // implicit: cele mai noi proiecte primele (data creare desc)
-        order: [[0, 'desc']],
+        order: [[1, 'desc']],
         language: {
           search: 'Caută:',
           searchPlaceholder: 'Caută în tabel…',
