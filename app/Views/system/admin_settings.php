@@ -36,7 +36,7 @@ ob_start();
 
 <div class="card app-card p-3 mb-3">
   <div class="h5 m-0">Date firmă</div>
-  <div class="text-muted">Datele firmei care produce piesele și logo pentru documente</div>
+  <div class="text-muted">Datele firmei care produce produsele și logo pentru documente</div>
 
   <form method="post" action="<?= htmlspecialchars(Url::to('/system/admin-settings/company/update')) ?>" class="row g-2 mt-2" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">

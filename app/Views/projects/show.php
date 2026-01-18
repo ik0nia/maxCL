@@ -52,7 +52,7 @@ if (is_string($ppStatusErrorRaw) && $ppStatusErrorRaw !== '') {
 
 $tabs = [
   'general' => 'General',
-  'products' => 'Produse (piese)',
+  'products' => 'Produse',
   'consum' => 'Consum materiale',
   'hours' => 'Ore & Manoperă',
   'cnc' => 'CNC / Tehnic',
@@ -260,11 +260,11 @@ ob_start();
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <div class="h5 m-0">Adaugă produs (nou)</div>
-            <div class="text-muted">Fiecare piesă se creează direct în proiect</div>
+            <div class="text-muted">Fiecare produs se creează direct în proiect</div>
           </div>
           <?php if ($canWrite): ?>
             <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNewCollapse" aria-expanded="false" aria-controls="ppAddNewCollapse">
-              <i class="bi bi-plus-lg me-1"></i> Creează piesă
+              <i class="bi bi-plus-lg me-1"></i> Creează produs
             </button>
           <?php endif; ?>
         </div>
@@ -581,7 +581,7 @@ ob_start();
       </div>
 
       <div class="card app-card p-3">
-        <div class="h5 m-0">Produse (piese) în proiect</div>
+        <div class="h5 m-0">Produse în proiect</div>
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
 
         <?php
@@ -873,7 +873,7 @@ ob_start();
                         <div class="h5 m-0 text-success fw-semibold">Accesorii</div>
                         <?php if ($canEditThis && $hasReservedAcc): ?>
                           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/consume')) ?>" class="m-0"
-                                onsubmit="return confirm('Dai în consum accesoriile rezervate pe această piesă?');">
+                                onsubmit="return confirm('Dai în consum accesoriile rezervate pe acest produs?');">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                             <button class="btn btn-outline-success btn-sm" type="submit">Dat în consum</button>
                           </form>
@@ -931,7 +931,7 @@ ob_start();
                                   <td class="text-end">
                                     <?php if ($canEditThis && $mode === 'RESERVED' && $iid > 0 && ($srcTag === 'DIRECT' || $srcTag === 'PROIECT')): ?>
                                       <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/unallocate')) ?>" class="m-0"
-                                            onsubmit="return confirm('Renunți la acest accesoriu rezervat pe piesă?');">
+                                            onsubmit="return confirm('Renunți la acest accesoriu rezervat pe produs?');">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                         <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
                                         <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>">
@@ -1125,7 +1125,7 @@ ob_start();
 
                     <div class="collapse mt-3" id="ppHpl<?= $ppId ?>">
                       <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
-                        <div class="fw-semibold">Consum HPL (alocare pe piesă)</div>
+                        <div class="fw-semibold">Consum HPL (alocare pe produs)</div>
                         <div class="text-muted small">Aloci din piesele rezervate pe proiect sau din plăci REST (nestocate). Consumul efectiv se face manual din butonul „Debitat” din tabelul HPL.</div>
 
                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/create')) ?>" class="row g-2 mt-2 js-pp-hpl-form">
@@ -1171,7 +1171,7 @@ ob_start();
 
                     <div class="collapse mt-3" id="ppAcc<?= $ppId ?>">
                       <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
-                        <div class="fw-semibold">Accesorii (rezervate pentru această piesă)</div>
+                        <div class="fw-semibold">Accesorii (rezervate pentru acest produs)</div>
                         <div class="text-muted small">Se rezervă automat. La “Gata de livrare” se consumă din stoc.</div>
                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/create')) ?>" class="row g-2 mt-2">
                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">

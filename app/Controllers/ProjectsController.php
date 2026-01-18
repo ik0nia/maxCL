@@ -3020,7 +3020,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3132,7 +3132,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3205,7 +3205,7 @@ final class ProjectsController
         if ($idx === false) $idx = 0;
         $next = $flow[$idx + 1] ?? null;
         if ($next === null) {
-            Session::flash('toast_success', 'Piesa este deja la ultimul status.');
+            Session::flash('toast_success', 'Produsul este deja la ultimul status.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
@@ -3253,7 +3253,7 @@ final class ProjectsController
                     $items = array_values(array_unique($items));
                     $more = count($items) > 4;
                     $items = array_slice($items, 0, 4);
-                    $msg = 'Nu poți trece la Montaj: mai ai ' . count($reserved) . ' alocări HPL ne-debitate pe această piesă. '
+                    $msg = 'Nu poți trece la Montaj: mai ai ' . count($reserved) . ' alocări HPL ne-debitate pe acest produs. '
                          . 'Debitează (sau Renunță) din tabelul HPL.'
                          . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
                     Session::flash('toast_error', $msg);
@@ -3306,7 +3306,7 @@ final class ProjectsController
                     $more = count($items) > 4;
                     $items = array_slice($items, 0, 4);
                     $cnt = count($agg);
-                    $msg = 'Nu poți trece la Gata de livrare: mai ai ' . $cnt . ' accesorii rezervate neconsumate pe această piesă. '
+                    $msg = 'Nu poți trece la Gata de livrare: mai ai ' . $cnt . ' accesorii rezervate neconsumate pe acest produs. '
                          . 'Dă în consum accesoriile din secțiunea Accesorii.'
                          . ($items ? (' ' . implode(' · ', $items) . ($more ? ' · …' : '')) : '');
                     Session::flash('toast_error', $msg);
@@ -3365,12 +3365,12 @@ final class ProjectsController
             $after = $before;
             $after['production_status'] = $next;
             Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [
-                'message' => 'Schimbare status piesă: ' . $old . ' → ' . $next,
+                'message' => 'Schimbare status produs: ' . $old . ' → ' . $next,
                 'project_id' => $projectId,
                 'old_status' => $old,
                 'new_status' => $next,
             ]);
-            $msg = 'Status piesă actualizat.';
+            $msg = 'Status produs actualizat.';
             if (is_array($docInfo) && isset($docInfo['deviz_number'], $docInfo['bon_number'])) {
                 $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
             }
@@ -3762,7 +3762,7 @@ final class ProjectsController
                 self::insertProjectHplConsumption($pdo, $projectId, $boardId, 1, $fullM2, 'CONSUMED',
                     self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · ' . $projNote . ' · ' . $prodNote, Auth::id());
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                    'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · produs #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
                         ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                     'board_id' => $boardId,
                     'project_id' => $projectId,
@@ -3791,7 +3791,7 @@ final class ProjectsController
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · ' . $projNote . ' · ' . $prodNote, Auth::id());
                     Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · produs #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
                             ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                         'board_id' => $boardId,
                         'project_id' => $projectId,
@@ -3837,7 +3837,7 @@ final class ProjectsController
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         $consNote, Auth::id());
                     Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · piesă #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · produs #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
                             ' · rest=' . $ra .
                             ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                         'board_id' => $boardId,
@@ -4613,7 +4613,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4649,7 +4649,7 @@ final class ProjectsController
             $pdo->commit();
 
             Audit::log('PROJECT_CONSUMPTION_CREATE', 'project_magazie_consumptions', $cid, null, null, [
-                'message' => 'Accesoriu rezervat pe piesă: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'message' => 'Accesoriu rezervat pe produs: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'item_id' => (int)$itemId,
@@ -4657,7 +4657,7 @@ final class ProjectsController
                 'unit' => $unit,
                 'mode' => 'RESERVED',
             ]);
-            Session::flash('toast_success', 'Accesoriu rezervat pe piesă.');
+            Session::flash('toast_success', 'Accesoriu rezervat pe produs.');
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva accesoriul: ' . $e->getMessage());
@@ -4692,7 +4692,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4763,7 +4763,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4851,7 +4851,7 @@ final class ProjectsController
 
             $pdo->commit();
             Audit::log('PROJECT_PRODUCT_MAGAZIE_UNALLOCATE', 'project_magazie_consumptions', 0, null, null, [
-                'message' => 'Anulat accesoriu rezervat pe piesă: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
+                'message' => 'Anulat accesoriu rezervat pe produs: ' . (string)($item['winmentor_code'] ?? '') . ' · ' . (string)($item['name'] ?? ''),
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'item_id' => $itemId,
@@ -4902,7 +4902,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -5078,7 +5078,7 @@ final class ProjectsController
                 ]);
             }
             Audit::log('PROJECT_PRODUCT_HPL_RESERVE', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'HPL alocat pe piesă (' . $source . ', ' . $consumeMode . ')',
+                'message' => 'HPL alocat pe produs (' . $source . ', ' . $consumeMode . ')',
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'stock_piece_id' => (int)$allocPieceId,
@@ -5088,7 +5088,7 @@ final class ProjectsController
             ]);
 
             $pdo->commit();
-            Session::flash('toast_success', 'HPL alocat pe piesă.');
+            Session::flash('toast_success', 'HPL alocat pe produs.');
         } catch (\Throwable $e) {
             try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot salva consumul HPL: ' . $e->getMessage());
@@ -5128,7 +5128,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -5202,7 +5202,7 @@ final class ProjectsController
             ProjectProductHplConsumption::setConsumedPiece((int)$cid, (int)$consumedPieceId);
 
             Audit::log('PROJECT_PRODUCT_HPL_CONSUME', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'HPL debitat pe piesă.',
+                'message' => 'HPL debitat pe produs.',
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'board_id' => (int)($c['board_id'] ?? 0),
@@ -5213,7 +5213,7 @@ final class ProjectsController
             ]);
             if ($boardId > 0) {
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                    'message' => 'Consumat (Debitat) pe piesă #' . $ppId . ' · Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
+                    'message' => 'Consumat (Debitat) pe produs #' . $ppId . ' · Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
                     'board_id' => $boardId,
                     'project_id' => $projectId,
                     'project_code' => (string)($project['code'] ?? ''),
@@ -5265,7 +5265,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Piesa este definitivată (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -5335,12 +5335,12 @@ final class ProjectsController
                     // ensure it's visible in project stock
                     HplStockPiece::updateFields($pieceId, ['project_id' => $projectId, 'status' => 'RESERVED']);
                 }
-                try { HplStockPiece::appendNote((int)$pieceId, 'Renunțat de pe piesă · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
+                try { HplStockPiece::appendNote((int)$pieceId, 'Renunțat de pe produs · ' . $projNote . ' · ' . $prodNote); } catch (\Throwable $e) {}
             }
 
             $pdo->commit();
             Audit::log('PROJECT_PRODUCT_HPL_UNALLOCATE', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'Renunțat la HPL alocat pe piesă (neconsumat).',
+                'message' => 'Renunțat la HPL alocat pe produs (neconsumat).',
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'board_id' => (int)($c['board_id'] ?? 0),

@@ -21,7 +21,7 @@ ob_start();
 <div class="app-page-title">
   <div>
     <h1 class="m-0">Produse</h1>
-    <div class="text-muted">Produsele sunt piesele folosite în proiecte (status controlat din proiect)</div>
+    <div class="text-muted">Produsele sunt folosite în proiecte (status controlat din proiect)</div>
   </div>
 </div>
 
