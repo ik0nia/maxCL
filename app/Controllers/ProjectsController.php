@@ -3777,7 +3777,7 @@ final class ProjectsController
                 self::insertProjectHplConsumption($pdo, $projectId, $boardId, 1, $fullM2, 'CONSUMED',
                     self::HPL_NOTE_AUTO_CONSUME . ' · 1 placă · ' . $projNote . ' · ' . $prodNote, Auth::id());
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · produs #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1 placă (CNC → Montaj) · produs ' . $prodLabel .
                         ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                     'board_id' => $boardId,
                     'project_id' => $projectId,
@@ -3806,7 +3806,7 @@ final class ProjectsController
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         self::HPL_NOTE_AUTO_CONSUME . ' · 1/2 placă (din rest) · ' . $projNote . ' · ' . $prodNote, Auth::id());
                     Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · produs #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1/2 placă (din rest) (CNC → Montaj) · produs ' . $prodLabel .
                             ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                         'board_id' => $boardId,
                         'project_id' => $projectId,
@@ -3852,7 +3852,7 @@ final class ProjectsController
                     self::insertProjectHplConsumption($pdo, $projectId, $boardId, 0, $halfM2, 'CONSUMED',
                         $consNote, Auth::id());
                     Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · produs #' . $ppId . ($pname !== '' ? (' · ' . $pname) : '') .
+                        'message' => 'Consum HPL auto: 1/2 placă (tăiere din FULL) (CNC → Montaj) · produs ' . $prodLabel .
                             ' · rest=' . $ra .
                             ' · Proiect: ' . ($projCode !== '' ? $projCode : ('#' . $projectId)) . ($projName !== '' ? (' · ' . $projName) : ''),
                         'board_id' => $boardId,
@@ -5138,6 +5138,11 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
+        $projLabel = self::projectLabel($project);
+        $prodLabel = self::productLabelFromProjectProduct($pp);
+        $projNote = 'Proiect: ' . $projLabel;
+        $prodNote = 'Produs: ' . $prodLabel;
+
         // lock OPERATOR after final status
         $u = Auth::user();
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
@@ -5228,7 +5233,7 @@ final class ProjectsController
             ]);
             if ($boardId > 0) {
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                    'message' => 'Consumat (Debitat) pe produs #' . $ppId . ' · Proiect ' . (string)($project['code'] ?? '') . ' · ' . (string)($project['name'] ?? ''),
+                    'message' => 'Consumat (Debitat) pe produs ' . $prodLabel . ' · Proiect ' . $projLabel,
                     'board_id' => $boardId,
                     'project_id' => $projectId,
                     'project_code' => (string)($project['code'] ?? ''),

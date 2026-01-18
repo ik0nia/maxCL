@@ -25,6 +25,7 @@ $deliveryItems = $deliveryItems ?? [];
 $projectFiles = $projectFiles ?? [];
 $workLogs = $workLogs ?? [];
 $history = $history ?? [];
+$projectProductLabels = $projectProductLabels ?? [];
 $discussions = $discussions ?? [];
 $laborByProduct = $laborByProduct ?? [];
 $materialsByProduct = $materialsByProduct ?? [];
