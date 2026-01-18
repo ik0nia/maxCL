@@ -128,6 +128,13 @@ ob_start();
     </tbody>
   </table>
 </div>
+<div class="text-muted small mt-2">
+  <div class="d-flex flex-wrap align-items-center gap-3">
+    <span><i class="bi bi-gear-fill text-primary me-1"></i> În lucru (are produse nelivrate)</span>
+    <span><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Livrat, fără rezervări</span>
+    <span><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i> Livrat, cu rezervări rămase</span>
+  </div>
+</div>
 
 <script>
   document.addEventListener('DOMContentLoaded', function(){
