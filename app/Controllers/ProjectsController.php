@@ -735,9 +735,9 @@ final class ProjectsController
         $reservedRemainingM2 = max(0.0, $hplResM2 - $needM2);
         $reservedRemainingCost = ($hplAvgPpm > 0) ? ($reservedRemainingM2 * $hplAvgPpm) : 0.0;
 
-        $hplCostFromConsum = $hplResCost + $hplConCost;
-        if ($hplCostFromConsum > 0) {
-            $hplCost = $hplCostFromConsum;
+        // Cerință: în sumarul de cost folosim doar HPL efectiv consumat.
+        if ($hplConCost > 0) {
+            $hplCost = $hplConCost;
         }
         $totalCost = $laborCost + $magCost + $hplCost;
 
