@@ -151,7 +151,7 @@ $router->get('/uploads/finishes/{name}', function (array $params) {
     exit;
 }, [Auth::requireLogin()]);
 
-// ---- Uploads company logo (servite din storage/uploads/company)
+// ---- Uploads company logo (public)
 $router->get('/uploads/company/{name}', function (array $params) {
     $name = (string)($params['name'] ?? '');
     if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $name)) {
@@ -174,7 +174,7 @@ $router->get('/uploads/company/{name}', function (array $params) {
     header('Cache-Control: private, max-age=86400');
     readfile($fs);
     exit;
-}, [Auth::requireLogin()]);
+});
 
 // ---- Uploads files (servite din storage/uploads/files)
 $router->get('/uploads/files/{name}', function (array $params) {
