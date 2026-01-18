@@ -1351,6 +1351,11 @@ ob_start();
         function buildAddrOptions(select, clientId, selectedId){
           if (!select) return;
           const list = (clientId && addrMap && addrMap[clientId]) ? addrMap[clientId] : [];
+          let selected = String(selectedId || '');
+          if (!selected && list && list.length) {
+            const def = list.find(a => a && String(a.is_default || '') === '1');
+            if (def && def.id) selected = String(def.id);
+          }
           select.innerHTML = '';
           if (!list || !list.length) {
             const opt = document.createElement('option');
@@ -1370,7 +1375,7 @@ ob_start();
             const id = a && a.id ? String(a.id) : '';
             opt.value = id;
             opt.textContent = addrLabel(a) || ('Adresă #' + id);
-            if (id !== '' && String(selectedId || '') === id) opt.selected = true;
+            if (id !== '' && selected === id) opt.selected = true;
             select.appendChild(opt);
           });
         }
