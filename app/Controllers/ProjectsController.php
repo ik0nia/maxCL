@@ -1989,7 +1989,7 @@ final class ProjectsController
             ['value' => 'CNC', 'label' => 'CNC'],
             ['value' => 'MONTAJ', 'label' => 'Montaj'],
             ['value' => 'GATA_DE_LIVRARE', 'label' => 'Gata de livrare'],
-            ['value' => 'AVIZAT', 'label' => 'Avizat'],
+            ['value' => 'AVIZAT', 'label' => 'Avizare'],
             ['value' => 'LIVRAT', 'label' => 'Livrat'],
         ];
     }
@@ -2497,7 +2497,7 @@ final class ProjectsController
 
         $allowed = self::allowedProjectProductStatusesForCurrentUser();
         if (!in_array($next, $allowed, true)) {
-            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Avizat/Livrat sunt doar pentru Admin/Gestionar).');
+            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Avizare/Livrat sunt doar pentru Admin/Gestionar).');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
@@ -2600,6 +2600,20 @@ final class ProjectsController
                         'message' => $msg,
                     ], JSON_UNESCAPED_UNICODE));
                     Response::redirect('/projects/' . $projectId . '?tab=products');
+                }
+            }
+
+            if ($next === 'AVIZAT') {
+                $invoiceClientId = isset($before['invoice_client_id']) ? (int)$before['invoice_client_id'] : 0;
+                $deliveryAddressId = isset($before['delivery_address_id']) ? (int)$before['delivery_address_id'] : 0;
+                if ($invoiceClientId <= 0 || $deliveryAddressId <= 0) {
+                    $msg = 'Nu poți trece la Avizare: setează firma de facturare și adresa de livrare în Facturare/Livrare.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
                 }
             }
 

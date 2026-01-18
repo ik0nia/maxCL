@@ -762,7 +762,7 @@ ob_start();
                       </div>
 
                       <?php if (!$canSetPPFinal): ?>
-                        <div class="text-muted small">Avizat/Livrat: doar Admin/Gestionar.</div>
+                    <div class="text-muted small">Avizare/Livrat: doar Admin/Gestionar.</div>
                       <?php endif; ?>
                     </div>
                   <?php endif; ?>

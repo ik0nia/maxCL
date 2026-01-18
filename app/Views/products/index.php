@@ -11,7 +11,7 @@ $stLbl = [
   'CNC' => 'CNC',
   'MONTAJ' => 'Montaj',
   'GATA_DE_LIVRARE' => 'Gata de livrare',
-  'AVIZAT' => 'Avizat',
+  'AVIZAT' => 'Avizare',
   'LIVRAT' => 'Livrat',
 ];
 
