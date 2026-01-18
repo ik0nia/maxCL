@@ -4504,6 +4504,9 @@ final class ProjectsController
             Response::redirect($consumRedirect);
         }
         if (!in_array($mode, ['RESERVED','CONSUMED'], true)) $mode = 'CONSUMED';
+        if ($consumTab === 'accesorii') {
+            $mode = 'RESERVED';
+        }
 
         $item = MagazieItem::find((int)$itemId);
         if (!$item) {

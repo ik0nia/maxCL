@@ -1521,11 +1521,11 @@ ob_start();
 <?php elseif ($tab === 'consum'): ?>
   <?php
     $consumTabs = [
-      'accesorii' => 'Consum accesorii',
       'hpl' => 'Consum HPL',
+      'accesorii' => 'Consum accesorii',
     ];
-    $consumTab = isset($_GET['consum_tab']) ? trim((string)$_GET['consum_tab']) : 'accesorii';
-    if (!isset($consumTabs[$consumTab])) $consumTab = 'accesorii';
+    $consumTab = isset($_GET['consum_tab']) ? trim((string)$_GET['consum_tab']) : 'hpl';
+    if (!isset($consumTabs[$consumTab])) $consumTab = 'hpl';
   ?>
   <ul class="nav nav-tabs mb-3">
     <?php foreach ($consumTabs as $k => $label): ?>
@@ -1541,7 +1541,7 @@ ob_start();
   <?php if ($consumTab === 'accesorii'): ?>
     <div class="card app-card p-3">
         <div class="h5 m-0">Consum Magazie (accesorii)</div>
-        <div class="text-muted">Rezervat/Consumat — legabil la produs</div>
+        <div class="text-muted">Rezervat — legabil la produs</div>
 
         <?php if ($canWrite): ?>
           <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/consum/magazie/create')) ?>" class="row g-2 mt-2">
@@ -1556,14 +1556,7 @@ ob_start();
               <label class="form-label fw-semibold">Cantitate</label>
               <input class="form-control" type="number" step="0.001" min="0.001" name="qty" value="1">
             </div>
-            <div class="col-6"></div>
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Mod</label>
-              <select class="form-select" name="mode">
-                <option value="CONSUMED">consumat</option>
-                <option value="RESERVED">rezervat</option>
-              </select>
-            </div>
+            <input type="hidden" name="mode" value="RESERVED">
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Produs (opțional)</label>
               <select class="form-select" name="project_product_id">
