@@ -292,6 +292,7 @@ $router->post('/projects/{id}/products/{ppId}/status', fn($p) => ProjectsControl
 $router->post('/projects/{id}/products/{ppId}/unlink', fn($p) => ProjectsController::unlinkProjectProduct($p), $projectsWriteMW);
 $router->post('/projects/{id}/products/{ppId}/magazie/create', fn($p) => ProjectsController::addMagazieConsumptionForProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/magazie/consume', fn($p) => ProjectsController::consumeMagazieForProjectProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/magazie/{itemId}/update', fn($p) => ProjectsController::updateMagazieConsumptionForProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/magazie/{itemId}/unallocate', fn($p) => ProjectsController::unallocateMagazieForProjectProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/hpl/create', fn($p) => ProjectsController::addHplConsumptionForProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/hpl/{cid}/cut', fn($p) => ProjectsController::cutHplForProjectProduct($p), $projectsProductEditMW);

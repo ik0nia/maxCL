@@ -930,7 +930,24 @@ ob_start();
                                     </td>
                                   <?php endif; ?>
                                   <td class="text-end">
-                                    <?php if ($canEditThis && $mode === 'RESERVED' && $iid > 0 && ($srcTag === 'DIRECT' || $srcTag === 'PROIECT')): ?>
+                                    <?php if ($canEditThis && $mode === 'RESERVED' && $iid > 0 && $srcTag === 'DIRECT'): ?>
+                                      <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/update')) ?>" class="d-inline-flex align-items-center gap-1">
+                                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                          <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
+                                          <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty"
+                                                 value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>" style="width:92px">
+                                          <button class="btn btn-outline-primary btn-sm" type="submit">Salvează</button>
+                                        </form>
+                                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/unallocate')) ?>" class="m-0"
+                                              onsubmit="return confirm('Renunți la acest accesoriu rezervat pe produs?');">
+                                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                          <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
+                                          <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>">
+                                          <button class="btn btn-outline-danger btn-sm" type="submit">Renunță</button>
+                                        </form>
+                                      </div>
+                                    <?php elseif ($canEditThis && $mode === 'RESERVED' && $iid > 0 && ($srcTag === 'DIRECT' || $srcTag === 'PROIECT')): ?>
                                       <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/unallocate')) ?>" class="m-0"
                                             onsubmit="return confirm('Renunți la acest accesoriu rezervat pe produs?');">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">

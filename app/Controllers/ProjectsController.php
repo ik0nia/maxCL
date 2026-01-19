@@ -4694,6 +4694,124 @@ final class ProjectsController
     }
 
     /**
+     * Editează cantitatea de accesorii rezervate pe produs (DIRECT, mode=RESERVED).
+     */
+    public static function updateMagazieConsumptionForProduct(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $itemId = (int)($params['itemId'] ?? 0);
+        if ($projectId <= 0 || $ppId <= 0 || $itemId <= 0) {
+            Session::flash('toast_error', 'Parametri invalizi.');
+            Response::redirect('/projects');
+        }
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        $u = Auth::user();
+        if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
+            $st = (string)($pp['production_status'] ?? 'CREAT');
+            if (self::isFinalProductStatus($st)) {
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Response::redirect('/projects/' . $projectId . '?tab=products');
+            }
+        }
+
+        $src = strtoupper(trim((string)($_POST['src'] ?? 'DIRECT')));
+        if ($src !== 'DIRECT') {
+            Session::flash('toast_error', 'Poți edita doar rezervările directe pe produs.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        if ($qty === null || $qty <= 0) {
+            Session::flash('toast_error', 'Cantitate invalidă.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        $item = MagazieItem::find($itemId);
+        if (!$item) {
+            Session::flash('toast_error', 'Accesoriu inexistent.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = \App\Core\DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare("
+                SELECT * FROM project_magazie_consumptions
+                WHERE project_id = ?
+                  AND project_product_id = ?
+                  AND item_id = ?
+                  AND mode = 'RESERVED'
+                ORDER BY created_at ASC, id ASC
+                FOR UPDATE
+            ");
+            $st->execute([$projectId, $ppId, $itemId]);
+            $rows = $st->fetchAll();
+            if (!$rows) {
+                throw new \RuntimeException('Nu există rezervări directe pentru acest accesoriu.');
+            }
+
+            $beforeQty = 0.0;
+            foreach ($rows as $r) {
+                $beforeQty += (float)($r['qty'] ?? 0);
+            }
+            $first = $rows[0];
+            $cid = (int)($first['id'] ?? 0);
+            if ($cid <= 0) throw new \RuntimeException('Rezervare invalidă.');
+
+            $unit = trim((string)($first['unit'] ?? (string)($item['unit'] ?? 'buc')));
+            ProjectMagazieConsumption::update($cid, [
+                'project_product_id' => $ppId,
+                'qty' => (float)$qty,
+                'unit' => $unit !== '' ? $unit : 'buc',
+                'mode' => 'RESERVED',
+                'note' => null,
+            ]);
+
+            if (count($rows) > 1) {
+                $ids = [];
+                foreach (array_slice($rows, 1) as $r) {
+                    $rid = (int)($r['id'] ?? 0);
+                    if ($rid > 0) $ids[] = $rid;
+                }
+                if ($ids) {
+                    $ph = implode(',', array_fill(0, count($ids), '?'));
+                    $stDel = $pdo->prepare("DELETE FROM project_magazie_consumptions WHERE id IN ($ph)");
+                    $stDel->execute($ids);
+                }
+            }
+
+            $pdo->commit();
+            Audit::log('PROJECT_CONSUMPTION_UPDATE', 'project_magazie_consumptions', $cid, $first, null, [
+                'message' => 'Actualizare accesoriu rezervat pe produs.',
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'item_id' => $itemId,
+                'qty_before' => $beforeQty,
+                'qty_after' => (float)$qty,
+                'unit' => $unit,
+            ]);
+            Session::flash('toast_success', 'Accesoriu actualizat.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot actualiza accesoriul: ' . $e->getMessage());
+        }
+
+        Response::redirect('/projects/' . $projectId . '?tab=products');
+    }
+
+    /**
      * Consumă accesoriile rezervate pe piesă (manual, din buton).
      */
     public static function consumeMagazieForProjectProduct(array $params): void
