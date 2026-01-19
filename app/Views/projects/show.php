@@ -709,6 +709,10 @@ ob_start();
                 $ppComments = isset($productComments[$ppId]) && is_array($productComments[$ppId]) ? $productComments[$ppId] : [];
                 $ppCommentsCount = count($ppComments);
                 $docLinks = $ppId > 0 && isset($docsByPp[$ppId]) && is_array($docsByPp[$ppId]) ? $docsByPp[$ppId] : [];
+                $saleUnit = isset($pp['product_sale_price']) && $pp['product_sale_price'] !== null && $pp['product_sale_price'] !== '' && is_numeric($pp['product_sale_price'])
+                  ? (float)$pp['product_sale_price']
+                  : null;
+                $saleTotal = ($saleUnit !== null && $qty > 0) ? ($saleUnit * $qty) : $saleUnit;
 
                 $projectClientId = (int)($project['client_id'] ?? 0);
                 $invoiceClientId = isset($pp['invoice_client_id']) ? (int)$pp['invoice_client_id'] : 0;
@@ -1125,6 +1129,17 @@ ob_start();
                           <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$atC, 2, '.', '') ?> lei</span></span>
                         <?php endif; ?>
                       </div>
+                      <?php if ($canSeePricesRole): ?>
+                        <div class="text-muted small js-price d-none mt-1">
+                          Total cost produs: <span class="fw-semibold"><?= number_format((float)$totalEst, 2, '.', '') ?> lei</span>
+                        </div>
+                        <div class="text-muted small js-price d-none">
+                          Preț vânzare produs:
+                          <span class="fw-semibold">
+                            <?= $saleTotal !== null ? number_format((float)$saleTotal, 2, '.', '') . ' lei' : '—' ?>
+                          </span>
+                        </div>
+                      <?php endif; ?>
                     </div>
                   </div>
 
