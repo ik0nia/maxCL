@@ -1135,6 +1135,9 @@ ob_start();
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAcc<?= $ppId ?>">
                         <i class="bi bi-box-seam me-1"></i> Adaugă accesorii
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppLabor<?= $ppId ?>">
+                        <i class="bi bi-tools me-1"></i> Adaugă manoperă
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppBill<?= $ppId ?>">
                         <i class="bi bi-receipt me-1"></i> Facturare/Livrare
                       </button>
@@ -1187,6 +1190,37 @@ ob_start();
                             <div class="text-muted small mt-1">Disponibil doar pentru plăci FULL din proiect.</div>
                           </div>
 
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-plus-lg me-1"></i> Adaugă
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+
+                    <div class="collapse mt-3" id="ppLabor<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Manoperă (CNC / Atelier)</div>
+                        <div class="text-muted small">Înregistrare estimată pentru acest produs.</div>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/hours/create')) ?>" class="row g-2 mt-2">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <input type="hidden" name="project_product_id" value="<?= (int)$ppId ?>">
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Tip</label>
+                            <select class="form-select form-select-sm" name="work_type">
+                              <option value="CNC">CNC</option>
+                              <option value="ATELIER">Atelier</option>
+                            </select>
+                          </div>
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Ore estimate</label>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="hours_estimated" required>
+                          </div>
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Notă</label>
+                            <input class="form-control form-control-sm" name="note" maxlength="255">
+                          </div>
                           <div class="col-12 d-flex justify-content-end">
                             <button class="btn btn-primary btn-sm" type="submit">
                               <i class="bi bi-plus-lg me-1"></i> Adaugă
