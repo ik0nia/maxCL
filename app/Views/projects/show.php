@@ -641,6 +641,12 @@ ob_start();
               $ppTotalQty += max(0.0, (float)($pp0['qty'] ?? 0));
             }
           ?>
+          <div class="d-flex justify-content-end mt-2">
+            <a class="btn btn-sm btn-outline-primary" target="_blank"
+               href="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/bon-consum-general')) ?>">
+              Bon consum general
+            </a>
+          </div>
           <?php if ($canSeePricesRole): ?>
             <div class="d-flex justify-content-end mt-2">
               <div class="form-check form-switch m-0">
@@ -1613,12 +1619,6 @@ ob_start();
               <div class="text-muted">Valoare</div>
               <div class="fw-semibold"><?= number_format($resCost, 2, '.', '') ?> lei</div>
             </div>
-          </div>
-          <div class="d-flex justify-content-end mt-2">
-            <a class="btn btn-sm btn-outline-primary" target="_blank"
-               href="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/bon-consum-general')) ?>">
-              Bon consum general
-            </a>
           </div>
         </div>
       </div>
