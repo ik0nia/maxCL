@@ -141,7 +141,12 @@ final class ProductsController
 
                     $label = $type === 'deviz' ? 'Deviz' : 'Bon consum';
                     $appendNum = true;
-                    if (preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $category)) {
+                    $orig = trim((string)($f['original_name'] ?? ''));
+                    $origBase = $orig !== '' ? preg_replace('/\.html$/i', '', $orig) : '';
+                    if ($origBase !== '' && preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $origBase)) {
+                        $label = $origBase;
+                        $appendNum = false;
+                    } elseif (preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $category)) {
                         $label = $category;
                         $appendNum = false;
                     }
