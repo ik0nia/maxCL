@@ -522,7 +522,7 @@ final class ProjectsController
 
     /**
      * @param array<int, array{item_id:int,mode:string,src:string,code:string,name:string,unit:string,qty:float,unit_price:?float}> $rows
-     * @return array<int, array{item_id:int,code:string,name:string,unit:string,qty:float}>
+     * @return array<int, array{item_id:int,code:string,name:string,unit:string,qty:float,unit_price:?float}>
      */
     private static function aggregateAccessories(array $rows, ?string $mode = null): array
     {
@@ -538,6 +538,9 @@ final class ProjectsController
             $code = trim((string)($r['code'] ?? ''));
             $name = trim((string)($r['name'] ?? ''));
             $unit = trim((string)($r['unit'] ?? ''));
+            $up = (isset($r['unit_price']) && $r['unit_price'] !== null && $r['unit_price'] !== '' && is_numeric($r['unit_price']))
+                ? (float)$r['unit_price']
+                : null;
             if (!isset($out[$itemId])) {
                 $out[$itemId] = [
                     'item_id' => $itemId,
@@ -545,19 +548,23 @@ final class ProjectsController
                     'name' => $name,
                     'unit' => $unit,
                     'qty' => 0.0,
+                    'unit_price' => $up,
                 ];
             }
             $out[$itemId]['qty'] += $qty;
             if ($out[$itemId]['code'] === '' && $code !== '') $out[$itemId]['code'] = $code;
             if ($out[$itemId]['name'] === '' && $name !== '') $out[$itemId]['name'] = $name;
             if ($out[$itemId]['unit'] === '' && $unit !== '') $out[$itemId]['unit'] = $unit;
+            if (($out[$itemId]['unit_price'] ?? null) === null && $up !== null) {
+                $out[$itemId]['unit_price'] = $up;
+            }
         }
         return array_values($out);
     }
 
     /**
      * @param array<int, array<string,mixed>> $rows
-     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int}>
+     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int,unit_price:?float,total_price:?float}>
      */
     private static function aggregateConsumedHpl(array $rows): array
     {
@@ -577,6 +584,17 @@ final class ProjectsController
             if ($qty <= 0) $qty = 1;
             $bcode = trim((string)($r['board_code'] ?? ''));
             $bname = trim((string)($r['board_name'] ?? ''));
+            $boardSale = (isset($r['board_sale_price']) && $r['board_sale_price'] !== null && $r['board_sale_price'] !== '' && is_numeric($r['board_sale_price']))
+                ? (float)$r['board_sale_price']
+                : null;
+            $stdW = (int)($r['board_std_width_mm'] ?? 0);
+            $stdH = (int)($r['board_std_height_mm'] ?? 0);
+            $boardArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+            $pieceArea = ($pw > 0 && $ph > 0) ? (($pw * $ph) / 1000000.0) : 0.0;
+            $unitPrice = null;
+            if ($boardSale !== null && $boardArea > 0.0 && $pieceArea > 0.0) {
+                $unitPrice = ($boardSale / $boardArea) * $pieceArea;
+            }
             $key = $bcode . '|' . $bname . '|' . $pt . '|' . $pw . '|' . $ph;
             if (!isset($out[$key])) {
                 $out[$key] = [
@@ -586,9 +604,20 @@ final class ProjectsController
                     'width_mm' => $pw,
                     'height_mm' => $ph,
                     'qty' => 0,
+                    'unit_price' => $unitPrice,
+                    'total_price' => null,
                 ];
             }
             $out[$key]['qty'] += $qty;
+            if ($out[$key]['unit_price'] === null && $unitPrice !== null) {
+                $out[$key]['unit_price'] = $unitPrice;
+            }
+        }
+        foreach ($out as $k => $row) {
+            $up = $row['unit_price'];
+            if ($up !== null) {
+                $out[$k]['total_price'] = (float)$up * (int)($row['qty'] ?? 0);
+            }
         }
         return array_values($out);
     }
@@ -638,8 +667,6 @@ final class ProjectsController
         $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
         $qty = (float)($product['qty'] ?? 0.0);
         $unit = (string)($product['unit'] ?? '');
-        $unitPrice = (float)($product['unit_price'] ?? 0.0);
-        $lineTotal = $qty * $unitPrice;
         $accLines = [];
         foreach ($accessories as $a) {
             $name = trim((string)($a['name'] ?? ''));
@@ -739,8 +766,7 @@ final class ProjectsController
       <tr>
         <th>Produs / descriere</th>
         <th style="width:110px">Cantitate</th>
-        <th style="width:120px">Preț/buc</th>
-        <th style="width:120px">Total</th>
+        <th style="width:140px">Cantitate</th>
       </tr>
     </thead>
     <tbody>
@@ -760,13 +786,9 @@ final class ProjectsController
           <?php endif; ?>
         </td>
         <td><?= $esc(self::fmtQty($qty)) ?><?= $unit !== '' ? (' ' . $esc($unit)) : '' ?></td>
-        <td><?= $esc(self::fmtMoney($unitPrice)) ?></td>
-        <td><?= $esc(self::fmtMoney($lineTotal)) ?></td>
       </tr>
     </tbody>
   </table>
-
-  <div class="total">Total: <?= $esc(self::fmtMoney($lineTotal)) ?></div>
   <?php if ($avizNumber !== ''): ?>
     <div class="small muted" style="margin-top:6px;">Număr aviz: <?= $esc($avizNumber) ?></div>
   <?php endif; ?>
@@ -850,6 +872,8 @@ final class ProjectsController
             <th style="width:110px">Tip</th>
             <th style="width:160px">Dimensiuni</th>
             <th style="width:80px">Buc</th>
+            <th style="width:110px">Preț/buc</th>
+            <th style="width:110px">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -859,12 +883,18 @@ final class ProjectsController
                 ? ((int)$r['height_mm'] . ' × ' . (int)$r['width_mm'] . ' mm')
                 : '—';
             ?>
+            <?php
+              $hplUp = isset($r['unit_price']) && $r['unit_price'] !== null ? (float)$r['unit_price'] : null;
+              $hplTot = isset($r['total_price']) && $r['total_price'] !== null ? (float)$r['total_price'] : null;
+            ?>
             <tr>
               <td><?= $esc($r['board_code'] ?? '') ?></td>
               <td><?= $esc($r['board_name'] ?? '') ?></td>
               <td><?= $esc($r['piece_type'] ?? '') ?></td>
               <td><?= $esc($dim) ?></td>
               <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?></td>
+              <td><?= $hplUp !== null ? $esc(self::fmtMoney($hplUp)) : '—' ?></td>
+              <td><?= $hplTot !== null ? $esc(self::fmtMoney($hplTot)) : '—' ?></td>
             </tr>
           <?php endforeach; ?>
         </tbody>
@@ -883,14 +913,24 @@ final class ProjectsController
             <th>Cod</th>
             <th>Denumire</th>
             <th style="width:90px">Cantitate</th>
+            <th style="width:110px">Preț/buc</th>
+            <th style="width:110px">Total</th>
           </tr>
         </thead>
         <tbody>
           <?php foreach ($accRows as $r): ?>
+            <?php
+              $accUp = (isset($r['unit_price']) && $r['unit_price'] !== null && $r['unit_price'] !== '' && is_numeric($r['unit_price']))
+                ? (float)$r['unit_price']
+                : null;
+              $accTot = $accUp !== null ? ($accUp * (float)($r['qty'] ?? 0)) : null;
+            ?>
             <tr>
               <td><?= $esc($r['code'] ?? '') ?></td>
               <td><?= $esc($r['name'] ?? '') ?></td>
               <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
+              <td><?= $accUp !== null ? $esc(self::fmtMoney($accUp)) : '—' ?></td>
+              <td><?= $accTot !== null ? $esc(self::fmtMoney($accTot)) : '—' ?></td>
             </tr>
           <?php endforeach; ?>
         </tbody>

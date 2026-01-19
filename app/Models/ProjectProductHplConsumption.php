@@ -18,6 +18,7 @@ final class ProjectProductHplConsumption
               x.*,
               b.code AS board_code,
               b.name AS board_name,
+              b.sale_price AS board_sale_price,
               b.thickness_mm AS board_thickness_mm,
               b.std_width_mm AS board_std_width_mm,
               b.std_height_mm AS board_std_height_mm,
