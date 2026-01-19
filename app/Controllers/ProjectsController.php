@@ -564,7 +564,7 @@ final class ProjectsController
 
     /**
      * @param array<int, array<string,mixed>> $rows
-     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int,unit_price:?float,total_price:?float}>
+     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int,display_width_mm:int,display_height_mm:int,display_qty:float,unit_price:?float,total_price:?float}>
      */
     private static function aggregateConsumedHpl(array $rows): array
     {
@@ -591,9 +591,23 @@ final class ProjectsController
             $stdH = (int)($r['board_std_height_mm'] ?? 0);
             $boardArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
             $pieceArea = ($pw > 0 && $ph > 0) ? (($pw * $ph) / 1000000.0) : 0.0;
+            $consumeMode = strtoupper((string)($r['consume_mode'] ?? ''));
+            $isHalf = $consumeMode === 'HALF';
+            if (!$isHalf && $boardArea > 0.0 && $pieceArea > 0.0) {
+                $isHalf = abs(($pieceArea * 2.0) - $boardArea) < 0.0001;
+            }
+            $displayW = $pw;
+            $displayH = $ph;
+            $displayQty = (float)$qty;
+            if ($isHalf && $stdW > 0 && $stdH > 0) {
+                $displayW = $stdW;
+                $displayH = $stdH;
+                $displayQty = 0.5 * (float)$qty;
+            }
+
             $unitPrice = null;
             if ($boardSale !== null && $boardArea > 0.0 && $pieceArea > 0.0) {
-                $unitPrice = ($boardSale / $boardArea) * $pieceArea;
+                $unitPrice = $isHalf ? $boardSale : (($boardSale / $boardArea) * $pieceArea);
             }
             $key = $bcode . '|' . $bname . '|' . $pt . '|' . $pw . '|' . $ph;
             if (!isset($out[$key])) {
@@ -604,11 +618,15 @@ final class ProjectsController
                     'width_mm' => $pw,
                     'height_mm' => $ph,
                     'qty' => 0,
+                    'display_width_mm' => $displayW,
+                    'display_height_mm' => $displayH,
+                    'display_qty' => $displayQty,
                     'unit_price' => $unitPrice,
                     'total_price' => null,
                 ];
             }
             $out[$key]['qty'] += $qty;
+            $out[$key]['display_qty'] += $displayQty;
             if ($out[$key]['unit_price'] === null && $unitPrice !== null) {
                 $out[$key]['unit_price'] = $unitPrice;
             }
@@ -616,7 +634,7 @@ final class ProjectsController
         foreach ($out as $k => $row) {
             $up = $row['unit_price'];
             if ($up !== null) {
-                $out[$k]['total_price'] = (float)$up * (int)($row['qty'] ?? 0);
+                $out[$k]['total_price'] = (float)$up * (float)($row['display_qty'] ?? (int)($row['qty'] ?? 0));
             }
         }
         return array_values($out);
@@ -809,6 +827,17 @@ final class ProjectsController
         $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
         $hplRows = is_array($ctx['hpl_rows'] ?? null) ? $ctx['hpl_rows'] : [];
         $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
+        $labor = is_array($ctx['labor'] ?? null) ? $ctx['labor'] : [];
+        $qty = isset($product['qty']) ? (float)($product['qty'] ?? 0) : 0.0;
+        $unit = (string)($product['unit'] ?? '');
+        $salePrice = (isset($product['sale_price']) && $product['sale_price'] !== null && $product['sale_price'] !== '' && is_numeric($product['sale_price']))
+            ? (float)$product['sale_price']
+            : 0.0;
+        $saleTotal = ($salePrice > 0 && $qty > 0) ? ($salePrice * $qty) : null;
+        $cncHours = (float)($labor['cnc_hours'] ?? 0.0);
+        $cncCost = (float)($labor['cnc_cost'] ?? 0.0);
+        $atelierHours = (float)($labor['atelier_hours'] ?? 0.0);
+        $atelierCost = (float)($labor['atelier_cost'] ?? 0.0);
         $logo = (string)($company['logo_url'] ?? '');
         if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
 
@@ -868,9 +897,8 @@ final class ProjectsController
           <tr>
             <th>Cod placă</th>
             <th>Denumire</th>
-            <th style="width:110px">Tip</th>
             <th style="width:160px">Dimensiuni</th>
-            <th style="width:80px">Buc</th>
+            <th style="width:80px">Cant.</th>
             <th style="width:110px">Preț/buc</th>
             <th style="width:110px">Total</th>
           </tr>
@@ -878,8 +906,11 @@ final class ProjectsController
         <tbody>
           <?php foreach ($hplRows as $r): ?>
             <?php
-              $dim = ($r['width_mm'] ?? 0) > 0 && ($r['height_mm'] ?? 0) > 0
-                ? ((int)$r['height_mm'] . ' × ' . (int)$r['width_mm'] . ' mm')
+              $dispH = (int)($r['display_height_mm'] ?? ($r['height_mm'] ?? 0));
+              $dispW = (int)($r['display_width_mm'] ?? ($r['width_mm'] ?? 0));
+              $dispQty = isset($r['display_qty']) ? (float)$r['display_qty'] : (float)($r['qty'] ?? 0);
+              $dim = ($dispW > 0 && $dispH > 0)
+                ? ($dispH . ' × ' . $dispW . ' mm')
                 : '—';
             ?>
             <?php
@@ -889,9 +920,8 @@ final class ProjectsController
             <tr>
               <td><?= $esc($r['board_code'] ?? '') ?></td>
               <td><?= $esc($r['board_name'] ?? '') ?></td>
-              <td><?= $esc($r['piece_type'] ?? '') ?></td>
               <td><?= $esc($dim) ?></td>
-              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?></td>
+              <td><?= $esc(self::fmtQty($dispQty)) ?></td>
               <td><?= $hplUp !== null ? $esc(self::fmtMoney($hplUp)) : '—' ?></td>
               <td><?= $hplTot !== null ? $esc(self::fmtMoney($hplTot)) : '—' ?></td>
             </tr>
@@ -934,6 +964,60 @@ final class ProjectsController
           <?php endforeach; ?>
         </tbody>
       </table>
+    <?php endif; ?>
+  </div>
+  <div class="section">
+    <div class="title">Manoperă</div>
+    <?php if ($cncHours <= 0 && $atelierHours <= 0): ?>
+      <div class="muted">Nu există manoperă.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Tip</th>
+            <th style="width:110px">Ore</th>
+            <th style="width:140px">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if ($cncHours > 0 || $cncCost > 0): ?>
+            <tr>
+              <td>CNC</td>
+              <td><?= $esc(self::fmtQty($cncHours, 2)) ?></td>
+              <td><?= $esc(self::fmtMoney($cncCost)) ?></td>
+            </tr>
+          <?php endif; ?>
+          <?php if ($atelierHours > 0 || $atelierCost > 0): ?>
+            <tr>
+              <td>Atelier</td>
+              <td><?= $esc(self::fmtQty($atelierHours, 2)) ?></td>
+              <td><?= $esc(self::fmtMoney($atelierCost)) ?></td>
+            </tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+  <?php
+    $totalHpl = 0.0;
+    foreach ($hplRows as $r) {
+      if (isset($r['total_price']) && $r['total_price'] !== null) $totalHpl += (float)$r['total_price'];
+    }
+    $totalAcc = 0.0;
+    foreach ($accRows as $r) {
+      if (isset($r['unit_price']) && $r['unit_price'] !== null && is_numeric($r['unit_price'])) {
+        $totalAcc += (float)$r['unit_price'] * (float)($r['qty'] ?? 0);
+      }
+    }
+    $totalLabor = $cncCost + $atelierCost;
+    $totalCosts = $totalHpl + $totalAcc + $totalLabor;
+  ?>
+  <div class="section">
+    <div class="title">Total costuri: <?= $esc(self::fmtMoney($totalCosts)) ?></div>
+    <?php if ($saleTotal !== null): ?>
+      <div class="muted">Preț vânzare produs: <?= $esc(self::fmtMoney($saleTotal)) ?></div>
+    <?php elseif ($salePrice > 0): ?>
+      <div class="muted">Preț vânzare produs: <?= $esc(self::fmtMoney($salePrice)) ?></div>
     <?php endif; ?>
   </div>
   <?php if ($avizNumber !== ''): ?>
@@ -1062,14 +1146,32 @@ final class ProjectsController
             try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
         }
         $bonAccRows = self::aggregateAccessories($accRowsAll, 'CONSUMED');
+        $workLogs = [];
+        try {
+            $workLogs = ProjectWorkLog::forProject($projectId);
+        } catch (\Throwable $e) {
+            $workLogs = [];
+        }
+        $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
+        $labor = $laborByProduct[$ppId] ?? [
+            'cnc_hours' => 0.0,
+            'cnc_cost' => 0.0,
+            'atelier_hours' => 0.0,
+            'atelier_cost' => 0.0,
+        ];
+
         $bonHtml = self::renderBonConsumHtml([
             'company' => $company,
             'product' => [
                 'name' => $productName !== '' ? $productName : 'Produs',
                 'code' => $productCode,
+                'qty' => $qty,
+                'unit' => $unit,
+                'sale_price' => $unitPrice,
             ],
             'hpl_rows' => self::aggregateConsumedHpl($hplRows),
             'acc_rows' => $bonAccRows,
+            'labor' => $labor,
             'doc_number' => $bonNumber,
             'doc_date' => $docDate,
             'project_label' => $projectLabel,
