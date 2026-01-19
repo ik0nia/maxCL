@@ -1037,6 +1037,218 @@ final class ProjectsController
         return (string)ob_get_clean();
     }
 
+    private static function renderBonConsumGeneralHtml(array $ctx): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $company = $ctx['company'] ?? [];
+        $docDate = (string)($ctx['doc_date'] ?? '');
+        $projectLabel = (string)($ctx['project_label'] ?? '');
+        $productLabels = is_array($ctx['product_labels'] ?? null) ? $ctx['product_labels'] : [];
+        $hplRows = is_array($ctx['hpl_rows'] ?? null) ? $ctx['hpl_rows'] : [];
+        $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
+        $labor = is_array($ctx['labor'] ?? null) ? $ctx['labor'] : [];
+        $cncHours = (float)($labor['cnc_hours'] ?? 0.0);
+        $cncCost = (float)($labor['cnc_cost'] ?? 0.0);
+        $atelierHours = (float)($labor['atelier_hours'] ?? 0.0);
+        $atelierCost = (float)($labor['atelier_cost'] ?? 0.0);
+        $logo = (string)($company['logo_url'] ?? '');
+        if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
+
+        ob_start();
+        ?>
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Bon de consum general</title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#111; font-size:13px; margin:24px; }
+    .header { display:flex; justify-content:space-between; gap:24px; }
+    .company-name { font-weight:700; font-size:16px; }
+    .doc-title { font-size:18px; font-weight:700; }
+    .box { border:1px solid #ddd; padding:10px 12px; border-radius:6px; }
+    .section { margin-top:16px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { border:1px solid #ddd; padding:7px; vertical-align:top; }
+    th { background:#f6f7f8; text-align:left; font-size:12px; }
+    .muted { color:#666; }
+    .logo { max-height:50px; margin-bottom:8px; }
+    .list { margin:6px 0 0 18px; padding:0; }
+    .list li { margin-bottom:3px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <?php if ($logo !== ''): ?>
+        <img src="<?= $esc($logo) ?>" class="logo" alt="Logo">
+      <?php endif; ?>
+      <div class="company-name"><?= $esc($company['name'] ?? '') ?></div>
+      <?php if (!empty($company['address'])): ?>
+        <div class="muted"><?= $esc($company['address']) ?></div>
+      <?php endif; ?>
+      <div class="muted">
+        <?php if (!empty($company['phone'])): ?>Tel: <?= $esc($company['phone']) ?><?php endif; ?>
+        <?php if (!empty($company['email'])): ?> · Email: <?= $esc($company['email']) ?><?php endif; ?>
+      </div>
+    </div>
+    <div class="box">
+      <div class="doc-title">Bon de consum general</div>
+      <div>Data: <?= $esc($docDate) ?></div>
+      <?php if ($projectLabel !== ''): ?>
+        <div>Proiect: <?= $esc($projectLabel) ?></div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="title">Produse incluse</div>
+    <?php if (!$productLabels): ?>
+      <div class="muted">Nu există produse cu status Avizare/Livrat.</div>
+    <?php else: ?>
+      <ul class="list">
+        <?php foreach ($productLabels as $pl): ?>
+          <li><?= $esc($pl) ?></li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <div class="title">Consum HPL</div>
+    <?php if (!$hplRows): ?>
+      <div class="muted">Nu există consum HPL.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Cod placă</th>
+            <th>Denumire</th>
+            <th style="width:160px">Dimensiuni</th>
+            <th style="width:80px">Cant.</th>
+            <th style="width:110px">Preț/buc</th>
+            <th style="width:110px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($hplRows as $r): ?>
+            <?php
+              $dispH = (int)($r['display_height_mm'] ?? ($r['height_mm'] ?? 0));
+              $dispW = (int)($r['display_width_mm'] ?? ($r['width_mm'] ?? 0));
+              $dispQty = isset($r['display_qty']) ? (float)$r['display_qty'] : (float)($r['qty'] ?? 0);
+              $dim = ($dispW > 0 && $dispH > 0)
+                ? ($dispH . ' × ' . $dispW . ' mm')
+                : '—';
+            ?>
+            <?php
+              $hplUp = isset($r['unit_price']) && $r['unit_price'] !== null ? (float)$r['unit_price'] : null;
+              $hplTot = isset($r['total_price']) && $r['total_price'] !== null ? (float)$r['total_price'] : null;
+            ?>
+            <tr>
+              <td><?= $esc($r['board_code'] ?? '') ?></td>
+              <td><?= $esc($r['board_name'] ?? '') ?></td>
+              <td><?= $esc($dim) ?></td>
+              <td><?= $esc(self::fmtQty($dispQty)) ?></td>
+              <td><?= $hplUp !== null ? $esc(self::fmtMoney($hplUp)) : '—' ?></td>
+              <td><?= $hplTot !== null ? $esc(self::fmtMoney($hplTot)) : '—' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <div class="title">Consum accesorii</div>
+    <?php if (!$accRows): ?>
+      <div class="muted">Nu există consum accesorii.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Cod</th>
+            <th>Denumire</th>
+            <th style="width:90px">Cantitate</th>
+            <th style="width:110px">Preț/buc</th>
+            <th style="width:110px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($accRows as $r): ?>
+            <?php
+              $accUp = (isset($r['unit_price']) && $r['unit_price'] !== null && $r['unit_price'] !== '' && is_numeric($r['unit_price']))
+                ? (float)$r['unit_price']
+                : null;
+              $accTot = $accUp !== null ? ($accUp * (float)($r['qty'] ?? 0)) : null;
+            ?>
+            <tr>
+              <td><?= $esc($r['code'] ?? '') ?></td>
+              <td><?= $esc($r['name'] ?? '') ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
+              <td><?= $accUp !== null ? $esc(self::fmtMoney($accUp)) : '—' ?></td>
+              <td><?= $accTot !== null ? $esc(self::fmtMoney($accTot)) : '—' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="section">
+    <div class="title">Manoperă</div>
+    <?php if ($cncHours <= 0 && $atelierHours <= 0): ?>
+      <div class="muted">Nu există manoperă.</div>
+    <?php else: ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Tip</th>
+            <th style="width:110px">Ore</th>
+            <th style="width:140px">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if ($cncHours > 0 || $cncCost > 0): ?>
+            <tr>
+              <td>CNC</td>
+              <td><?= $esc(self::fmtQty($cncHours, 2)) ?></td>
+              <td><?= $esc(self::fmtMoney($cncCost)) ?></td>
+            </tr>
+          <?php endif; ?>
+          <?php if ($atelierHours > 0 || $atelierCost > 0): ?>
+            <tr>
+              <td>Atelier</td>
+              <td><?= $esc(self::fmtQty($atelierHours, 2)) ?></td>
+              <td><?= $esc(self::fmtMoney($atelierCost)) ?></td>
+            </tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+  <?php
+    $totalHpl = 0.0;
+    foreach ($hplRows as $r) {
+      if (isset($r['total_price']) && $r['total_price'] !== null) $totalHpl += (float)$r['total_price'];
+    }
+    $totalAcc = 0.0;
+    foreach ($accRows as $r) {
+      if (isset($r['unit_price']) && $r['unit_price'] !== null && is_numeric($r['unit_price'])) {
+        $totalAcc += (float)$r['unit_price'] * (float)($r['qty'] ?? 0);
+      }
+    }
+    $totalLabor = $cncCost + $atelierCost;
+    $totalCosts = $totalHpl + $totalAcc + $totalLabor;
+  ?>
+  <div class="section">
+    <div class="title">Total costuri: <?= $esc(self::fmtMoney($totalCosts)) ?></div>
+  </div>
+</body>
+</html>
+        <?php
+        return (string)ob_get_clean();
+    }
+
     /**
      * @return array{deviz_number:int,bon_number:int}
      */
@@ -1206,6 +1418,104 @@ final class ProjectsController
         ]);
 
         return ['deviz_number' => $devizNumber, 'bon_number' => $bonNumber];
+    }
+
+    public static function bonConsumGeneral(array $params): void
+    {
+        $projectId = (int)($params['id'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+
+        $projectProducts = ProjectProduct::forProject($projectId);
+        $eligible = [];
+        $eligibleIds = [];
+        foreach ($projectProducts as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+            $st = strtoupper((string)($pp['production_status'] ?? ''));
+            if (in_array($st, ['AVIZAT', 'LIVRAT'], true)) {
+                $eligible[] = $pp;
+                $eligibleIds[] = $ppId;
+            }
+        }
+
+        $productLabels = [];
+        foreach ($eligible as $pp) {
+            $label = self::productLabelFromProjectProduct($pp);
+            $qty = (float)($pp['qty'] ?? 0);
+            $unit = (string)($pp['unit'] ?? '');
+            if ($qty > 0) {
+                $label .= ' · ' . self::fmtQty($qty) . ($unit !== '' ? (' ' . $unit) : '');
+            }
+            $productLabels[] = $label;
+        }
+
+        $hplRows = [];
+        foreach ($eligibleIds as $ppId) {
+            try {
+                $hplRows = array_merge($hplRows, ProjectProductHplConsumption::forProjectProduct($ppId));
+            } catch (\Throwable $e) {
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                try { $hplRows = array_merge($hplRows, ProjectProductHplConsumption::forProjectProduct($ppId)); } catch (\Throwable $e3) {}
+            }
+        }
+
+        $magConsum = [];
+        try {
+            $magConsum = ProjectMagazieConsumption::forProject($projectId);
+        } catch (\Throwable $e) {
+            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+            try { $magConsum = ProjectMagazieConsumption::forProject($projectId); } catch (\Throwable $e3) { $magConsum = []; }
+        }
+        $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+        $accRows = [];
+        foreach ($eligibleIds as $ppId) {
+            $accRows = array_merge($accRows, $accBy[$ppId] ?? []);
+        }
+
+        $labor = [
+            'cnc_hours' => 0.0,
+            'cnc_cost' => 0.0,
+            'atelier_hours' => 0.0,
+            'atelier_cost' => 0.0,
+        ];
+        if ($eligibleIds) {
+            $workLogs = [];
+            try {
+                $workLogs = ProjectWorkLog::forProject($projectId);
+            } catch (\Throwable $e) {
+                $workLogs = [];
+            }
+            $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
+            foreach ($eligibleIds as $ppId) {
+                $lab = $laborByProduct[$ppId] ?? null;
+                if (!$lab) continue;
+                $labor['cnc_hours'] += (float)($lab['cnc_hours'] ?? 0.0);
+                $labor['cnc_cost'] += (float)($lab['cnc_cost'] ?? 0.0);
+                $labor['atelier_hours'] += (float)($lab['atelier_hours'] ?? 0.0);
+                $labor['atelier_cost'] += (float)($lab['atelier_cost'] ?? 0.0);
+            }
+        }
+
+        $company = self::companySettingsForDocs();
+        $projectLabel = self::projectLabel($project);
+        $docDate = date('Y-m-d');
+
+        $html = self::renderBonConsumGeneralHtml([
+            'company' => $company,
+            'project_label' => $projectLabel,
+            'doc_date' => $docDate,
+            'product_labels' => $productLabels,
+            'hpl_rows' => self::aggregateConsumedHpl($hplRows),
+            'acc_rows' => self::aggregateAccessories($accRows, 'CONSUMED'),
+            'labor' => $labor,
+        ]);
+        header('Content-Type: text/html; charset=utf-8');
+        echo $html;
+        exit;
     }
 
     /**

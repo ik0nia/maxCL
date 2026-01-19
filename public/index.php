@@ -281,6 +281,7 @@ $router->get('/projects', fn() => ProjectsController::index(), $projectsReadMW);
 $router->get('/projects/create', fn() => ProjectsController::createForm(), $projectsWriteMW);
 $router->post('/projects/create', fn() => ProjectsController::create(), $projectsWriteMW);
 $router->get('/projects/{id}', fn($p) => ProjectsController::show($p), $projectsReadMW);
+$router->get('/projects/{id}/bon-consum-general', fn($p) => ProjectsController::bonConsumGeneral($p), $projectsReadMW);
 $router->post('/projects/{id}/edit', fn($p) => ProjectsController::update($p), $projectsWriteMW);
 $router->post('/projects/{id}/status', fn($p) => ProjectsController::changeStatus($p), $projectsWriteMW);
 $router->post('/projects/{id}/delete', fn($p) => ProjectsController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);

@@ -1548,6 +1548,12 @@ ob_start();
               <div class="fw-semibold"><?= number_format($resCost, 2, '.', '') ?> lei</div>
             </div>
           </div>
+          <div class="d-flex justify-content-end mt-2">
+            <a class="btn btn-sm btn-outline-primary" target="_blank"
+               href="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/bon-consum-general')) ?>">
+              Bon consum general
+            </a>
+          </div>
         </div>
       </div>
     </div>
