@@ -2866,6 +2866,7 @@ final class ProjectsController
                 $materialsByProduct = [];
                 $projectCostSummary = [];
                 $discussions = [];
+                $productComments = [];
                 if ($tab === 'products') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
@@ -2926,6 +2927,15 @@ final class ProjectsController
                             // dacă tabela nu există încă (deploy vechi), încercăm migrările și reîncercăm o singură dată.
                             try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
                             try { $ppHplByProduct[$ppId] = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $ppHplByProduct[$ppId] = []; }
+                        }
+                    }
+                    foreach ($projectProducts as $ppRow) {
+                        $ppId = (int)($ppRow['id'] ?? 0);
+                        if ($ppId <= 0) continue;
+                        try {
+                            $productComments[$ppId] = EntityComment::forEntity('project_products', $ppId, 200);
+                        } catch (\Throwable $e) {
+                            $productComments[$ppId] = [];
                         }
                     }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
@@ -3028,6 +3038,7 @@ final class ProjectsController
                     'billingClients' => $billingClients ?? [],
                     'billingAddresses' => $billingAddresses ?? [],
                     'discussions' => $discussions,
+                    'productComments' => $productComments ?? [],
                     'costSettings' => [
                         'labor' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
                         'cnc' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
@@ -6929,6 +6940,47 @@ final class ProjectsController
             Session::flash('toast_error', 'Nu pot salva mesajul.');
         }
         Response::redirect('/projects/' . $projectId . '?tab=discutii');
+    }
+
+    public static function addProductComment(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        $msg = trim((string)($_POST['comment'] ?? ''));
+        if ($msg === '') {
+            Session::flash('toast_error', 'Mesaj gol.');
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+        if (mb_strlen($msg) > 4000) {
+            $msg = mb_substr($msg, 0, 4000);
+        }
+        try {
+            $cid = EntityComment::create('project_products', $ppId, $msg, Auth::id());
+            if ($cid > 0) {
+                Audit::log('PROJECT_PRODUCT_COMMENT_ADD', 'entity_comments', $cid, null, null, [
+                    'message' => 'Observație pe produs.',
+                    'project_id' => $projectId,
+                    'project_product_id' => $ppId,
+                ]);
+                Session::flash('toast_success', 'Observație salvată.');
+            } else {
+                Session::flash('toast_error', 'Nu pot salva observația.');
+            }
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot salva observația.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
     }
 
     public static function deleteWorkLog(array $params): void

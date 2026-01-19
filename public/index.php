@@ -298,6 +298,7 @@ $router->post('/projects/{id}/products/{ppId}/magazie/{itemId}/unallocate', fn($
 $router->post('/projects/{id}/products/{ppId}/hpl/create', fn($p) => ProjectsController::addHplConsumptionForProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/hpl/{cid}/cut', fn($p) => ProjectsController::cutHplForProjectProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/hpl/{cid}/unallocate', fn($p) => ProjectsController::unallocateHplForProjectProduct($p), $projectsProductEditMW);
+$router->post('/projects/{id}/products/{ppId}/comments/create', fn($p) => ProjectsController::addProductComment($p), $projectsReadMW);
 $router->post('/projects/{id}/hpl/pieces/{pieceId}/return', fn($p) => ProjectsController::returnRestHplToStock($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);

@@ -27,6 +27,7 @@ $workLogs = $workLogs ?? [];
 $history = $history ?? [];
 $projectProductLabels = $projectProductLabels ?? [];
 $discussions = $discussions ?? [];
+$productComments = $productComments ?? [];
 $laborByProduct = $laborByProduct ?? [];
 $materialsByProduct = $materialsByProduct ?? [];
 $projectCostSummary = $projectCostSummary ?? [];
@@ -664,6 +665,8 @@ ob_start();
                 $hplCost = $mat ? (float)($mat['hpl_cost'] ?? 0.0) : 0.0;
                 $matCost = $magCost + $hplCost;
                 $totalEst = $manCost + $matCost;
+                $ppComments = isset($productComments[$ppId]) && is_array($productComments[$ppId]) ? $productComments[$ppId] : [];
+                $ppCommentsCount = count($ppComments);
 
                 $projectClientId = (int)($project['client_id'] ?? 0);
                 $invoiceClientId = isset($pp['invoice_client_id']) ? (int)$pp['invoice_client_id'] : 0;
@@ -1141,6 +1144,9 @@ ob_start();
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppBill<?= $ppId ?>">
                         <i class="bi bi-receipt me-1"></i> Facturare/Livrare
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppObs<?= $ppId ?>">
+                        <i class="bi bi-chat-dots me-1"></i> Observații(<?= (int)$ppCommentsCount ?>)
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppEdit<?= $ppId ?>">
                         <i class="bi bi-pencil me-1"></i> Editează
                       </button>
@@ -1227,6 +1233,46 @@ ob_start();
                             </button>
                           </div>
                         </form>
+                      </div>
+                    </div>
+
+                    <div class="collapse mt-3" id="ppObs<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Observații produs</div>
+                        <div class="text-muted small">Mesaje pe produs (cu user + dată/oră).</div>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/comments/create')) ?>" class="mt-2">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <label class="form-label fw-semibold mb-1">Mesaj</label>
+                          <textarea class="form-control form-control-sm" name="comment" rows="2" maxlength="4000" placeholder="Scrie observația…"></textarea>
+                          <div class="d-flex justify-content-end mt-2">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-send me-1"></i> Trimite
+                            </button>
+                          </div>
+                        </form>
+                        <hr class="my-3">
+                        <?php if (!$ppComments): ?>
+                          <div class="text-muted small">Nu există observații încă.</div>
+                        <?php else: ?>
+                          <div class="d-flex flex-column gap-2">
+                            <?php foreach ($ppComments as $m): ?>
+                              <?php
+                                $who = (string)($m['user_name'] ?? '');
+                                if ($who === '') $who = (string)($m['user_email'] ?? '');
+                                if ($who === '') $who = '—';
+                                $dt = (string)($m['created_at'] ?? '');
+                                $txt = (string)($m['comment'] ?? '');
+                              ?>
+                              <div class="p-2 rounded" style="background:#F7FAFB;border:1px solid #D9E3E6">
+                                <div class="d-flex justify-content-between gap-2">
+                                  <div class="fw-semibold"><?= htmlspecialchars($who) ?></div>
+                                  <div class="text-muted small"><?= htmlspecialchars($dt) ?></div>
+                                </div>
+                                <div class="mt-1"><?= nl2br(htmlspecialchars($txt)) ?></div>
+                              </div>
+                            <?php endforeach; ?>
+                          </div>
+                        <?php endif; ?>
                       </div>
                     </div>
 
