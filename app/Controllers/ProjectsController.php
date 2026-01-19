@@ -765,7 +765,6 @@ final class ProjectsController
     <thead>
       <tr>
         <th>Produs / descriere</th>
-        <th style="width:110px">Cantitate</th>
         <th style="width:140px">Cantitate</th>
       </tr>
     </thead>
