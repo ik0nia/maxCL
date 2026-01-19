@@ -3923,6 +3923,34 @@ final class ProjectsController
         $avizNumber = '';
         try {
             // Statusurile piesei nu mai modifică automat locația/statusul HPL-ului.
+            // CNC -> Montaj: necesită manoperă CNC pe produs.
+            if ($old === 'CNC' && $next === 'MONTAJ') {
+                $hasCnc = false;
+                try {
+                    $stCnc = \App\Core\DB::pdo()->prepare("
+                        SELECT id
+                        FROM project_work_logs
+                        WHERE project_id = ?
+                          AND project_product_id = ?
+                          AND work_type = 'CNC'
+                          AND hours_estimated > 0
+                        LIMIT 1
+                    ");
+                    $stCnc->execute([$projectId, $ppId]);
+                    $hasCnc = (bool)$stCnc->fetch();
+                } catch (\Throwable $e) {
+                    $hasCnc = false;
+                }
+                if (!$hasCnc) {
+                    $msg = 'Nu poți trece la Montaj: adaugă manoperă CNC pentru acest produs.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products');
+                }
+            }
             // CNC -> Montaj: blocăm până când toate plăcile/piesele HPL alocate pe piesă sunt "Debitat" (consumate manual).
             if ($old === 'CNC' && $next === 'MONTAJ') {
                 $reserved = [];
@@ -3970,8 +3998,34 @@ final class ProjectsController
                 }
             }
 
-            // Gata de livrare: blocăm dacă există accesorii rezervate neconsumate pe piesă (DIRECT sau PROIECT).
+            // Gata de livrare: necesită manoperă Atelier pe produs și fără accesorii rezervate neconsumate.
             if ($next === 'GATA_DE_LIVRARE') {
+                $hasAtelier = false;
+                try {
+                    $stAt = \App\Core\DB::pdo()->prepare("
+                        SELECT id
+                        FROM project_work_logs
+                        WHERE project_id = ?
+                          AND project_product_id = ?
+                          AND work_type = 'ATELIER'
+                          AND hours_estimated > 0
+                        LIMIT 1
+                    ");
+                    $stAt->execute([$projectId, $ppId]);
+                    $hasAtelier = (bool)$stAt->fetch();
+                } catch (\Throwable $e) {
+                    $hasAtelier = false;
+                }
+                if (!$hasAtelier) {
+                    $msg = 'Nu poți trece la Gata de livrare: adaugă manoperă Atelier pentru acest produs.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products');
+                }
+
                 $projectProducts = [];
                 $magConsum = [];
                 try { $projectProducts = ProjectProduct::forProject($projectId); } catch (\Throwable $e) { $projectProducts = []; }
