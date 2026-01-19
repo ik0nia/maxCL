@@ -925,6 +925,13 @@ final class ProjectsController
 
         $docDate = date('Y-m-d');
 
+        $projectNameForDoc = trim((string)($project['name'] ?? ''));
+        if ($projectNameForDoc === '') $projectNameForDoc = trim((string)($project['code'] ?? ''));
+        if ($projectNameForDoc === '') $projectNameForDoc = 'Proiect';
+        $productNameForDoc = $productName !== '' ? $productName : 'Produs';
+        $devizLabel = 'DEVIZ #' . $devizNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
+        $bonLabel = 'BON CONSUM #' . $bonNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
+
         $devizHtml = self::renderDevizHtml([
             'company' => $company,
             'client' => $client,
@@ -942,12 +949,15 @@ final class ProjectsController
             'project_label' => $projectLabel,
             'aviz_number' => $avizNumber,
         ]);
-        $devizFile = self::saveHtmlDocument('deviz-' . $devizNumber . '-pp' . $ppId . '.html', $devizHtml);
+        $devizFile = self::saveHtmlDocument(
+            'deviz-' . $devizNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
+            $devizHtml
+        );
         $devizId = EntityFile::create([
             'entity_type' => 'projects',
             'entity_id' => $projectId,
-            'category' => 'Deviz nr. ' . $devizNumber . ' · ' . ($productName !== '' ? $productName : ('Produs #' . $ppId)),
-            'original_name' => 'Deviz ' . $devizNumber . ' - ' . ($productName !== '' ? $productName : ('Produs ' . $ppId)) . '.html',
+            'category' => $devizLabel,
+            'original_name' => $devizLabel . '.html',
             'stored_name' => $devizFile['stored_name'],
             'mime' => $devizFile['mime'],
             'size_bytes' => $devizFile['size_bytes'],
@@ -980,12 +990,15 @@ final class ProjectsController
             'project_label' => $projectLabel,
             'aviz_number' => $avizNumber,
         ]);
-        $bonFile = self::saveHtmlDocument('bon-consum-' . $bonNumber . '-pp' . $ppId . '.html', $bonHtml);
+        $bonFile = self::saveHtmlDocument(
+            'bon-consum-' . $bonNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
+            $bonHtml
+        );
         $bonId = EntityFile::create([
             'entity_type' => 'projects',
             'entity_id' => $projectId,
-            'category' => 'Bon consum nr. ' . $bonNumber . ' · ' . ($productName !== '' ? $productName : ('Produs #' . $ppId)),
-            'original_name' => 'Bon consum ' . $bonNumber . ' - ' . ($productName !== '' ? $productName : ('Produs ' . $ppId)) . '.html',
+            'category' => $bonLabel,
+            'original_name' => $bonLabel . '.html',
             'stored_name' => $bonFile['stored_name'],
             'mime' => $bonFile['mime'],
             'size_bytes' => $bonFile['size_bytes'],

@@ -140,6 +140,9 @@ final class ProductsController
                     if (isset($docsByPp[$ppId][$type])) continue;
 
                     $label = $type === 'deviz' ? 'Deviz' : 'Bon consum';
+                    if (preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $category)) {
+                        $label = $category;
+                    }
                     $num = '';
                     if (preg_match('/nr\.?\s*([0-9]+)/i', $category, $m)) {
                         $num = (string)$m[1];
