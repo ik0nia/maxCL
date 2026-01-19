@@ -977,8 +977,8 @@ final class ProjectsController
 
         $magConsum = ProjectMagazieConsumption::forProject($projectId);
         $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
-        $accRows = $accBy[$ppId] ?? [];
-        $accRows = array_values(array_filter($accRows, function (array $r): bool {
+        $accRowsAll = $accBy[$ppId] ?? [];
+        $accRowsDeviz = array_values(array_filter($accRowsAll, function (array $r): bool {
             return (int)($r['include_in_deviz'] ?? 1) === 1;
         }));
 
@@ -1028,7 +1028,7 @@ final class ProjectsController
                 'unit' => $unit,
                 'unit_price' => $unitPrice,
             ],
-            'accessories' => self::aggregateAccessories($accRows),
+            'accessories' => self::aggregateAccessories($accRowsDeviz),
             'doc_number' => $devizNumber,
             'doc_date' => $docDate,
             'project_label' => $projectLabel,
@@ -1061,7 +1061,7 @@ final class ProjectsController
             try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
             try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
         }
-        $bonAccRows = self::aggregateAccessories($accRows, 'CONSUMED');
+        $bonAccRows = self::aggregateAccessories($accRowsAll, 'CONSUMED');
         $bonHtml = self::renderBonConsumHtml([
             'company' => $company,
             'product' => [
