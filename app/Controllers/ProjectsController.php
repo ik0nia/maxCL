@@ -575,11 +575,19 @@ final class ProjectsController
             $pw = (int)($r['consumed_piece_width_mm'] ?? 0);
             $ph = (int)($r['consumed_piece_height_mm'] ?? 0);
             $qty = (int)($r['consumed_piece_qty'] ?? 0);
+            $usedFallback = false;
             if ($pt === '' && $pw === 0 && $ph === 0) {
+                $usedFallback = true;
                 $pt = (string)($r['piece_type'] ?? '');
                 $pw = (int)($r['piece_width_mm'] ?? 0);
                 $ph = (int)($r['piece_height_mm'] ?? 0);
                 $qty = (int)($r['piece_qty'] ?? 0);
+            }
+            if ($usedFallback) {
+                $pieceStatus = (string)($r['piece_status'] ?? '');
+                if ($pieceStatus !== 'CONSUMED') {
+                    $qty = 1;
+                }
             }
             if ($qty <= 0) $qty = 1;
             $bcode = trim((string)($r['board_code'] ?? ''));
