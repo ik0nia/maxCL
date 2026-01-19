@@ -1043,10 +1043,11 @@ final class ProjectsController
         $company = $ctx['company'] ?? [];
         $docDate = (string)($ctx['doc_date'] ?? '');
         $projectLabel = (string)($ctx['project_label'] ?? '');
-        $productLabels = is_array($ctx['product_labels'] ?? null) ? $ctx['product_labels'] : [];
+        $productRows = is_array($ctx['product_rows'] ?? null) ? $ctx['product_rows'] : [];
         $hplRows = is_array($ctx['hpl_rows'] ?? null) ? $ctx['hpl_rows'] : [];
         $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
         $labor = is_array($ctx['labor'] ?? null) ? $ctx['labor'] : [];
+        $totalSale = isset($ctx['total_sale']) ? (float)($ctx['total_sale'] ?? 0.0) : 0.0;
         $cncHours = (float)($labor['cnc_hours'] ?? 0.0);
         $cncCost = (float)($labor['cnc_cost'] ?? 0.0);
         $atelierHours = (float)($labor['atelier_hours'] ?? 0.0);
@@ -1103,14 +1104,27 @@ final class ProjectsController
 
   <div class="section">
     <div class="title">Produse incluse</div>
-    <?php if (!$productLabels): ?>
+    <?php if (!$productRows): ?>
       <div class="muted">Nu există produse cu status Avizare/Livrat.</div>
     <?php else: ?>
-      <ul class="list">
-        <?php foreach ($productLabels as $pl): ?>
-          <li><?= $esc($pl) ?></li>
-        <?php endforeach; ?>
-      </ul>
+      <table>
+        <thead>
+          <tr>
+            <th>Produs</th>
+            <th style="width:140px">Cost</th>
+            <th style="width:160px">Preț vânzare</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($productRows as $pr): ?>
+            <tr>
+              <td><?= $esc($pr['label'] ?? '') ?></td>
+              <td><?= $esc(self::fmtMoney((float)($pr['cost_total'] ?? 0.0))) ?></td>
+              <td><?= $esc(self::fmtMoney((float)($pr['sale_total'] ?? 0.0))) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
     <?php endif; ?>
   </div>
 
@@ -1242,6 +1256,7 @@ final class ProjectsController
   ?>
   <div class="section">
     <div class="title">Total costuri: <?= $esc(self::fmtMoney($totalCosts)) ?></div>
+    <div class="muted">Preț vânzare total: <?= $esc(self::fmtMoney($totalSale)) ?></div>
   </div>
 </body>
 </html>
@@ -1442,26 +1457,13 @@ final class ProjectsController
             }
         }
 
-        $productLabels = [];
-        foreach ($eligible as $pp) {
-            $label = self::productLabelFromProjectProduct($pp);
-            $qty = (float)($pp['qty'] ?? 0);
-            $unit = (string)($pp['unit'] ?? '');
-            if ($qty > 0) {
-                $label .= ' · ' . self::fmtQty($qty) . ($unit !== '' ? (' ' . $unit) : '');
-            }
-            $productLabels[] = $label;
+        $workLogs = [];
+        try {
+            $workLogs = ProjectWorkLog::forProject($projectId);
+        } catch (\Throwable $e) {
+            $workLogs = [];
         }
-
-        $hplRows = [];
-        foreach ($eligibleIds as $ppId) {
-            try {
-                $hplRows = array_merge($hplRows, ProjectProductHplConsumption::forProjectProduct($ppId));
-            } catch (\Throwable $e) {
-                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
-                try { $hplRows = array_merge($hplRows, ProjectProductHplConsumption::forProjectProduct($ppId)); } catch (\Throwable $e3) {}
-            }
-        }
+        $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
 
         $magConsum = [];
         try {
@@ -1471,33 +1473,73 @@ final class ProjectsController
             try { $magConsum = ProjectMagazieConsumption::forProject($projectId); } catch (\Throwable $e3) { $magConsum = []; }
         }
         $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
+        $productRows = [];
+        $totalSale = 0.0;
+        $hplRows = [];
         $accRows = [];
-        foreach ($eligibleIds as $ppId) {
-            $accRows = array_merge($accRows, $accBy[$ppId] ?? []);
-        }
-
         $labor = [
             'cnc_hours' => 0.0,
             'cnc_cost' => 0.0,
             'atelier_hours' => 0.0,
             'atelier_cost' => 0.0,
         ];
-        if ($eligibleIds) {
-            $workLogs = [];
-            try {
-                $workLogs = ProjectWorkLog::forProject($projectId);
-            } catch (\Throwable $e) {
-                $workLogs = [];
+        foreach ($eligible as $pp) {
+            $ppId = (int)($pp['id'] ?? 0);
+            if ($ppId <= 0) continue;
+
+            $label = self::productLabelFromProjectProduct($pp);
+            $qty = (float)($pp['qty'] ?? 0);
+            $unit = (string)($pp['unit'] ?? '');
+            if ($qty > 0) {
+                $label .= ' · ' . self::fmtQty($qty) . ($unit !== '' ? (' ' . $unit) : '');
             }
-            $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
-            foreach ($eligibleIds as $ppId) {
-                $lab = $laborByProduct[$ppId] ?? null;
-                if (!$lab) continue;
+            $unitSale = (isset($pp['product_sale_price']) && $pp['product_sale_price'] !== null && $pp['product_sale_price'] !== '' && is_numeric($pp['product_sale_price']))
+                ? (float)$pp['product_sale_price']
+                : 0.0;
+            $saleTotal = ($qty > 0) ? ($unitSale * $qty) : $unitSale;
+            $totalSale += $saleTotal;
+
+            $lab = $laborByProduct[$ppId] ?? null;
+            if (is_array($lab)) {
                 $labor['cnc_hours'] += (float)($lab['cnc_hours'] ?? 0.0);
                 $labor['cnc_cost'] += (float)($lab['cnc_cost'] ?? 0.0);
                 $labor['atelier_hours'] += (float)($lab['atelier_hours'] ?? 0.0);
                 $labor['atelier_cost'] += (float)($lab['atelier_cost'] ?? 0.0);
             }
+            $laborCost = is_array($lab) ? (float)($lab['total_cost'] ?? 0.0) : 0.0;
+
+            $accRowsProd = $accBy[$ppId] ?? [];
+            $accRows = array_merge($accRows, $accRowsProd);
+            $accAgg = self::aggregateAccessories($accRowsProd, 'CONSUMED');
+            $accCost = 0.0;
+            foreach ($accAgg as $a) {
+                $up = isset($a['unit_price']) && $a['unit_price'] !== null && is_numeric($a['unit_price'])
+                    ? (float)$a['unit_price']
+                    : 0.0;
+                $accCost += $up * (float)($a['qty'] ?? 0);
+            }
+
+            $hplRowsProd = [];
+            try {
+                $hplRowsProd = ProjectProductHplConsumption::forProjectProduct($ppId);
+            } catch (\Throwable $e) {
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                try { $hplRowsProd = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRowsProd = []; }
+            }
+            $hplRows = array_merge($hplRows, $hplRowsProd);
+            $hplAgg = self::aggregateConsumedHpl($hplRowsProd);
+            $hplCost = 0.0;
+            foreach ($hplAgg as $h) {
+                if (isset($h['total_price']) && $h['total_price'] !== null) {
+                    $hplCost += (float)$h['total_price'];
+                }
+            }
+
+            $productRows[] = [
+                'label' => $label,
+                'cost_total' => $laborCost + $accCost + $hplCost,
+                'sale_total' => $saleTotal,
+            ];
         }
 
         $company = self::companySettingsForDocs();
@@ -1508,10 +1550,11 @@ final class ProjectsController
             'company' => $company,
             'project_label' => $projectLabel,
             'doc_date' => $docDate,
-            'product_labels' => $productLabels,
+            'product_rows' => $productRows,
             'hpl_rows' => self::aggregateConsumedHpl($hplRows),
             'acc_rows' => self::aggregateAccessories($accRows, 'CONSUMED'),
             'labor' => $labor,
+            'total_sale' => $totalSale,
         ]);
         header('Content-Type: text/html; charset=utf-8');
         echo $html;
