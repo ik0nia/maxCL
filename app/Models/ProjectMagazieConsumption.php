@@ -8,6 +8,12 @@ use PDO;
 
 final class ProjectMagazieConsumption
 {
+    private static function isUnknownColumn(\Throwable $e, string $col): bool
+    {
+        $m = strtolower($e->getMessage());
+        return str_contains($m, 'unknown column') && str_contains($m, strtolower($col));
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function forProject(int $projectId): array
     {
@@ -72,22 +78,46 @@ final class ProjectMagazieConsumption
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            INSERT INTO project_magazie_consumptions
-              (project_id, project_product_id, item_id, qty, unit, mode, note, created_by)
-            VALUES
-              (:project_id, :pp_id, :item_id, :qty, :unit, :mode, :note, :created_by)
-        ');
-        $st->execute([
-            ':project_id' => (int)$data['project_id'],
-            ':pp_id' => $data['project_product_id'] ?? null,
-            ':item_id' => (int)$data['item_id'],
-            ':qty' => (float)$data['qty'],
-            ':unit' => (string)($data['unit'] ?? 'buc'),
-            ':mode' => (string)($data['mode'] ?? 'CONSUMED'),
-            ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
-            ':created_by' => $data['created_by'] ?? null,
-        ]);
+        $include = array_key_exists('include_in_deviz', $data) ? (int)!!$data['include_in_deviz'] : 1;
+        try {
+            $st = $pdo->prepare('
+                INSERT INTO project_magazie_consumptions
+                  (project_id, project_product_id, item_id, qty, unit, mode, include_in_deviz, note, created_by)
+                VALUES
+                  (:project_id, :pp_id, :item_id, :qty, :unit, :mode, :include_in_deviz, :note, :created_by)
+            ');
+            $st->execute([
+                ':project_id' => (int)$data['project_id'],
+                ':pp_id' => $data['project_product_id'] ?? null,
+                ':item_id' => (int)$data['item_id'],
+                ':qty' => (float)$data['qty'],
+                ':unit' => (string)($data['unit'] ?? 'buc'),
+                ':mode' => (string)($data['mode'] ?? 'CONSUMED'),
+                ':include_in_deviz' => $include,
+                ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
+                ':created_by' => $data['created_by'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'include_in_deviz')) {
+                throw $e;
+            }
+            $st = $pdo->prepare('
+                INSERT INTO project_magazie_consumptions
+                  (project_id, project_product_id, item_id, qty, unit, mode, note, created_by)
+                VALUES
+                  (:project_id, :pp_id, :item_id, :qty, :unit, :mode, :note, :created_by)
+            ');
+            $st->execute([
+                ':project_id' => (int)$data['project_id'],
+                ':pp_id' => $data['project_product_id'] ?? null,
+                ':item_id' => (int)$data['item_id'],
+                ':qty' => (float)$data['qty'],
+                ':unit' => (string)($data['unit'] ?? 'buc'),
+                ':mode' => (string)($data['mode'] ?? 'CONSUMED'),
+                ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
+                ':created_by' => $data['created_by'] ?? null,
+            ]);
+        }
         return (int)$pdo->lastInsertId();
     }
 
@@ -96,19 +126,40 @@ final class ProjectMagazieConsumption
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            UPDATE project_magazie_consumptions
-            SET project_product_id=:pp_id, qty=:qty, unit=:unit, mode=:mode, note=:note
-            WHERE id=:id
-        ');
-        $st->execute([
-            ':id' => $id,
-            ':pp_id' => $data['project_product_id'] ?? null,
-            ':qty' => (float)$data['qty'],
-            ':unit' => (string)($data['unit'] ?? 'buc'),
-            ':mode' => (string)($data['mode'] ?? 'CONSUMED'),
-            ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
-        ]);
+        $include = array_key_exists('include_in_deviz', $data) ? (int)!!$data['include_in_deviz'] : 1;
+        try {
+            $st = $pdo->prepare('
+                UPDATE project_magazie_consumptions
+                SET project_product_id=:pp_id, qty=:qty, unit=:unit, mode=:mode, include_in_deviz=:include_in_deviz, note=:note
+                WHERE id=:id
+            ');
+            $st->execute([
+                ':id' => $id,
+                ':pp_id' => $data['project_product_id'] ?? null,
+                ':qty' => (float)$data['qty'],
+                ':unit' => (string)($data['unit'] ?? 'buc'),
+                ':mode' => (string)($data['mode'] ?? 'CONSUMED'),
+                ':include_in_deviz' => $include,
+                ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
+            ]);
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'include_in_deviz')) {
+                throw $e;
+            }
+            $st = $pdo->prepare('
+                UPDATE project_magazie_consumptions
+                SET project_product_id=:pp_id, qty=:qty, unit=:unit, mode=:mode, note=:note
+                WHERE id=:id
+            ');
+            $st->execute([
+                ':id' => $id,
+                ':pp_id' => $data['project_product_id'] ?? null,
+                ':qty' => (float)$data['qty'],
+                ':unit' => (string)($data['unit'] ?? 'buc'),
+                ':mode' => (string)($data['mode'] ?? 'CONSUMED'),
+                ':note' => (isset($data['note']) && trim((string)$data['note']) !== '') ? trim((string)$data['note']) : null,
+            ]);
+        }
     }
 
     public static function delete(int $id): void

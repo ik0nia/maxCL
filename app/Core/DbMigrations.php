@@ -665,6 +665,7 @@ final class DbMigrations
                           qty DECIMAL(12,3) NOT NULL,
                           unit VARCHAR(32) NOT NULL DEFAULT 'buc',
                           mode ENUM('RESERVED','CONSUMED') NOT NULL DEFAULT 'CONSUMED',
+                          include_in_deviz TINYINT(1) NOT NULL DEFAULT 1,
                           note VARCHAR(255) NULL,
                           created_by INT UNSIGNED NULL,
                           created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -883,6 +884,20 @@ final class DbMigrations
                         ");
                     } catch (\Throwable $e) {
                         // ignore
+                    }
+                },
+            ],
+            [
+                'id' => '2026-01-19_01_project_magazie_consumptions_deviz_flag',
+                'label' => 'ALTER project_magazie_consumptions ADD include_in_deviz',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_magazie_consumptions')) return;
+                    if (!self::columnExists($pdo, 'project_magazie_consumptions', 'include_in_deviz')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_magazie_consumptions ADD COLUMN include_in_deviz TINYINT(1) NOT NULL DEFAULT 1 AFTER mode");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
                     }
                 },
             ],

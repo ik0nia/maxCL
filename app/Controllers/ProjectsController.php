@@ -361,13 +361,24 @@ final class ProjectsController
                 ? (float)$c['item_unit_price']
                 : null;
 
+            $includeInDeviz = isset($c['include_in_deviz']) ? (int)$c['include_in_deviz'] : 1;
             $ppId = isset($c['project_product_id']) && $c['project_product_id'] !== null && $c['project_product_id'] !== ''
                 ? (int)$c['project_product_id']
                 : 0;
             if ($ppId > 0 && isset($valid[$ppId])) {
-                $key = $iid . '|' . $mode . '|DIRECT';
+                $key = $iid . '|' . $mode . '|DIRECT|' . $includeInDeviz;
                 if (!isset($out[$ppId][$key])) {
-                    $out[$ppId][$key] = ['item_id' => $iid, 'mode' => $mode, 'src' => 'DIRECT', 'code' => $code, 'name' => $name, 'unit' => $unit, 'qty' => 0.0, 'unit_price' => $up];
+                    $out[$ppId][$key] = [
+                        'item_id' => $iid,
+                        'mode' => $mode,
+                        'src' => 'DIRECT',
+                        'code' => $code,
+                        'name' => $name,
+                        'unit' => $unit,
+                        'qty' => 0.0,
+                        'unit_price' => $up,
+                        'include_in_deviz' => $includeInDeviz,
+                    ];
                 }
                 $out[$ppId][$key]['qty'] += $qty;
                 continue;
@@ -382,9 +393,19 @@ final class ProjectsController
                 if ($wgt <= 0) continue;
                 $allocQty = $qty * $wgt;
                 if ($allocQty <= 0) continue;
-                $key = $iid . '|' . $mode . '|PROIECT';
+                $key = $iid . '|' . $mode . '|PROIECT|' . $includeInDeviz;
                 if (!isset($out[$pid][$key])) {
-                    $out[$pid][$key] = ['item_id' => $iid, 'mode' => $mode, 'src' => 'PROIECT', 'code' => $code, 'name' => $name, 'unit' => $unit, 'qty' => 0.0, 'unit_price' => $up];
+                    $out[$pid][$key] = [
+                        'item_id' => $iid,
+                        'mode' => $mode,
+                        'src' => 'PROIECT',
+                        'code' => $code,
+                        'name' => $name,
+                        'unit' => $unit,
+                        'qty' => 0.0,
+                        'unit_price' => $up,
+                        'include_in_deviz' => $includeInDeviz,
+                    ];
                 }
                 $out[$pid][$key]['qty'] += $allocQty;
             }
@@ -896,6 +917,9 @@ final class ProjectsController
         $magConsum = ProjectMagazieConsumption::forProject($projectId);
         $accBy = self::accessoriesByProductForDisplay($projectProducts, $magConsum);
         $accRows = $accBy[$ppId] ?? [];
+        $accRows = array_values(array_filter($accRows, function (array $r): bool {
+            return (int)($r['include_in_deviz'] ?? 1) === 1;
+        }));
 
         $company = self::companySettingsForDocs();
         $projectLabel = self::projectLabel($project);
@@ -2590,6 +2614,10 @@ final class ProjectsController
 
         $newStatus = trim((string)($_POST['status'] ?? ''));
         $note = trim((string)($_POST['note'] ?? ''));
+        $includeInDeviz = isset($_POST['include_in_deviz'])
+            ? (int)$_POST['include_in_deviz']
+            : (int)($before['include_in_deviz'] ?? 1);
+        $includeInDeviz = isset($_POST['include_in_deviz']) ? (int)$_POST['include_in_deviz'] : 1;
         $allowedStatuses = array_map(fn($s) => (string)$s['value'], self::statuses());
         if ($newStatus === '' || !in_array($newStatus, $allowedStatuses, true)) {
             Session::flash('toast_error', 'Status invalid.');
@@ -3568,6 +3596,7 @@ final class ProjectsController
                     'qty' => (float)$qty,
                     'unit' => (string)($beforeRow['unit'] ?? (string)($beforeItem['unit'] ?? 'buc')),
                     'mode' => 'CONSUMED',
+                    'include_in_deviz' => (int)($beforeRow['include_in_deviz'] ?? 1),
                     'note' => null,
                 ]);
 
@@ -3608,7 +3637,7 @@ final class ProjectsController
                 $need = (float)$need;
                 if ($need <= 0) continue;
                 $stProj = $pdo->prepare("
-                    SELECT id, qty, unit
+                    SELECT id, qty, unit, include_in_deviz
                     FROM project_magazie_consumptions
                     WHERE project_id = ?
                       AND (project_product_id IS NULL OR project_product_id = 0)
@@ -3648,6 +3677,7 @@ final class ProjectsController
                         'qty' => (float)$take,
                         'unit' => $unit !== '' ? $unit : 'buc',
                         'mode' => 'CONSUMED',
+                        'include_in_deviz' => (int)($pr['include_in_deviz'] ?? 1),
                         'note' => null,
                         'created_by' => Auth::id(),
                     ]);
@@ -4525,6 +4555,8 @@ final class ProjectsController
         $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        $includeInDeviz = isset($_POST['include_in_deviz']) ? (int)$_POST['include_in_deviz'] : 1;
+        $includeInDeviz = isset($_POST['include_in_deviz']) ? (int)$_POST['include_in_deviz'] : 1;
         $mode = trim((string)($_POST['mode'] ?? 'CONSUMED'));
         $note = trim((string)($_POST['note'] ?? ''));
         if ($itemId === null || $qty === null || $qty <= 0) {
@@ -4563,6 +4595,7 @@ final class ProjectsController
                 'qty' => (float)$qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => $mode,
+                'include_in_deviz' => $includeInDeviz ? 1 : 0,
                 'note' => $note !== '' ? $note : null,
                 'created_by' => Auth::id(),
             ]);
@@ -4671,6 +4704,7 @@ final class ProjectsController
                 'qty' => (float)$qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => 'RESERVED',
+                'include_in_deviz' => $includeInDeviz ? 1 : 0,
                 'note' => null,
                 'created_by' => Auth::id(),
             ]);
@@ -4771,11 +4805,15 @@ final class ProjectsController
             if ($cid <= 0) throw new \RuntimeException('Rezervare invalidă.');
 
             $unit = trim((string)($first['unit'] ?? (string)($item['unit'] ?? 'buc')));
+            if (!isset($_POST['include_in_deviz'])) {
+                $includeInDeviz = (int)($first['include_in_deviz'] ?? 1);
+            }
             ProjectMagazieConsumption::update($cid, [
                 'project_product_id' => $ppId,
                 'qty' => (float)$qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => 'RESERVED',
+                'include_in_deviz' => $includeInDeviz ? 1 : 0,
                 'note' => null,
             ]);
 
@@ -5849,6 +5887,7 @@ final class ProjectsController
                 'qty' => $afterQty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => $afterMode,
+                'include_in_deviz' => $includeInDeviz ? 1 : 0,
                 'note' => $note !== '' ? $note : null,
             ]);
             if (abs($stockDelta) > 0.0000001) {

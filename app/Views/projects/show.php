@@ -906,6 +906,7 @@ ob_start();
                                   $up = $ar['unit_price'];
                                   $val = ($up !== null) ? ($up * $aq) : null;
                                   $badgeCls = ($mode === 'CONSUMED') ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis';
+                                  $showDeviz = (int)($ar['include_in_deviz'] ?? 1) === 1;
                                   $iid = (int)($ar['item_id'] ?? 0);
                                 ?>
                                 <tr>
@@ -916,6 +917,9 @@ ob_start();
                                     <?php endif; ?>
                                     <?php if ($mode !== ''): ?>
                                       <span class="badge rounded-pill <?= $badgeCls ?> ms-1"><?= htmlspecialchars($mode) ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!$showDeviz): ?>
+                                      <span class="badge rounded-pill bg-light text-secondary-emphasis ms-1">fără deviz</span>
                                     <?php endif; ?>
                                   </td>
                                   <td class="text-end fw-semibold"><?= number_format($aq, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
@@ -935,8 +939,13 @@ ob_start();
                                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/update')) ?>" class="d-inline-flex align-items-center gap-1">
                                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                           <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
+                                          <input type="hidden" name="include_in_deviz" value="0">
                                           <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty"
                                                  value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>" style="width:92px">
+                                          <label class="form-check m-0 d-flex align-items-center gap-1">
+                                            <input class="form-check-input m-0" type="checkbox" name="include_in_deviz" value="1" <?= $showDeviz ? 'checked' : '' ?>>
+                                            <span class="small text-muted">Deviz</span>
+                                          </label>
                                           <button class="btn btn-outline-primary btn-sm" type="submit">Salvează</button>
                                         </form>
                                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/magazie/' . $iid . '/unallocate')) ?>" class="m-0"
@@ -1200,6 +1209,13 @@ ob_start();
                           <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold mb-1">Cantitate</label>
                             <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty" value="1" required>
+                          </div>
+                          <div class="col-12">
+                            <input type="hidden" name="include_in_deviz" value="0">
+                            <label class="form-check m-0">
+                              <input class="form-check-input" type="checkbox" name="include_in_deviz" value="1" checked>
+                              <span class="form-check-label">Apare pe deviz</span>
+                            </label>
                           </div>
                           <div class="col-12 d-flex justify-content-end">
                             <button class="btn btn-primary btn-sm" type="submit">
@@ -1587,6 +1603,13 @@ ob_start();
               </select>
             </div>
             <div class="col-12">
+              <input type="hidden" name="include_in_deviz" value="0">
+              <label class="form-check m-0">
+                <input class="form-check-input" type="checkbox" name="include_in_deviz" value="1" checked>
+                <span class="form-check-label">Apare pe deviz</span>
+              </label>
+            </div>
+            <div class="col-12">
               <label class="form-label fw-semibold">Notă</label>
               <input class="form-control" name="note" maxlength="255" placeholder="opțional…">
             </div>
@@ -1731,6 +1754,14 @@ ob_start();
                                 <option value="CONSUMED" <?= ((string)($c['mode'] ?? '') === 'CONSUMED') ? 'selected' : '' ?>>consumat</option>
                                 <option value="RESERVED" <?= ((string)($c['mode'] ?? '') === 'RESERVED') ? 'selected' : '' ?>>rezervat</option>
                               </select>
+                            </div>
+                            <div class="col-12 col-md-2">
+                              <label class="form-label fw-semibold mb-1">Deviz</label>
+                              <input type="hidden" name="include_in_deviz" value="0">
+                              <label class="form-check m-0">
+                                <input class="form-check-input" type="checkbox" name="include_in_deviz" value="1" <?= ((int)($c['include_in_deviz'] ?? 1) === 1) ? 'checked' : '' ?>>
+                                <span class="form-check-label">Apare</span>
+                              </label>
                             </div>
                             <div class="col-12 col-md-3">
                               <label class="form-label fw-semibold mb-1">Produs</label>
