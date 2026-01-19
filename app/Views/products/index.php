@@ -84,15 +84,19 @@ ob_start();
               <div class="small mt-1">
                 <?php if (isset($docLinks['deviz'])): ?>
                   <?php $d = $docLinks['deviz']; ?>
-                  <a class="text-decoration-none me-2" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($d['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                  <div>
+                    <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($d['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
                     <i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars((string)($d['label'] ?? 'Deviz')) ?>
-                  </a>
+                    </a>
+                  </div>
                 <?php endif; ?>
                 <?php if (isset($docLinks['bon'])): ?>
                   <?php $b = $docLinks['bon']; ?>
-                  <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($b['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
-                    <i class="bi bi-receipt me-1"></i><?= htmlspecialchars((string)($b['label'] ?? 'Bon consum')) ?>
-                  </a>
+                  <div>
+                    <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($b['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                      <i class="bi bi-receipt me-1"></i><?= htmlspecialchars((string)($b['label'] ?? 'Bon consum')) ?>
+                    </a>
+                  </div>
                 <?php endif; ?>
               </div>
             <?php endif; ?>
