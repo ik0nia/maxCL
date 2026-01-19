@@ -110,6 +110,28 @@ final class ProjectsController
         return $t !== false ? (int)$t : null;
     }
 
+    private static function boolFromPost(string $key, int $default = 1): int
+    {
+        if (!array_key_exists($key, $_POST)) return $default ? 1 : 0;
+        $val = $_POST[$key];
+        if (is_array($val)) {
+            foreach ($val as $v) {
+                $s = strtolower(trim((string)$v));
+                if (in_array($s, ['1', 'true', 'on', 'da', 'yes'], true)) return 1;
+            }
+            return 0;
+        }
+        $s = strtolower(trim((string)$val));
+        return in_array($s, ['1', 'true', 'on', 'da', 'yes'], true) ? 1 : 0;
+    }
+
+    private static function includeInDevizFromPost(int $default = 1): int
+    {
+        if (array_key_exists('include_in_deviz_flag', $_POST)) return 1;
+        if (array_key_exists('include_in_deviz', $_POST)) return self::boolFromPost('include_in_deviz', $default);
+        return $default ? 1 : 0;
+    }
+
     private static function formatLabel(string $code, string $name, string $fallback): string
     {
         $code = trim($code);
@@ -4555,8 +4577,7 @@ final class ProjectsController
         $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
-        $includeInDeviz = isset($_POST['include_in_deviz']) ? (int)$_POST['include_in_deviz'] : 1;
-        $includeInDeviz = isset($_POST['include_in_deviz']) ? (int)$_POST['include_in_deviz'] : 1;
+        $includeInDeviz = self::includeInDevizFromPost(1);
         $mode = trim((string)($_POST['mode'] ?? 'CONSUMED'));
         $note = trim((string)($_POST['note'] ?? ''));
         if ($itemId === null || $qty === null || $qty <= 0) {
@@ -4595,7 +4616,7 @@ final class ProjectsController
                 'qty' => (float)$qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => $mode,
-                'include_in_deviz' => $includeInDeviz ? 1 : 0,
+                'include_in_deviz' => $includeInDeviz,
                 'note' => $note !== '' ? $note : null,
                 'created_by' => Auth::id(),
             ]);
@@ -4681,6 +4702,7 @@ final class ProjectsController
 
         $itemId = Validator::int(trim((string)($_POST['item_id'] ?? '')), 1);
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
+        $includeInDeviz = self::includeInDevizFromPost(1);
         if ($itemId === null || $qty === null || $qty <= 0) {
             Session::flash('toast_error', 'Consum invalid.');
             Response::redirect('/projects/' . $projectId . '?tab=products');
@@ -4704,7 +4726,7 @@ final class ProjectsController
                 'qty' => (float)$qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => 'RESERVED',
-                'include_in_deviz' => $includeInDeviz ? 1 : 0,
+                'include_in_deviz' => $includeInDeviz,
                 'note' => null,
                 'created_by' => Auth::id(),
             ]);
@@ -4805,15 +4827,15 @@ final class ProjectsController
             if ($cid <= 0) throw new \RuntimeException('Rezervare invalidă.');
 
             $unit = trim((string)($first['unit'] ?? (string)($item['unit'] ?? 'buc')));
-            if (!isset($_POST['include_in_deviz'])) {
-                $includeInDeviz = (int)($first['include_in_deviz'] ?? 1);
-            }
+            $includeInDeviz = (array_key_exists('include_in_deviz_flag', $_POST) || array_key_exists('include_in_deviz', $_POST))
+                ? self::includeInDevizFromPost(1)
+                : (int)($first['include_in_deviz'] ?? 1);
             ProjectMagazieConsumption::update($cid, [
                 'project_product_id' => $ppId,
                 'qty' => (float)$qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => 'RESERVED',
-                'include_in_deviz' => $includeInDeviz ? 1 : 0,
+                'include_in_deviz' => $includeInDeviz,
                 'note' => null,
             ]);
 
@@ -5850,6 +5872,9 @@ final class ProjectsController
         $unit = trim((string)($_POST['unit'] ?? (string)($before['unit'] ?? 'buc')));
         $mode = trim((string)($_POST['mode'] ?? (string)($before['mode'] ?? 'CONSUMED')));
         $note = trim((string)($_POST['note'] ?? ''));
+        $includeInDeviz = (array_key_exists('include_in_deviz_flag', $_POST) || array_key_exists('include_in_deviz', $_POST))
+            ? self::includeInDevizFromPost(1)
+            : (int)($before['include_in_deviz'] ?? 1);
         if ($qty === null || $qty <= 0) {
             Session::flash('toast_error', 'Cantitate invalidă.');
             Response::redirect($consumRedirect);
@@ -5887,7 +5912,7 @@ final class ProjectsController
                 'qty' => $afterQty,
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'mode' => $afterMode,
-                'include_in_deviz' => $includeInDeviz ? 1 : 0,
+                'include_in_deviz' => $includeInDeviz,
                 'note' => $note !== '' ? $note : null,
             ]);
             if (abs($stockDelta) > 0.0000001) {

@@ -943,7 +943,7 @@ ob_start();
                                           <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty"
                                                  value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>" style="width:92px">
                                           <label class="form-check m-0 d-flex align-items-center gap-1">
-                                            <input class="form-check-input m-0" type="checkbox" name="include_in_deviz" value="1" <?= $showDeviz ? 'checked' : '' ?>>
+                                            <input class="form-check-input m-0" type="checkbox" name="include_in_deviz_flag" value="1" <?= $showDeviz ? 'checked' : '' ?>>
                                             <span class="small text-muted">Deviz</span>
                                           </label>
                                           <button class="btn btn-outline-primary btn-sm" type="submit">Salvează</button>
@@ -1213,7 +1213,7 @@ ob_start();
                           <div class="col-12">
                             <input type="hidden" name="include_in_deviz" value="0">
                             <label class="form-check m-0">
-                              <input class="form-check-input" type="checkbox" name="include_in_deviz" value="1" checked>
+                              <input class="form-check-input" type="checkbox" name="include_in_deviz_flag" value="1" checked>
                               <span class="form-check-label">Apare pe deviz</span>
                             </label>
                           </div>
@@ -1605,7 +1605,7 @@ ob_start();
             <div class="col-12">
               <input type="hidden" name="include_in_deviz" value="0">
               <label class="form-check m-0">
-                <input class="form-check-input" type="checkbox" name="include_in_deviz" value="1" checked>
+                <input class="form-check-input" type="checkbox" name="include_in_deviz_flag" value="1" checked>
                 <span class="form-check-label">Apare pe deviz</span>
               </label>
             </div>
@@ -1759,7 +1759,7 @@ ob_start();
                               <label class="form-label fw-semibold mb-1">Deviz</label>
                               <input type="hidden" name="include_in_deviz" value="0">
                               <label class="form-check m-0">
-                                <input class="form-check-input" type="checkbox" name="include_in_deviz" value="1" <?= ((int)($c['include_in_deviz'] ?? 1) === 1) ? 'checked' : '' ?>>
+                                <input class="form-check-input" type="checkbox" name="include_in_deviz_flag" value="1" <?= ((int)($c['include_in_deviz'] ?? 1) === 1) ? 'checked' : '' ?>>
                                 <span class="form-check-label">Apare</span>
                               </label>
                             </div>
