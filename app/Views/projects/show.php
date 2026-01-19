@@ -977,6 +977,9 @@ ob_start();
                                 <th style="width:120px">Locație</th>
                                 <th>Notă</th>
                                 <th class="text-end" style="width:90px">mp</th>
+                                <?php if ($canSeePricesRole): ?>
+                                  <th class="text-end js-price d-none" style="width:150px">Preț</th>
+                                <?php endif; ?>
                                 <th style="width:80px">Mod</th>
                                 <th style="width:80px">Sursă</th>
                                 <th style="width:150px">Dată</th>
@@ -1023,6 +1026,23 @@ ob_start();
                                   $noteTxt = trim($pn2);
                                   if ($noteTxt !== '' && mb_strlen($noteTxt) > 110) $noteTxt = mb_substr($noteTxt, 0, 110) . '…';
                                   $createdAt = (string)($hr['created_at'] ?? '');
+                                  $boardSale = (isset($hr['board_sale_price']) && $hr['board_sale_price'] !== null && $hr['board_sale_price'] !== '' && is_numeric($hr['board_sale_price']))
+                                    ? (float)$hr['board_sale_price']
+                                    : null;
+                                  $stdW = (int)($hr['board_std_width_mm'] ?? 0);
+                                  $stdH = (int)($hr['board_std_height_mm'] ?? 0);
+                                  $boardArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+                                  $pricePm2 = ($boardSale !== null && $boardArea > 0) ? ($boardSale / $boardArea) : null;
+                                  $areaM2 = $pm2;
+                                  if ($areaM2 <= 0 && $pw2 > 0 && $ph2 > 0) {
+                                    $areaM2 = ($pw2 * $ph2) / 1000000.0;
+                                  }
+                                  $hplPriceTxt = '—';
+                                  if ($pricePm2 !== null && $areaM2 > 0) {
+                                    $totalPrice = $pricePm2 * $areaM2;
+                                    $hplPriceTxt = number_format((float)$pricePm2, 2, '.', '') . ' × ' . number_format((float)$areaM2, 2, '.', '') .
+                                      ' = ' . number_format((float)$totalPrice, 2, '.', '') . ' lei';
+                                  }
                                 ?>
                                 <tr>
                                   <td class="fw-semibold">
@@ -1061,6 +1081,9 @@ ob_start();
                                   <td class="text-muted"><?= htmlspecialchars($pl2) ?></td>
                                   <td class="text-muted small" style="max-width:420px;white-space:pre-line"><?= htmlspecialchars($noteTxt) ?></td>
                                   <td class="text-end fw-semibold"><?= $pm2 > 0 ? number_format((float)$pm2, 2, '.', '') : '—' ?></td>
+                                  <?php if ($canSeePricesRole): ?>
+                                    <td class="text-end js-price d-none"><?= htmlspecialchars($hplPriceTxt) ?></td>
+                                  <?php endif; ?>
                                   <td><?= htmlspecialchars($cm2) ?></td>
                                   <td><?= htmlspecialchars($src2) ?></td>
                                   <td class="text-muted small"><?= htmlspecialchars($createdAt) ?></td>
