@@ -649,8 +649,9 @@ ob_start();
                 $del = (float)($pp['delivered_qty'] ?? 0);
                 $pname = (string)($pp['product_name'] ?? '');
                 $pcode = (string)($pp['product_code'] ?? '');
-                $m2u = isset($pp['m2_per_unit']) ? (float)($pp['m2_per_unit'] ?? 0) : 0.0;
-                $m2t = ($m2u > 0 && $qty > 0) ? ($m2u * $qty) : 0.0;
+                $unitLabel = trim((string)($pp['unit'] ?? ''));
+                if ($unitLabel === '') $unitLabel = 'buc';
+                $qtyLabelTxt = $qty > 0 ? (number_format($qty, 2, '.', '') . ' ' . $unitLabel) : '';
 
                 $lab = (isset($laborByProduct[$ppId]) && is_array($laborByProduct[$ppId])) ? $laborByProduct[$ppId] : null;
                 $cncH = $lab ? (float)($lab['cnc_hours'] ?? 0.0) : 0.0;
@@ -704,7 +705,12 @@ ob_start();
                 <div class="card app-card p-3" id="pp-<?= (int)$ppId ?>">
                   <div class="d-flex align-items-start justify-content-between gap-2">
                     <div>
-                      <div class="h2 m-0 text-success"><?= htmlspecialchars($pname) ?></div>
+                      <div class="h2 m-0 text-success">
+                        <?= htmlspecialchars($pname) ?>
+                        <?php if ($qtyLabelTxt !== ''): ?>
+                          <span class="text-muted fw-semibold">(<?= htmlspecialchars($qtyLabelTxt) ?>)</span>
+                        <?php endif; ?>
+                      </div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
                     </div>
                   </div>
@@ -777,44 +783,6 @@ ob_start();
                     </div>
                   <?php endif; ?>
 
-                  <div class="row g-2 mt-2">
-                    <div class="col-6 col-md-3">
-                      <div class="text-muted small">Cantitate</div>
-                      <div class="fw-semibold"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></div>
-                    </div>
-                    <?php
-                      $sType = (string)($pp['surface_type'] ?? '');
-                      $sVal = isset($pp['surface_value']) && $pp['surface_value'] !== null && $pp['surface_value'] !== '' ? (float)$pp['surface_value'] : null;
-                      if ($sType === '' && $m2u > 0) { $sType = 'M2'; $sVal = round($m2u, 2); }
-                      $perTxt = '';
-                      $totTxt = '';
-                      if ($sType === 'BOARD' && $sVal !== null) {
-                        $perTxt = (abs($sVal - 0.5) < 1e-9) ? '1/2 placă' : '1 placă';
-                        $totBoards = $qty * $sVal;
-                        $unitLbl = (abs($totBoards - 1.0) < 1e-9) ? 'placă' : 'plăci';
-                        $totTxt = number_format($totBoards, 2, '.', '') . ' ' . $unitLbl;
-                      } elseif ($sType === 'M2' && $sVal !== null) {
-                        $perTxt = number_format($sVal, 2, '.', '') . ' mp';
-                        $totTxt = number_format($qty * $sVal, 2, '.', '') . ' mp';
-                      } else {
-                        if ($m2u > 0) {
-                          $perTxt = number_format($m2u, 4, '.', '') . ' mp';
-                          $totTxt = number_format($m2t, 4, '.', '') . ' mp';
-                        } else {
-                          $perTxt = '—';
-                          $totTxt = '—';
-                        }
-                      }
-                    ?>
-                    <div class="col-6 col-md-3">
-                      <div class="text-muted small">Suprafață/buc</div>
-                      <div class="fw-semibold"><?= htmlspecialchars($perTxt) ?></div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                      <div class="text-muted small">Suprafață totală</div>
-                      <div class="fw-semibold"><?= htmlspecialchars($totTxt) ?></div>
-                    </div>
-                  </div>
                   <?php
                     $hbCode = trim((string)($pp['hpl_board_code'] ?? ''));
                     $hbName = trim((string)($pp['hpl_board_name'] ?? ''));
@@ -1117,7 +1085,7 @@ ob_start();
                     </div>
 
                     <div class="mt-2">
-                      <div class="text-muted small fw-semibold">Manopere</div>
+                      <div class="h5 m-0 text-success fw-semibold">Manopere</div>
                       <div class="text-muted small">
                         CNC: <span class="fw-semibold"><?= number_format((float)$cncH, 2, '.', '') ?>h</span>
                         <?php if ($canSeePricesRole): ?>
@@ -1133,7 +1101,7 @@ ob_start();
                   </div>
 
                   <?php if ($docLinks): ?>
-                    <div class="d-flex flex-wrap gap-3 mt-2">
+                    <div class="d-flex flex-column align-items-end mt-2">
                       <?php if (isset($docLinks['deviz'])): ?>
                         <?php $d = $docLinks['deviz']; ?>
                         <a class="text-decoration-none small" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($d['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
