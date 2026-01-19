@@ -28,6 +28,7 @@ $history = $history ?? [];
 $projectProductLabels = $projectProductLabels ?? [];
 $discussions = $discussions ?? [];
 $productComments = $productComments ?? [];
+$docsByPp = $docsByPp ?? [];
 $laborByProduct = $laborByProduct ?? [];
 $materialsByProduct = $materialsByProduct ?? [];
 $projectCostSummary = $projectCostSummary ?? [];
@@ -667,6 +668,7 @@ ob_start();
                 $totalEst = $manCost + $matCost;
                 $ppComments = isset($productComments[$ppId]) && is_array($productComments[$ppId]) ? $productComments[$ppId] : [];
                 $ppCommentsCount = count($ppComments);
+                $docLinks = $ppId > 0 && isset($docsByPp[$ppId]) && is_array($docsByPp[$ppId]) ? $docsByPp[$ppId] : [];
 
                 $projectClientId = (int)($project['client_id'] ?? 0);
                 $invoiceClientId = isset($pp['invoice_client_id']) ? (int)$pp['invoice_client_id'] : 0;
@@ -1129,6 +1131,23 @@ ob_start();
                       </div>
                     </div>
                   </div>
+
+                  <?php if ($docLinks): ?>
+                    <div class="d-flex flex-wrap gap-3 mt-2">
+                      <?php if (isset($docLinks['deviz'])): ?>
+                        <?php $d = $docLinks['deviz']; ?>
+                        <a class="text-decoration-none small" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($d['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                          <i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars((string)($d['label'] ?? 'Deviz')) ?>
+                        </a>
+                      <?php endif; ?>
+                      <?php if (isset($docLinks['bon'])): ?>
+                        <?php $b = $docLinks['bon']; ?>
+                        <a class="text-decoration-none small" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($b['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                          <i class="bi bi-receipt me-1"></i><?= htmlspecialchars((string)($b['label'] ?? 'Bon consum')) ?>
+                        </a>
+                      <?php endif; ?>
+                    </div>
+                  <?php endif; ?>
 
                   <?php if ($canEditThis): ?>
                     <div class="d-flex justify-content-end gap-2 mt-3">

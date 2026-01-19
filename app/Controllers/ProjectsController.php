@@ -2867,6 +2867,7 @@ final class ProjectsController
                 $projectCostSummary = [];
                 $discussions = [];
                 $productComments = [];
+                $docsByPp = [];
                 if ($tab === 'products') {
                     try { $projectProducts = ProjectProduct::forProject($id); } catch (\Throwable $e) { $projectProducts = []; }
                     try { $workLogs = ProjectWorkLog::forProject($id); } catch (\Throwable $e) { $workLogs = []; }
@@ -2936,6 +2937,118 @@ final class ProjectsController
                             $productComments[$ppId] = EntityComment::forEntity('project_products', $ppId, 200);
                         } catch (\Throwable $e) {
                             $productComments[$ppId] = [];
+                        }
+                    }
+                    $ppIds = [];
+                    foreach ($projectProducts as $ppRow) {
+                        $ppId = (int)($ppRow['id'] ?? 0);
+                        if ($ppId > 0) $ppIds[] = $ppId;
+                    }
+                    $ppIds = array_values(array_unique($ppIds));
+                    if ($ppIds) {
+                        $ppIdSet = array_fill_keys($ppIds, true);
+                        $in = implode(',', array_fill(0, count($ppIds), '?'));
+                        $sqlFiles = '
+                            SELECT id, entity_type, entity_id, category, original_name, stored_name, created_at
+                            FROM entity_files
+                            WHERE (entity_type = "project_products" AND entity_id IN (' . $in . '))
+                               OR (entity_type = "projects" AND entity_id = ? AND (
+                                    stored_name LIKE "deviz-%-pp%.html"
+                                    OR stored_name LIKE "bon-consum-%-pp%.html"
+                                  ))
+                            ORDER BY created_at DESC, id DESC
+                        ';
+                        try {
+                            $stFiles = \App\Core\DB::pdo()->prepare($sqlFiles);
+                            $stFiles->execute(array_merge($ppIds, [$id]));
+                            $files = $stFiles->fetchAll();
+                        } catch (\Throwable $e) {
+                            $files = [];
+                        }
+                        $auditByFileId = [];
+                        if ($files) {
+                            $fileIds = [];
+                            foreach ($files as $f) {
+                                $fid = (int)($f['id'] ?? 0);
+                                if ($fid > 0) $fileIds[] = $fid;
+                            }
+                            $fileIds = array_values(array_unique($fileIds));
+                            if ($fileIds) {
+                                try {
+                                    $ph = implode(',', array_fill(0, count($fileIds), '?'));
+                                    $stA = \App\Core\DB::pdo()->prepare("
+                                        SELECT entity_id, action, meta_json
+                                        FROM audit_log
+                                        WHERE entity_type = 'entity_files'
+                                          AND entity_id IN ($ph)
+                                          AND action IN ('DEVIZ_GENERATED','BON_CONSUM_GENERATED')
+                                    ");
+                                    $stA->execute($fileIds);
+                                    $audRows = $stA->fetchAll();
+                                    foreach ($audRows as $ar) {
+                                        $fid = (int)($ar['entity_id'] ?? 0);
+                                        if ($fid <= 0) continue;
+                                        $meta = is_string($ar['meta_json'] ?? null) ? json_decode((string)$ar['meta_json'], true) : null;
+                                        $ppId = is_array($meta) && isset($meta['project_product_id']) && is_numeric($meta['project_product_id'])
+                                            ? (int)$meta['project_product_id']
+                                            : 0;
+                                        if ($ppId <= 0) continue;
+                                        $action = (string)($ar['action'] ?? '');
+                                        $type = $action === 'DEVIZ_GENERATED' ? 'deviz' : ($action === 'BON_CONSUM_GENERATED' ? 'bon' : null);
+                                        $auditByFileId[$fid] = ['ppId' => $ppId, 'type' => $type];
+                                    }
+                                } catch (\Throwable $e) {
+                                    $auditByFileId = [];
+                                }
+                            }
+                        }
+                        foreach ($files as $f) {
+                            $etype = (string)($f['entity_type'] ?? '');
+                            $stored = (string)($f['stored_name'] ?? '');
+                            $category = (string)($f['category'] ?? '');
+                            $fid = (int)($f['id'] ?? 0);
+                            $audit = $fid > 0 && isset($auditByFileId[$fid]) ? $auditByFileId[$fid] : null;
+                            $ppId = 0;
+                            if ($etype === 'project_products') {
+                                $ppId = (int)($f['entity_id'] ?? 0);
+                            } else {
+                                if (preg_match('/-pp(\d+)(?:-\d+)?\.html$/', $stored, $m)) {
+                                    $ppId = (int)$m[1];
+                                }
+                            }
+                            if ($ppId <= 0 && $audit && isset($audit['ppId'])) {
+                                $ppId = (int)$audit['ppId'];
+                            }
+                            if ($ppId <= 0 || !isset($ppIdSet[$ppId])) continue;
+
+                            $type = null;
+                            if (str_starts_with($stored, 'deviz-') || stripos($category, 'deviz') !== false) {
+                                $type = 'deviz';
+                            } elseif (str_starts_with($stored, 'bon-consum-') || stripos($category, 'bon consum') !== false) {
+                                $type = 'bon';
+                            }
+                            if ($type === null && $audit && !empty($audit['type'])) {
+                                $type = (string)$audit['type'];
+                            }
+                            if ($type === null) continue;
+                            if (isset($docsByPp[$ppId][$type])) continue;
+
+                            $label = $type === 'deviz' ? 'Deviz' : 'Bon consum';
+                            if (preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $category)) {
+                                $label = $category;
+                            }
+                            $num = '';
+                            if (preg_match('/nr\.?\s*([0-9]+)/i', $category, $m)) {
+                                $num = (string)$m[1];
+                            } elseif (preg_match('/^(deviz|bon-consum)-(\d+)/', $stored, $m)) {
+                                $num = (string)$m[2];
+                            }
+                            if ($num !== '') $label .= ' ' . $num;
+
+                            $docsByPp[$ppId][$type] = [
+                                'stored_name' => $stored,
+                                'label' => $label,
+                            ];
                         }
                     }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
@@ -3039,6 +3152,7 @@ final class ProjectsController
                     'billingAddresses' => $billingAddresses ?? [],
                     'discussions' => $discussions,
                     'productComments' => $productComments ?? [],
+                    'docsByPp' => $docsByPp ?? [],
                     'costSettings' => [
                         'labor' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_LABOR_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
                         'cnc' => (function () { try { return AppSetting::getFloat(AppSetting::KEY_COST_CNC_PER_HOUR); } catch (\Throwable $e) { return null; } })(),
