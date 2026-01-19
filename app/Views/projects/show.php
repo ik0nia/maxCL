@@ -839,6 +839,15 @@ ob_start();
                     if (is_array($mbr) && isset($mbr['acc_rows']) && is_array($mbr['acc_rows'])) {
                       $accRows = $mbr['acc_rows'];
                     }
+                    $accCostCalc = 0.0;
+                    foreach ($accRows as $ar) {
+                      $aq = (float)($ar['qty'] ?? 0);
+                      $up = $ar['unit_price'] ?? null;
+                      if ($aq <= 0) continue;
+                      if ($up !== null && is_numeric($up)) {
+                        $accCostCalc += ((float)$up * $aq);
+                      }
+                    }
                     // drepturi pentru acțiuni pe această piesă (folosit și în tabelul HPL pentru butonul "Debitat")
                     $canEditThis = $canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp);
                     $hasReservedAcc = false;
@@ -959,10 +968,37 @@ ob_start();
                     </div>
 
                     <?php
-                      $hplRows = [];
-                      if (is_array($mbr) && isset($mbr['hpl_rows']) && is_array($mbr['hpl_rows'])) {
-                        $hplRows = $mbr['hpl_rows'];
+                    $hplRows = [];
+                    if (is_array($mbr) && isset($mbr['hpl_rows']) && is_array($mbr['hpl_rows'])) {
+                      $hplRows = $mbr['hpl_rows'];
+                    }
+                    $hplCostCalc = 0.0;
+                    foreach ($hplRows as $hr0) {
+                      $boardSale = (isset($hr0['board_sale_price']) && $hr0['board_sale_price'] !== null && $hr0['board_sale_price'] !== '' && is_numeric($hr0['board_sale_price']))
+                        ? (float)$hr0['board_sale_price']
+                        : null;
+                      $stdW = (int)($hr0['board_std_width_mm'] ?? 0);
+                      $stdH = (int)($hr0['board_std_height_mm'] ?? 0);
+                      $boardArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
+                      $pricePm2 = ($boardSale !== null && $boardArea > 0) ? ($boardSale / $boardArea) : null;
+                      if ($pricePm2 === null) continue;
+                      $pt0 = (string)($hr0['consumed_piece_type'] ?? '');
+                      $pw0 = (int)($hr0['consumed_piece_width_mm'] ?? 0);
+                      $ph0 = (int)($hr0['consumed_piece_height_mm'] ?? 0);
+                      $pm0 = isset($hr0['consumed_piece_area_total_m2']) ? (float)($hr0['consumed_piece_area_total_m2'] ?? 0) : 0.0;
+                      if ($pt0 === '' && $pw0 === 0 && $ph0 === 0) {
+                        $pw0 = (int)($hr0['piece_width_mm'] ?? 0);
+                        $ph0 = (int)($hr0['piece_height_mm'] ?? 0);
+                        $pm0 = isset($hr0['piece_area_total_m2']) ? (float)($hr0['piece_area_total_m2'] ?? 0) : 0.0;
                       }
+                      $areaM2 = $pm0;
+                      if ($areaM2 <= 0 && $pw0 > 0 && $ph0 > 0) {
+                        $areaM2 = ($pw0 * $ph0) / 1000000.0;
+                      }
+                      if ($areaM2 > 0) {
+                        $hplCostCalc += ($pricePm2 * $areaM2);
+                      }
+                    }
                     ?>
                     <div class="mt-2">
                       <div class="h5 m-0 text-success fw-semibold">Consum HPL</div>
@@ -1130,8 +1166,9 @@ ob_start();
                         <?php endif; ?>
                       </div>
                       <?php if ($canSeePricesRole): ?>
+                        <?php $totalCostCalc = $manCost + $accCostCalc + $hplCostCalc; ?>
                         <div class="text-muted small js-price d-none mt-1">
-                          Total cost produs: <span class="fw-semibold"><?= number_format((float)$totalEst, 2, '.', '') ?> lei</span>
+                          Total cost produs: <span class="fw-semibold"><?= number_format((float)$totalCostCalc, 2, '.', '') ?> lei</span>
                         </div>
                         <div class="text-muted small js-price d-none">
                           Preț vânzare produs:
