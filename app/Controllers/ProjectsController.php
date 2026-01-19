@@ -692,7 +692,6 @@ final class ProjectsController
         $projectLabel = (string)($ctx['project_label'] ?? '');
         $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
         $avizDate = trim((string)($ctx['aviz_date'] ?? ''));
-        $avizDate = trim((string)($ctx['aviz_date'] ?? ''));
         $qty = (float)($product['qty'] ?? 0.0);
         $unit = (string)($product['unit'] ?? '');
         $accLines = [];
