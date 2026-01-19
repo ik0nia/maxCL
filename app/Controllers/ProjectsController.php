@@ -620,7 +620,7 @@ final class ProjectsController
                     'qty' => 0,
                     'display_width_mm' => $displayW,
                     'display_height_mm' => $displayH,
-                    'display_qty' => $displayQty,
+                    'display_qty' => 0.0,
                     'unit_price' => $unitPrice,
                     'total_price' => null,
                 ];
