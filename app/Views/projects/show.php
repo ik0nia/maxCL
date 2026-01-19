@@ -1218,10 +1218,10 @@ ob_start();
                         <i class="bi bi-pencil me-1"></i> Editează
                       </button>
                       <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/unlink')) ?>" class="m-0"
-                            onsubmit="return confirm('Scoți produsul din proiect?');">
+                            onsubmit="return confirm('Ștergi produsul din proiect?');">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-                        <button class="btn btn-outline-secondary btn-sm" type="submit">
-                          <i class="bi bi-link-45deg me-1"></i> Scoate
+                        <button class="btn btn-outline-danger btn-sm" type="submit">
+                          x Sterge produs
                         </button>
                       </form>
                     </div>
