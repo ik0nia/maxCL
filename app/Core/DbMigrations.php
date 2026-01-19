@@ -1114,6 +1114,27 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-20_01_project_products_aviz_data',
+                'label' => 'ALTER project_products ADD aviz_number + aviz_date',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::columnExists($pdo, 'project_products', 'aviz_number')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN aviz_number VARCHAR(40) NULL AFTER production_status");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                    if (!self::columnExists($pdo, 'project_products', 'aviz_date')) {
+                        try {
+                            $pdo->exec("ALTER TABLE project_products ADD COLUMN aviz_date DATE NULL AFTER aviz_number");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                },
+            ],
         ];
     }
 

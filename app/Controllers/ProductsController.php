@@ -29,7 +29,7 @@ final class ProductsController
             $sql = '
                 SELECT
                   pp.id AS project_product_id,
-                  pp.qty, pp.unit, pp.production_status, pp.delivered_qty,
+                  pp.qty, pp.unit, pp.production_status, pp.delivered_qty, pp.aviz_date,
                   p.id AS product_id, p.code AS product_code, p.name AS product_name,
                   pr.id AS project_id, pr.code AS project_code, pr.name AS project_name, pr.status AS project_status,
                   GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR ", ") AS labels

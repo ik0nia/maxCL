@@ -691,6 +691,8 @@ final class ProjectsController
         $docDate = (string)($ctx['doc_date'] ?? '');
         $projectLabel = (string)($ctx['project_label'] ?? '');
         $avizNumber = trim((string)($ctx['aviz_number'] ?? ''));
+        $avizDate = trim((string)($ctx['aviz_date'] ?? ''));
+        $avizDate = trim((string)($ctx['aviz_date'] ?? ''));
         $qty = (float)($product['qty'] ?? 0.0);
         $unit = (string)($product['unit'] ?? '');
         $accLines = [];
@@ -814,8 +816,11 @@ final class ProjectsController
       </tr>
     </tbody>
   </table>
-  <?php if ($avizNumber !== ''): ?>
-    <div class="small muted" style="margin-top:6px;">Număr aviz: <?= $esc($avizNumber) ?></div>
+  <?php if ($avizNumber !== '' || $avizDate !== ''): ?>
+    <div class="small muted" style="margin-top:6px;">
+      <?php if ($avizNumber !== ''): ?>Număr aviz: <?= $esc($avizNumber) ?><?php endif; ?>
+      <?php if ($avizDate !== ''): ?><?= $avizNumber !== '' ? ' · ' : '' ?>Data aviz: <?= $esc($avizDate) ?><?php endif; ?>
+    </div>
   <?php endif; ?>
 </body>
 </html>
@@ -1028,8 +1033,11 @@ final class ProjectsController
       <div class="muted">Preț vânzare produs: <?= $esc(self::fmtMoney($salePrice)) ?></div>
     <?php endif; ?>
   </div>
-  <?php if ($avizNumber !== ''): ?>
-    <div class="muted" style="margin-top:12px;">Număr aviz: <?= $esc($avizNumber) ?></div>
+  <?php if ($avizNumber !== '' || $avizDate !== ''): ?>
+    <div class="muted" style="margin-top:12px;">
+      <?php if ($avizNumber !== ''): ?>Număr aviz: <?= $esc($avizNumber) ?><?php endif; ?>
+      <?php if ($avizDate !== ''): ?><?= $avizNumber !== '' ? ' · ' : '' ?>Data aviz: <?= $esc($avizDate) ?><?php endif; ?>
+    </div>
   <?php endif; ?>
 </body>
 </html>
@@ -1267,7 +1275,7 @@ final class ProjectsController
     /**
      * @return array{deviz_number:int,bon_number:int}
      */
-    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before, string $avizNumber): array
+    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before, string $avizNumber, string $avizDate = ''): array
     {
         $project = Project::find($projectId);
         if (!$project) {
@@ -1352,6 +1360,7 @@ final class ProjectsController
             'doc_date' => $docDate,
             'project_label' => $projectLabel,
             'aviz_number' => $avizNumber,
+            'aviz_date' => $avizDate,
         ]);
         $devizFile = self::saveHtmlDocument(
             'deviz-' . $devizNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
@@ -1411,6 +1420,7 @@ final class ProjectsController
             'doc_date' => $docDate,
             'project_label' => $projectLabel,
             'aviz_number' => $avizNumber,
+            'aviz_date' => $avizDate,
         ]);
         $bonFile = self::saveHtmlDocument(
             'bon-consum-' . $bonNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
@@ -3921,6 +3931,8 @@ final class ProjectsController
         }
 
         $avizNumber = '';
+        $avizDateIso = null;
+        $avizDateLabel = '';
         try {
             // Statusurile piesei nu mai modifică automat locația/statusul HPL-ului.
             // CNC -> Montaj: necesită manoperă CNC pe produs.
@@ -4113,14 +4125,49 @@ final class ProjectsController
                     Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
                 }
                 $avizNumber = mb_substr($avizNumber, 0, 40);
+                $avizDateRaw = trim((string)($_POST['aviz_date'] ?? ''));
+                if ($avizDateRaw === '') {
+                    $msg = 'Nu poți trece la Avizare: completează data avizului.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                if (!preg_match('/^\d{2}\.\d{2}\.\d{4}$/', $avizDateRaw)) {
+                    $msg = 'Nu poți trece la Avizare: data avizului trebuie să fie în format zz.ll.aaaa.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $dt = \DateTime::createFromFormat('d.m.Y', $avizDateRaw);
+                $dtErrors = \DateTime::getLastErrors();
+                if (!$dt || ($dtErrors && ($dtErrors['warning_count'] ?? 0) > 0) || ($dtErrors && ($dtErrors['error_count'] ?? 0) > 0)) {
+                    $msg = 'Nu poți trece la Avizare: data avizului este invalidă.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $avizDateIso = $dt->format('Y-m-d');
+                $avizDateLabel = $dt->format('d.m.Y');
             }
 
             $docInfo = null;
             if ($next === 'AVIZAT') {
-                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber);
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber, $avizDateLabel);
             }
 
             ProjectProduct::updateStatus($ppId, $next);
+            if ($next === 'AVIZAT') {
+                ProjectProduct::updateAvizData($ppId, $avizNumber, $avizDateIso);
+            }
             $after = $before;
             $after['production_status'] = $next;
             Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [

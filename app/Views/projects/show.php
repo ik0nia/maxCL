@@ -800,6 +800,7 @@ ob_start();
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <?php if ($nextVal === 'AVIZAT'): ?>
                                 <input type="hidden" name="aviz_number" value="">
+                                <input type="hidden" name="aviz_date" value="">
                               <?php endif; ?>
                               <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
                                 <?= htmlspecialchars($lbl) ?>
@@ -2949,7 +2950,10 @@ ob_start();
         <label for="avizNumberInput" class="form-label fw-semibold">Introdu numărul de aviz</label>
         <input class="form-control" id="avizNumberInput" maxlength="40" placeholder="ex: AVZ-10234">
         <div class="invalid-feedback">Introdu un număr de aviz.</div>
-        <div class="text-muted small mt-2">Numărul de aviz va fi afișat jos pe Deviz și Bonul de consum.</div>
+        <label for="avizDateInput" class="form-label fw-semibold mt-2">Data avizului</label>
+        <input class="form-control" id="avizDateInput" maxlength="10" placeholder="zz.ll.aaaa">
+        <div class="invalid-feedback">Introdu data în format zz.ll.aaaa.</div>
+        <div class="text-muted small mt-2">Numărul și data avizului vor fi afișate jos pe Deviz și Bonul de consum.</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
@@ -3065,6 +3069,7 @@ ob_start();
       ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
       : null;
     const input = document.getElementById('avizNumberInput');
+    const dateInput = document.getElementById('avizDateInput');
     const confirmBtn = document.getElementById('avizNumberConfirm');
     let activeForm = null;
 
@@ -3073,12 +3078,29 @@ ob_start();
         input.value = '';
         input.classList.remove('is-invalid');
       }
+      if (dateInput) {
+        dateInput.value = '';
+        dateInput.classList.remove('is-invalid');
+      }
     }
 
-    function applyAndSubmit(value) {
+    function isValidDate(val) {
+      if (!/^\d{2}\.\d{2}\.\d{4}$/.test(val)) return false;
+      const parts = val.split('.');
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const y = parseInt(parts[2], 10);
+      if (!d || !m || !y) return false;
+      const dt = new Date(y, m - 1, d);
+      return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
+    }
+
+    function applyAndSubmit(value, dateVal) {
       if (!activeForm) return;
       const target = activeForm.querySelector('input[name="aviz_number"]');
       if (target) target.value = value;
+      const dateTarget = activeForm.querySelector('input[name="aviz_date"]');
+      if (dateTarget) dateTarget.value = dateVal;
       activeForm.dataset.avizConfirmed = '1';
       if (modal) modal.hide();
       activeForm.submit();
@@ -3093,13 +3115,17 @@ ob_start();
         const txt = window.prompt('Număr de aviz:') || '';
         const val = txt.trim();
         if (val === '') return;
-        applyAndSubmit(val);
+        const dTxt = window.prompt('Data avizului (zz.ll.aaaa):') || '';
+        const dVal = dTxt.trim();
+        if (dVal === '' || !isValidDate(dVal)) return;
+        applyAndSubmit(val, dVal);
       }
     }
 
     if (confirmBtn) {
       confirmBtn.addEventListener('click', function () {
         const val = input ? input.value.trim() : '';
+        const dVal = dateInput ? dateInput.value.trim() : '';
         if (val === '') {
           if (input) {
             input.classList.add('is-invalid');
@@ -3107,13 +3133,25 @@ ob_start();
           }
           return;
         }
-        applyAndSubmit(val);
+        if (dVal === '' || !isValidDate(dVal)) {
+          if (dateInput) {
+            dateInput.classList.add('is-invalid');
+            dateInput.focus();
+          }
+          return;
+        }
+        applyAndSubmit(val, dVal);
       });
     }
 
     if (input) {
       input.addEventListener('input', function () {
         input.classList.remove('is-invalid');
+      });
+    }
+    if (dateInput) {
+      dateInput.addEventListener('input', function () {
+        dateInput.classList.remove('is-invalid');
       });
     }
 
@@ -3124,7 +3162,8 @@ ob_start();
           return;
         }
         const current = form.querySelector('input[name="aviz_number"]');
-        if (current && current.value.trim() !== '') return;
+        const currentDate = form.querySelector('input[name="aviz_date"]');
+        if (current && current.value.trim() !== '' && (!currentDate || currentDate.value.trim() !== '')) return;
         ev.preventDefault();
         openModal(form);
       });
