@@ -3043,8 +3043,10 @@ final class ProjectsController
                             if (isset($docsByPp[$ppId][$type])) continue;
 
                             $label = $type === 'deviz' ? 'Deviz' : 'Bon consum';
+                            $appendNum = true;
                             if (preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $category)) {
                                 $label = $category;
+                                $appendNum = false;
                             }
                             $num = '';
                             if (preg_match('/nr\.?\s*([0-9]+)/i', $category, $m)) {
@@ -3052,7 +3054,7 @@ final class ProjectsController
                             } elseif (preg_match('/^(deviz|bon-consum)-(\d+)/', $stored, $m)) {
                                 $num = (string)$m[2];
                             }
-                            if ($num !== '') $label .= ' ' . $num;
+                            if ($appendNum && $num !== '') $label .= ' ' . $num;
 
                             $docsByPp[$ppId][$type] = [
                                 'stored_name' => $stored,
