@@ -641,6 +641,39 @@ ob_start();
               $ppTotalQty += max(0.0, (float)($pp0['qty'] ?? 0));
             }
           ?>
+          <?php if ($canSeePricesRole): ?>
+            <div class="d-flex justify-content-end mt-2">
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="ppTogglePrices">
+                <label class="form-check-label text-muted" for="ppTogglePrices">Afișează prețuri</label>
+              </div>
+            </div>
+            <script>
+              document.addEventListener('DOMContentLoaded', function(){
+                const key = 'pp_show_prices_v1';
+                const cb = document.getElementById('ppTogglePrices');
+                if (!cb) return;
+                const apply = (on) => {
+                  document.querySelectorAll('.js-price').forEach(function(el){
+                    if (on) el.classList.remove('d-none');
+                    else el.classList.add('d-none');
+                  });
+                };
+                try {
+                  const saved = localStorage.getItem(key);
+                  const on = saved === '1';
+                  cb.checked = on;
+                  apply(on);
+                } catch (e) {}
+                cb.addEventListener('change', function(){
+                  const on = !!cb.checked;
+                  apply(on);
+                  try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+                });
+              });
+            </script>
+          <?php endif; ?>
+
           <div class="row g-3 mt-2">
             <?php foreach ($projectProducts as $ppIdx => $pp): ?>
               <?php
@@ -708,7 +741,7 @@ ob_start();
                       <div class="h2 m-0 text-success">
                         <?= htmlspecialchars($pname) ?>
                         <?php if ($qtyLabelTxt !== ''): ?>
-                          <span class="text-muted fw-semibold">(<?= htmlspecialchars($qtyLabelTxt) ?>)</span>
+                          <span class="text-muted fw-semibold small">(<?= htmlspecialchars($qtyLabelTxt) ?>)</span>
                         <?php endif; ?>
                       </div>
                       <div class="text-muted small"><?= htmlspecialchars($pcode) ?></div>
@@ -808,40 +841,6 @@ ob_start();
                   ?>
 
                   <div class="mt-3">
-                    <div class="d-flex justify-content-between align-items-center gap-2">
-                      <div class="fw-semibold">Consum</div>
-                      <?php if ($canSeePricesRole && (int)$ppIdx === 0): ?>
-                        <div class="form-check form-switch m-0">
-                          <input class="form-check-input" type="checkbox" role="switch" id="ppTogglePrices">
-                          <label class="form-check-label text-muted" for="ppTogglePrices">Afișează prețuri</label>
-                        </div>
-                        <script>
-                          document.addEventListener('DOMContentLoaded', function(){
-                            const key = 'pp_show_prices_v1';
-                            const cb = document.getElementById('ppTogglePrices');
-                            if (!cb) return;
-                            const apply = (on) => {
-                              document.querySelectorAll('.js-price').forEach(function(el){
-                                if (on) el.classList.remove('d-none');
-                                else el.classList.add('d-none');
-                              });
-                            };
-                            try {
-                              const saved = localStorage.getItem(key);
-                              const on = saved === '1';
-                              cb.checked = on;
-                              apply(on);
-                            } catch (e) {}
-                            cb.addEventListener('change', function(){
-                              const on = !!cb.checked;
-                              apply(on);
-                              try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
-                            });
-                          });
-                        </script>
-                      <?php endif; ?>
-                    </div>
-
                     <div class="mt-2">
                       <div class="d-flex justify-content-between align-items-center gap-2">
                         <div class="h5 m-0 text-success fw-semibold">Accesorii</div>
