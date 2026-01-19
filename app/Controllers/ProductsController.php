@@ -71,17 +71,59 @@ final class ProductsController
                 } catch (\Throwable $e) {
                     $files = [];
                 }
+                $auditByFileId = [];
+                if ($files) {
+                    $fileIds = [];
+                    foreach ($files as $f) {
+                        $fid = (int)($f['id'] ?? 0);
+                        if ($fid > 0) $fileIds[] = $fid;
+                    }
+                    $fileIds = array_values(array_unique($fileIds));
+                    if ($fileIds) {
+                        try {
+                            $ph = implode(',', array_fill(0, count($fileIds), '?'));
+                            $stA = $pdo->prepare("
+                                SELECT entity_id, action, meta_json
+                                FROM audit_log
+                                WHERE entity_type = 'entity_files'
+                                  AND entity_id IN ($ph)
+                                  AND action IN ('DEVIZ_GENERATED','BON_CONSUM_GENERATED')
+                            ");
+                            $stA->execute($fileIds);
+                            $audRows = $stA->fetchAll();
+                            foreach ($audRows as $ar) {
+                                $fid = (int)($ar['entity_id'] ?? 0);
+                                if ($fid <= 0) continue;
+                                $meta = is_string($ar['meta_json'] ?? null) ? json_decode((string)$ar['meta_json'], true) : null;
+                                $ppId = is_array($meta) && isset($meta['project_product_id']) && is_numeric($meta['project_product_id'])
+                                    ? (int)$meta['project_product_id']
+                                    : 0;
+                                if ($ppId <= 0) continue;
+                                $action = (string)($ar['action'] ?? '');
+                                $type = $action === 'DEVIZ_GENERATED' ? 'deviz' : ($action === 'BON_CONSUM_GENERATED' ? 'bon' : null);
+                                $auditByFileId[$fid] = ['ppId' => $ppId, 'type' => $type];
+                            }
+                        } catch (\Throwable $e) {
+                            $auditByFileId = [];
+                        }
+                    }
+                }
                 foreach ($files as $f) {
                     $etype = (string)($f['entity_type'] ?? '');
                     $stored = (string)($f['stored_name'] ?? '');
                     $category = (string)($f['category'] ?? '');
+                    $fid = (int)($f['id'] ?? 0);
+                    $audit = $fid > 0 && isset($auditByFileId[$fid]) ? $auditByFileId[$fid] : null;
                     $ppId = 0;
                     if ($etype === 'project_products') {
                         $ppId = (int)($f['entity_id'] ?? 0);
                     } else {
-                        if (preg_match('/-pp(\d+)\.html$/', $stored, $m)) {
+                        if (preg_match('/-pp(\d+)(?:-\d+)?\.html$/', $stored, $m)) {
                             $ppId = (int)$m[1];
                         }
+                    }
+                    if ($ppId <= 0 && $audit && isset($audit['ppId'])) {
+                        $ppId = (int)$audit['ppId'];
                     }
                     if ($ppId <= 0 || !isset($ppIdSet[$ppId])) continue;
 
@@ -90,6 +132,9 @@ final class ProductsController
                         $type = 'deviz';
                     } elseif (str_starts_with($stored, 'bon-consum-') || stripos($category, 'bon consum') !== false) {
                         $type = 'bon';
+                    }
+                    if ($type === null && $audit && !empty($audit['type'])) {
+                        $type = (string)$audit['type'];
                     }
                     if ($type === null) continue;
                     if (isset($docsByPp[$ppId][$type])) continue;
