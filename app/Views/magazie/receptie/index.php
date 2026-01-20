@@ -146,7 +146,8 @@ ob_start();
         <th style="width:170px">Dată</th>
         <th style="width:70px">Tip</th>
         <th style="width:160px">Cod WinMentor</th>
-        <th>Produs</th>
+        <th>Accesoriu</th>
+        <th style="width:200px">Produs proiect</th>
         <th class="text-end" style="width:110px">Bucăți</th>
         <?php if ($canSeePrices): ?>
           <th class="text-end" style="width:130px">Preț/buc</th>
@@ -171,6 +172,23 @@ ob_start();
           <td class="fw-semibold"><?= htmlspecialchars($dir) ?></td>
           <td class="fw-semibold"><?= htmlspecialchars((string)($m['winmentor_code'] ?? '')) ?></td>
           <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
+          <?php
+            $ppId = (int)($m['project_product_id'] ?? 0);
+            $ppCode = trim((string)($m['project_product_code'] ?? ''));
+            $ppName = trim((string)($m['project_product_name'] ?? ''));
+            $ppLabel = trim($ppCode . ' · ' . $ppName);
+            if ($ppLabel === '·' || $ppLabel === '· ') $ppLabel = $ppName !== '' ? $ppName : $ppCode;
+            $projId = (int)($m['project_id'] ?? 0);
+          ?>
+          <td>
+            <?php if ($ppId > 0 && $projId > 0): ?>
+              <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=products#pp-' . $ppId)) ?>">
+                <?= htmlspecialchars($ppLabel !== '' ? $ppLabel : ('Produs #' . $ppId)) ?>
+              </a>
+            <?php else: ?>
+              <span class="text-muted">—</span>
+            <?php endif; ?>
+          </td>
           <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
@@ -180,13 +198,26 @@ ob_start();
             $pname = (string)($m['project_name'] ?? '');
           ?>
           <td>
-            <?php if ($pcode !== '' && $pname !== ''): ?>
-              <div class="fw-semibold"><?= htmlspecialchars($pcode) ?></div>
-              <div class="text-muted small" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                <?= htmlspecialchars($pname) ?>
-              </div>
+            <?php if ($projId > 0): ?>
+              <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                <?php if ($pcode !== '' && $pname !== ''): ?>
+                  <div class="fw-semibold"><?= htmlspecialchars($pcode) ?></div>
+                  <div class="text-muted small" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    <?= htmlspecialchars($pname) ?>
+                  </div>
+                <?php else: ?>
+                  <?= htmlspecialchars($pcode !== '' ? $pcode : ('Proiect #' . $projId)) ?>
+                <?php endif; ?>
+              </a>
             <?php else: ?>
-              <?= htmlspecialchars($pcode) ?>
+              <?php if ($pcode !== '' && $pname !== ''): ?>
+                <div class="fw-semibold"><?= htmlspecialchars($pcode) ?></div>
+                <div class="text-muted small" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                  <?= htmlspecialchars($pname) ?>
+                </div>
+              <?php else: ?>
+                <?= htmlspecialchars($pcode) ?>
+              <?php endif; ?>
             <?php endif; ?>
           </td>
           <td class="text-muted"><?= htmlspecialchars((string)($m['note'] ?? '')) ?></td>

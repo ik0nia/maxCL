@@ -65,10 +65,19 @@ final class MagazieMovement
                   i.winmentor_code,
                   i.name AS item_name,
                   COALESCE(NULLIF(m.project_code, \'\'), p.code) AS project_code_display,
-                  p.name AS project_name
+                  p.name AS project_name,
+                  CAST(JSON_UNQUOTE(JSON_EXTRACT(a.meta_json, \'$.project_product_id\')) AS UNSIGNED) AS project_product_id,
+                  prod.code AS project_product_code,
+                  prod.name AS project_product_name
                 FROM magazie_movements m
                 INNER JOIN magazie_items i ON i.id = m.item_id
                 LEFT JOIN projects p ON p.id = m.project_id
+                LEFT JOIN audit_log a
+                  ON a.action = \'MAGAZIE_OUT\'
+                 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(a.meta_json, \'$.movement_id\')) AS UNSIGNED) = m.id
+                LEFT JOIN project_products pp
+                  ON pp.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(a.meta_json, \'$.project_product_id\')) AS UNSIGNED)
+                LEFT JOIN products prod ON prod.id = pp.product_id
                 ORDER BY m.created_at DESC, m.id DESC
                 LIMIT ' . (int)$limit
             );
