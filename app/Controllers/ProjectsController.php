@@ -3231,6 +3231,12 @@ final class ProjectsController
         }
 
         $avizNumber = '';
+        $avizDateIso = null;
+        $avizDateLabel = '';
+        $deliveryDateIso = null;
+        $deliveryDateLabel = '';
+        $useTx = ($next === 'LIVRAT');
+        $pdo = null;
         try {
             // Statusurile piesei nu mai modifică automat locația/statusul HPL-ului.
             // CNC -> Montaj: blocăm până când toate plăcile/piesele HPL alocate pe piesă sunt "Debitat" (consumate manual).
@@ -3369,6 +3375,77 @@ final class ProjectsController
                     Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
                 }
                 $avizNumber = mb_substr($avizNumber, 0, 40);
+                $avizDateRaw = trim((string)($_POST['aviz_date'] ?? ''));
+                if ($avizDateRaw === '') {
+                    $msg = 'Nu poți trece la Avizare: completează data avizului.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                if (!preg_match('/^\d{2}\.\d{2}\.\d{4}$/', $avizDateRaw)) {
+                    $msg = 'Nu poți trece la Avizare: data avizului trebuie să fie în format zz.ll.aaaa.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $dt = \DateTime::createFromFormat('d.m.Y', $avizDateRaw);
+                $dtErrors = \DateTime::getLastErrors();
+                if (!$dt || ($dtErrors && ($dtErrors['warning_count'] ?? 0) > 0) || ($dtErrors && ($dtErrors['error_count'] ?? 0) > 0)) {
+                    $msg = 'Nu poți trece la Avizare: data avizului este invalidă.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $avizDateIso = $dt->format('Y-m-d');
+                $avizDateLabel = $dt->format('d.m.Y');
+            }
+
+            if ($next === 'LIVRAT') {
+                $deliveryDateRaw = trim((string)($_POST['delivery_date'] ?? ''));
+                if ($deliveryDateRaw === '') {
+                    $msg = 'Nu poți trece la Livrat: completează data livrării.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $dt = null;
+                if (preg_match('/^\d{2}\.\d{2}\.\d{4}$/', $deliveryDateRaw)) {
+                    $dt = \DateTime::createFromFormat('d.m.Y', $deliveryDateRaw);
+                } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $deliveryDateRaw)) {
+                    $dt = \DateTime::createFromFormat('Y-m-d', $deliveryDateRaw);
+                } else {
+                    $msg = 'Nu poți trece la Livrat: data livrării trebuie să fie în format zz.ll.aaaa.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $dtErrors = \DateTime::getLastErrors();
+                if (!$dt || ($dtErrors && ($dtErrors['warning_count'] ?? 0) > 0) || ($dtErrors && ($dtErrors['error_count'] ?? 0) > 0)) {
+                    $msg = 'Nu poți trece la Livrat: data livrării este invalidă.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                $deliveryDateIso = $dt->format('Y-m-d');
+                $deliveryDateLabel = $dt->format('d.m.Y');
             }
 
             $docInfo = null;
@@ -3376,7 +3453,74 @@ final class ProjectsController
                 $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber);
             }
 
+            if ($useTx) {
+                /** @var \PDO $pdo */
+                $pdo = \App\Core\DB::pdo();
+                $pdo->beginTransaction();
+            }
             ProjectProduct::updateStatus($ppId, $next);
+            if ($next === 'AVIZAT') {
+                ProjectProduct::updateAvizData($ppId, $avizNumber, $avizDateIso);
+            }
+            $deliveryId = null;
+            if ($next === 'LIVRAT') {
+                $totalQty = (float)($before['qty'] ?? 0);
+                $currentDelivered = (float)($before['delivered_qty'] ?? 0);
+                $newDelivered = $currentDelivered;
+                if ($totalQty > $currentDelivered) $newDelivered = $totalQty;
+                if (abs($newDelivered - $currentDelivered) > 0.000001) {
+                    ProjectProduct::updateDeliveredQty($ppId, $newDelivered);
+                }
+                $deliveryQty = max(0.0, $newDelivered - $currentDelivered);
+                if ($deliveryQty > 0) {
+                    $deliveryId = ProjectDelivery::create([
+                        'project_id' => $projectId,
+                        'delivery_date' => $deliveryDateIso ?? date('Y-m-d'),
+                        'note' => null,
+                        'created_by' => Auth::id(),
+                    ]);
+                    ProjectDeliveryItem::create([
+                        'delivery_id' => $deliveryId,
+                        'project_product_id' => $ppId,
+                        'qty' => $deliveryQty,
+                    ]);
+                    Audit::log('PROJECT_DELIVERY_ITEM', 'project_products', $ppId, $before, null, [
+                        'message' => 'Livrare produs: +' . $deliveryQty . ' (total livrat ' . $newDelivered . '/' . $totalQty . ')',
+                        'project_id' => $projectId,
+                        'delivery_id' => $deliveryId,
+                        'qty' => $deliveryQty,
+                        'delivery_date' => $deliveryDateIso,
+                    ]);
+                }
+
+                $project = Project::find($projectId);
+                if ($project) {
+                    $ppsNow = ProjectProduct::forProject($projectId);
+                    $allDelivered = true;
+                    $anyDelivered = false;
+                    foreach ($ppsNow as $ppRow) {
+                        $t = (float)($ppRow['qty'] ?? 0);
+                        $d = (float)($ppRow['delivered_qty'] ?? 0);
+                        if ($d > 0) $anyDelivered = true;
+                        if ($t > 0 && $d < $t - 1e-9) $allDelivered = false;
+                    }
+                    $beforeProj = $project;
+                    $afterProj = $project;
+                    if ($allDelivered && $ppsNow) {
+                        $afterProj['status'] = 'LIVRAT_COMPLET';
+                        $afterProj['completed_at'] = date('Y-m-d H:i:s');
+                    } elseif ($anyDelivered) {
+                        $afterProj['status'] = 'LIVRAT_PARTIAL';
+                    }
+                    if ((string)($beforeProj['status'] ?? '') !== (string)($afterProj['status'] ?? '')) {
+                        Project::update($projectId, $afterProj);
+                        Audit::log('PROJECT_STATUS_CHANGE', 'projects', $projectId, $beforeProj, $afterProj, [
+                            'message' => 'Status proiect actualizat automat după livrare produs.',
+                            'delivery_id' => $deliveryId,
+                        ]);
+                    }
+                }
+            }
             $after = $before;
             $after['production_status'] = $next;
             Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [
@@ -3389,8 +3533,17 @@ final class ProjectsController
             if (is_array($docInfo) && isset($docInfo['deviz_number'], $docInfo['bon_number'])) {
                 $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
             }
+            if ($next === 'LIVRAT') {
+                $msg .= ' Livrare înregistrată' . ($deliveryDateLabel !== '' ? (' (' . $deliveryDateLabel . ').') : '.');
+            }
+            if ($useTx && $pdo && $pdo->inTransaction()) {
+                $pdo->commit();
+            }
             Session::flash('toast_success', $msg);
         } catch (\Throwable $e) {
+            if ($useTx && $pdo && $pdo->inTransaction()) {
+                try { $pdo->rollBack(); } catch (\Throwable $e2) {}
+            }
             Session::flash('toast_error', 'Nu pot schimba statusul: ' . $e->getMessage());
         }
         Response::redirect('/projects/' . $projectId . '?tab=products');

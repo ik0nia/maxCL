@@ -188,6 +188,39 @@ final class ProjectProduct
         }
     }
 
+    public static function updateDeliveredQty(int $id, float $deliveredQty): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('UPDATE project_products SET delivered_qty = :del WHERE id = :id');
+        $st->execute([
+            ':id' => $id,
+            ':del' => (float)$deliveredQty,
+        ]);
+    }
+
+    public static function updateAvizData(int $id, ?string $avizNumber, ?string $avizDate): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $num = $avizNumber !== null && trim($avizNumber) !== '' ? trim($avizNumber) : null;
+        $date = $avizDate !== null && trim($avizDate) !== '' ? trim($avizDate) : null;
+        try {
+            $st = $pdo->prepare("
+                UPDATE project_products
+                SET aviz_number = :num,
+                    aviz_date = :dt
+                WHERE id = :id
+            ");
+            $st->execute([
+                ':id' => $id,
+                ':num' => $num,
+                ':dt' => $date,
+            ]);
+        } catch (\Throwable $e) {
+            // compat: coloane pot lipsi
+        }
+    }
     public static function delete(int $id): void
     {
         /** @var PDO $pdo */

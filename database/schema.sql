@@ -317,6 +317,8 @@ CREATE TABLE IF NOT EXISTS project_products (
   surface_type ENUM('BOARD','M2') NULL,
   surface_value DECIMAL(12,2) NULL,
   production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
+  aviz_number VARCHAR(40) NULL,
+  aviz_date DATE NULL,
   hpl_board_id INT UNSIGNED NULL,
   delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
   notes TEXT NULL,
