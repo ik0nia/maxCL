@@ -2723,6 +2723,13 @@ final class ProjectsController
                     // ignore
                 }
             }
+            foreach ($rows as $r) {
+                $pid = (int)($r['id'] ?? 0);
+                if ($pid <= 0 || !isset($projectMeta[$pid])) continue;
+                if ((string)($r['status'] ?? '') === 'LIVRAT_COMPLET') {
+                    $projectMeta[$pid]['all_delivered'] = true;
+                }
+            }
             echo View::render('projects/index', [
                 'title' => 'Proiecte',
                 'rows' => $rows,
