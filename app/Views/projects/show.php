@@ -266,7 +266,7 @@ ob_start();
             <div class="text-muted">Fiecare produs se creează direct în proiect</div>
           </div>
           <?php if ($canWrite): ?>
-            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNewCollapse" aria-expanded="false" aria-controls="ppAddNewCollapse">
+            <button class="btn btn-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppAddNewCollapse" aria-expanded="false" aria-controls="ppAddNewCollapse">
               <i class="bi bi-plus-lg me-1"></i> Creează produs
             </button>
           <?php endif; ?>
@@ -2396,7 +2396,7 @@ ob_start();
                       <th class="text-end" style="width:120px">Total</th>
                       <th class="text-end" style="width:120px">Livrat</th>
                       <th class="text-end" style="width:120px">Rămas</th>
-                      <th class="text-end" style="width:160px">Livrare acum</th>
+                      
                     </tr>
                   </thead>
                   <tbody>
@@ -2412,10 +2412,7 @@ ob_start();
                         <td class="text-end"><?= number_format($total, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
                         <td class="text-end"><?= number_format($del, 2, '.', '') ?></td>
                         <td class="text-end fw-semibold"><?= number_format($left, 2, '.', '') ?></td>
-                        <td class="text-end">
-                          <input class="form-control form-control-sm text-end" type="number" step="0.01" min="0" max="<?= htmlspecialchars((string)$left) ?>"
-                                 name="delivery_qty[<?= $ppId ?>]" value="0">
-                        </td>
+                        
                       </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -2423,11 +2420,7 @@ ob_start();
               </div>
             </div>
 
-            <div class="d-flex justify-content-end mt-3">
-              <button class="btn btn-primary" type="submit" onclick="return confirm('Salvez livrarea?');">
-                <i class="bi bi-truck me-1"></i> Salvează livrarea
-              </button>
-            </div>
+            
           </form>
         <?php endif; ?>
       </div>
