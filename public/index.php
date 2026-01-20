@@ -317,7 +317,7 @@ $router->post('/projects/{id}/labels/{labelId}/remove', fn($p) => ProjectsContro
 $router->get('/products', fn() => ProductsController::index(), $projectsReadMW);
 
 $clientsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
-$clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 
 $router->get('/clients', fn() => ClientsController::index(), $clientsReadMW);
 $router->get('/clients/create', fn() => ClientsController::createForm(), $clientsWriteMW);
@@ -348,7 +348,7 @@ $router->post('/stock/boards/{boardId}/pieces/{pieceId}/delete', fn($p) => Stock
 
 // ---- Magazie (accesorii)
 $magReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
-$magWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$magWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 
 $router->get('/magazie/stoc', fn() => MagazieStockController::index(), $magReadMW);
 $router->get('/magazie/stoc/{id}', fn($p) => MagazieStockController::show($p), $magReadMW);
