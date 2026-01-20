@@ -146,13 +146,13 @@ ob_start();
         <th style="width:170px">Dată</th>
         <th style="width:70px">Tip</th>
         <th style="width:160px">Cod WinMentor</th>
-        <th style="width:160px">Proiect</th>
         <th>Accesoriu</th>
-        <th style="width:200px">Produs proiect</th>
         <th class="text-end" style="width:110px">Bucăți</th>
         <?php if ($canSeePrices): ?>
           <th class="text-end" style="width:130px">Preț/buc</th>
         <?php endif; ?>
+        <th style="width:160px">Proiect</th>
+        <th style="width:200px">Produs proiect</th>
         <th>Notă</th>
       </tr>
     </thead>
@@ -181,6 +181,11 @@ ob_start();
             $pcode = (string)($m['project_code_display'] ?? ($m['project_code'] ?? ''));
             $pname = (string)($m['project_name'] ?? '');
           ?>
+          <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
+          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
+          <?php if ($canSeePrices): ?>
+            <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
+          <?php endif; ?>
           <td>
             <?php if ($projId > 0 && $pname !== ''): ?>
               <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
@@ -196,7 +201,6 @@ ob_start();
               <span class="text-muted">—</span>
             <?php endif; ?>
           </td>
-          <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
           <td>
             <?php if ($ppId > 0 && $projId > 0): ?>
               <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=products#pp-' . $ppId)) ?>">
@@ -206,10 +210,6 @@ ob_start();
               <span class="text-muted">—</span>
             <?php endif; ?>
           </td>
-          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
-          <?php if ($canSeePrices): ?>
-            <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
-          <?php endif; ?>
           <td class="text-muted"><?= htmlspecialchars((string)($m['note'] ?? '')) ?></td>
         </tr>
       <?php endforeach; ?>
