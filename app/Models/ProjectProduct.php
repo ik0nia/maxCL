@@ -188,6 +188,17 @@ final class ProjectProduct
         }
     }
 
+    public static function updateDeliveredQty(int $id, float $deliveredQty): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('UPDATE project_products SET delivered_qty = :del WHERE id = :id');
+        $st->execute([
+            ':id' => $id,
+            ':del' => (float)$deliveredQty,
+        ]);
+    }
+
     public static function updateAvizData(int $id, ?string $avizNumber, ?string $avizDate): void
     {
         /** @var PDO $pdo */

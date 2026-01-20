@@ -767,6 +767,12 @@ ob_start();
                     $stVal = (string)($pp['production_status'] ?? '');
                     $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
                     $idx = array_search($stVal, $ppAllowedValues, true);
+                    $avizDateIso = trim((string)($pp['aviz_date'] ?? ''));
+                    $avizDateLabel = '';
+                    if ($avizDateIso !== '') {
+                      $dt = \DateTime::createFromFormat('Y-m-d', $avizDateIso);
+                      if ($dt) $avizDateLabel = $dt->format('d.m.Y');
+                    }
                   ?>
                   <?php if ($canSetPPStatus): ?>
                     <?php
@@ -795,12 +801,21 @@ ob_start();
                           <?php if (!$isVisible) continue; ?>
 
                           <?php if ($isNext && $canAdvance): ?>
-                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0"
-                                  <?= $nextVal === 'AVIZAT' ? 'data-aviz-required="1"' : '' ?>>
+                            <?php
+                              $formAttr = '';
+                              if ($nextVal === 'AVIZAT') $formAttr .= ' data-aviz-required="1"';
+                              if ($nextVal === 'LIVRAT') {
+                                $formAttr .= ' data-delivery-required="1"';
+                                $formAttr .= ' data-delivery-default="' . htmlspecialchars($avizDateLabel) . '"';
+                              }
+                            ?>
+                            <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0"<?= $formAttr ?>>
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <?php if ($nextVal === 'AVIZAT'): ?>
                                 <input type="hidden" name="aviz_number" value="">
                                 <input type="hidden" name="aviz_date" value="">
+                              <?php elseif ($nextVal === 'LIVRAT'): ?>
+                                <input type="hidden" name="delivery_date" value="">
                               <?php endif; ?>
                               <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
                                 <?= htmlspecialchars($lbl) ?>
@@ -2421,53 +2436,66 @@ ob_start();
     <div class="col-12 col-lg-6">
       <div class="card app-card p-3">
         <div class="h5 m-0">Livrări existente</div>
-        <div class="text-muted">Istoric livrări (cantități pe produse)</div>
+        <div class="text-muted">Istoric livrări (produs + dată livrare + oră procesare)</div>
 
         <?php if (!$deliveries): ?>
           <div class="text-muted mt-2">Nu există livrări încă.</div>
         <?php else: ?>
-          <div class="accordion mt-2" id="deliveriesAcc">
-            <?php foreach ($deliveries as $d): ?>
-              <?php
-                $did = (int)($d['id'] ?? 0);
-                $items = is_array($deliveryItems[$did] ?? null) ? $deliveryItems[$did] : [];
-              ?>
-              <div class="accordion-item">
-                <h2 class="accordion-header" id="h<?= $did ?>">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c<?= $did ?>">
-                    <?= htmlspecialchars((string)($d['delivery_date'] ?? '')) ?> · <?= count($items) ?> produse
-                    <?php if (!empty($d['note'])): ?>
-                      <span class="text-muted ms-2"><?= htmlspecialchars((string)$d['note']) ?></span>
-                    <?php endif; ?>
-                  </button>
-                </h2>
-                <div id="c<?= $did ?>" class="accordion-collapse collapse" data-bs-parent="#deliveriesAcc">
-                  <div class="accordion-body">
-                    <?php if (!$items): ?>
-                      <div class="text-muted">Fără produse.</div>
-                    <?php else: ?>
-                      <table class="table table-sm align-middle mb-0">
-                        <thead>
-                          <tr>
-                            <th>Produs</th>
-                            <th class="text-end" style="width:140px">Cantitate</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <?php foreach ($items as $it): ?>
-                            <tr>
-                              <td class="fw-semibold"><?= htmlspecialchars((string)($it['product_name'] ?? '')) ?></td>
-                              <td class="text-end fw-semibold"><?= number_format((float)($it['qty'] ?? 0), 2, '.', '') ?></td>
-                            </tr>
-                          <?php endforeach; ?>
-                        </tbody>
-                      </table>
-                    <?php endif; ?>
-                  </div>
-                </div>
-              </div>
-            <?php endforeach; ?>
-          </div>
+          <?php
+            $deliveryRows = [];
+            foreach ($deliveries as $d) {
+              $did = (int)($d['id'] ?? 0);
+              $items = is_array($deliveryItems[$did] ?? null) ? $deliveryItems[$did] : [];
+              $dateRaw = (string)($d['delivery_date'] ?? '');
+              $dateDisp = $dateRaw;
+              if ($dateRaw !== '') {
+                $dt = \DateTime::createFromFormat('Y-m-d', $dateRaw);
+                if ($dt) $dateDisp = $dt->format('d.m.Y');
+              }
+              $procRaw = (string)($d['created_at'] ?? '');
+              $procDisp = $procRaw;
+              if ($procRaw !== '') {
+                try {
+                  $dt2 = new \DateTime($procRaw);
+                  $procDisp = $dt2->format('d.m.Y H:i');
+                } catch (\Throwable $e) {}
+              }
+              foreach ($items as $it) {
+                $deliveryRows[] = [
+                  'product_name' => (string)($it['product_name'] ?? ''),
+                  'qty' => (float)($it['qty'] ?? 0),
+                  'delivery_date' => $dateDisp,
+                  'processed_at' => $procDisp,
+                ];
+              }
+            }
+          ?>
+          <?php if (!$deliveryRows): ?>
+            <div class="text-muted mt-2">Nu există produse livrate.</div>
+          <?php else: ?>
+            <div class="table-responsive mt-2">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Produs</th>
+                    <th class="text-end" style="width:140px">Cantitate</th>
+                    <th style="width:140px">Data livrare</th>
+                    <th style="width:170px">Procesat la</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($deliveryRows as $row): ?>
+                    <tr>
+                      <td class="fw-semibold"><?= htmlspecialchars($row['product_name']) ?></td>
+                      <td class="text-end fw-semibold"><?= number_format((float)$row['qty'], 2, '.', '') ?></td>
+                      <td><?= htmlspecialchars((string)$row['delivery_date']) ?></td>
+                      <td><?= htmlspecialchars((string)$row['processed_at']) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
     </div>
@@ -2963,6 +2991,27 @@ ob_start();
   </div>
 </div>
 
+<div class="modal fade" id="deliveryDateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Data livrare</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="deliveryDateInput" class="form-label fw-semibold">Introdu data livrării</label>
+        <input class="form-control" id="deliveryDateInput" maxlength="10" placeholder="zz.ll.aaaa">
+        <div class="invalid-feedback">Introdu data în format zz.ll.aaaa.</div>
+        <div class="text-muted small mt-2">Data livrării va fi afișată în tabul Livrări.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+        <button type="button" class="btn btn-primary" id="deliveryDateConfirm">Continuă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="returnNoteModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -3164,6 +3213,103 @@ ob_start();
         const current = form.querySelector('input[name="aviz_number"]');
         const currentDate = form.querySelector('input[name="aviz_date"]');
         if (current && current.value.trim() !== '' && (!currentDate || currentDate.value.trim() !== '')) return;
+        ev.preventDefault();
+        openModal(form);
+      });
+    });
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('deliveryDateModal');
+    const modal = (modalEl && window.bootstrap && window.bootstrap.Modal)
+      ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
+      : null;
+    const input = document.getElementById('deliveryDateInput');
+    const confirmBtn = document.getElementById('deliveryDateConfirm');
+    let activeForm = null;
+
+    function resetInput() {
+      if (input) {
+        input.value = '';
+        input.classList.remove('is-invalid');
+      }
+    }
+
+    function fmtDate(d) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = String(d.getFullYear());
+      return day + '.' + month + '.' + year;
+    }
+
+    function isValidDate(val) {
+      if (!/^\d{2}\.\d{2}\.\d{4}$/.test(val)) return false;
+      const parts = val.split('.');
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const y = parseInt(parts[2], 10);
+      if (!d || !m || !y) return false;
+      const dt = new Date(y, m - 1, d);
+      return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
+    }
+
+    function applyAndSubmit(value) {
+      if (!activeForm) return;
+      const target = activeForm.querySelector('input[name="delivery_date"]');
+      if (target) target.value = value;
+      activeForm.dataset.deliveryConfirmed = '1';
+      if (modal) modal.hide();
+      activeForm.submit();
+    }
+
+    function openModal(form) {
+      activeForm = form;
+      resetInput();
+      if (input) {
+        const def = (form.dataset.deliveryDefault || '').trim();
+        input.value = def !== '' ? def : fmtDate(new Date());
+        input.classList.remove('is-invalid');
+      }
+      if (modal) {
+        modal.show();
+      } else {
+        const txt = window.prompt('Data livrării (zz.ll.aaaa):', input ? input.value : '') || '';
+        const val = txt.trim();
+        if (val === '' || !isValidDate(val)) return;
+        applyAndSubmit(val);
+      }
+    }
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () {
+        const val = input ? input.value.trim() : '';
+        if (val === '' || !isValidDate(val)) {
+          if (input) {
+            input.classList.add('is-invalid');
+            input.focus();
+          }
+          return;
+        }
+        applyAndSubmit(val);
+      });
+    }
+
+    if (input) {
+      input.addEventListener('input', function () {
+        input.classList.remove('is-invalid');
+      });
+    }
+
+    document.querySelectorAll('form[data-delivery-required="1"]').forEach(function (form) {
+      form.addEventListener('submit', function (ev) {
+        if (form.dataset.deliveryConfirmed === '1') {
+          form.dataset.deliveryConfirmed = '';
+          return;
+        }
+        const current = form.querySelector('input[name="delivery_date"]');
+        if (current && current.value.trim() !== '') return;
         ev.preventDefault();
         openModal(form);
       });
