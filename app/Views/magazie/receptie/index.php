@@ -146,13 +146,13 @@ ob_start();
         <th style="width:170px">Dată</th>
         <th style="width:70px">Tip</th>
         <th style="width:160px">Cod WinMentor</th>
+        <th style="width:160px">Proiect</th>
         <th>Accesoriu</th>
         <th style="width:200px">Produs proiect</th>
         <th class="text-end" style="width:110px">Bucăți</th>
         <?php if ($canSeePrices): ?>
           <th class="text-end" style="width:130px">Preț/buc</th>
         <?php endif; ?>
-        <th style="width:160px">Proiect</th>
         <th>Notă</th>
       </tr>
     </thead>
@@ -171,7 +171,6 @@ ob_start();
           <td class="text-muted"><?= htmlspecialchars($date) ?></td>
           <td class="fw-semibold"><?= htmlspecialchars($dir) ?></td>
           <td class="fw-semibold"><?= htmlspecialchars((string)($m['winmentor_code'] ?? '')) ?></td>
-          <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
           <?php
             $ppId = (int)($m['project_product_id'] ?? 0);
             $ppCode = trim((string)($m['project_product_code'] ?? ''));
@@ -179,7 +178,25 @@ ob_start();
             $ppLabel = trim($ppCode . ' · ' . $ppName);
             if ($ppLabel === '·' || $ppLabel === '· ') $ppLabel = $ppName !== '' ? $ppName : $ppCode;
             $projId = (int)($m['project_id'] ?? 0);
+            $pcode = (string)($m['project_code_display'] ?? ($m['project_code'] ?? ''));
+            $pname = (string)($m['project_name'] ?? '');
           ?>
+          <td>
+            <?php if ($projId > 0 && $pname !== ''): ?>
+              <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                <?= htmlspecialchars($pname) ?>
+              </a>
+              <div class="text-muted small">#<?= htmlspecialchars($pcode !== '' ? $pcode : (string)$projId) ?></div>
+            <?php elseif ($projId > 0): ?>
+              <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
+                Proiect #<?= htmlspecialchars((string)$projId) ?>
+              </a>
+              <div class="text-muted small">#<?= htmlspecialchars($pcode !== '' ? $pcode : (string)$projId) ?></div>
+            <?php else: ?>
+              <span class="text-muted">—</span>
+            <?php endif; ?>
+          </td>
+          <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
           <td>
             <?php if ($ppId > 0 && $projId > 0): ?>
               <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $projId . '?tab=products#pp-' . $ppId)) ?>">
@@ -193,33 +210,6 @@ ob_start();
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>
-          <?php
-            $pcode = (string)($m['project_code_display'] ?? ($m['project_code'] ?? ''));
-            $pname = (string)($m['project_name'] ?? '');
-          ?>
-          <td>
-            <?php if ($projId > 0): ?>
-              <a class="text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $projId)) ?>">
-                <?php if ($pcode !== '' && $pname !== ''): ?>
-                  <div class="fw-semibold"><?= htmlspecialchars($pcode) ?></div>
-                  <div class="text-muted small" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                    <?= htmlspecialchars($pname) ?>
-                  </div>
-                <?php else: ?>
-                  <?= htmlspecialchars($pcode !== '' ? $pcode : ('Proiect #' . $projId)) ?>
-                <?php endif; ?>
-              </a>
-            <?php else: ?>
-              <?php if ($pcode !== '' && $pname !== ''): ?>
-                <div class="fw-semibold"><?= htmlspecialchars($pcode) ?></div>
-                <div class="text-muted small" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                  <?= htmlspecialchars($pname) ?>
-                </div>
-              <?php else: ?>
-                <?= htmlspecialchars($pcode) ?>
-              <?php endif; ?>
-            <?php endif; ?>
-          </td>
           <td class="text-muted"><?= htmlspecialchars((string)($m['note'] ?? '')) ?></td>
         </tr>
       <?php endforeach; ?>
