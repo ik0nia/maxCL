@@ -255,6 +255,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name VARCHAR(190) NOT NULL,
   client_id INT UNSIGNED NULL,
   client_group_id INT UNSIGNED NULL,
+  source_offer_id INT UNSIGNED NULL,
   status ENUM(
     'DRAFT','CONFIRMAT','IN_PRODUCTIE','IN_ASTEPTARE','FINALIZAT_TEHNIC',
     'LIVRAT_PARTIAL','LIVRAT_COMPLET','ANULAT',
@@ -281,6 +282,7 @@ CREATE TABLE IF NOT EXISTS projects (
   UNIQUE KEY uq_projects_code (code),
   KEY idx_projects_client (client_id),
   KEY idx_projects_group (client_group_id),
+  KEY idx_projects_source_offer (source_offer_id),
   KEY idx_projects_status (status),
   KEY idx_projects_created (created_at),
   KEY idx_projects_deleted (deleted_at),
@@ -288,6 +290,108 @@ CREATE TABLE IF NOT EXISTS projects (
   CONSTRAINT fk_projects_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id),
   CONSTRAINT fk_projects_user FOREIGN KEY (created_by) REFERENCES users(id),
   CONSTRAINT fk_projects_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS offers (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code VARCHAR(64) NOT NULL,
+  name VARCHAR(190) NOT NULL,
+  client_id INT UNSIGNED NULL,
+  client_group_id INT UNSIGNED NULL,
+  status ENUM('DRAFT','TRIMISA','ACCEPTATA','RESPINSA','ANULATA') NOT NULL DEFAULT 'DRAFT',
+  category VARCHAR(190) NULL,
+  description TEXT NULL,
+  due_date DATE NULL,
+  notes TEXT NULL,
+  technical_notes TEXT NULL,
+  tags TEXT NULL,
+  converted_project_id INT UNSIGNED NULL,
+  converted_at DATETIME NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_offers_code (code),
+  KEY idx_offers_client (client_id),
+  KEY idx_offers_group (client_group_id),
+  KEY idx_offers_status (status),
+  KEY idx_offers_created (created_at),
+  KEY idx_offers_converted (converted_project_id),
+  CONSTRAINT fk_offers_client FOREIGN KEY (client_id) REFERENCES clients(id),
+  CONSTRAINT fk_offers_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id),
+  CONSTRAINT fk_offers_converted_project FOREIGN KEY (converted_project_id) REFERENCES projects(id),
+  CONSTRAINT fk_offers_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS offer_products (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  offer_id INT UNSIGNED NOT NULL,
+  product_id INT UNSIGNED NOT NULL,
+  qty DECIMAL(12,2) NOT NULL DEFAULT 1,
+  unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_offer_prod (offer_id, product_id),
+  KEY idx_offer_prod_offer (offer_id),
+  KEY idx_offer_prod_product (product_id),
+  CONSTRAINT fk_offer_prod_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS offer_product_hpl (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  offer_id INT UNSIGNED NOT NULL,
+  offer_product_id BIGINT UNSIGNED NOT NULL,
+  board_id INT UNSIGNED NOT NULL,
+  consume_mode ENUM('FULL','HALF') NOT NULL DEFAULT 'FULL',
+  qty DECIMAL(12,2) NOT NULL DEFAULT 1,
+  width_mm INT NULL,
+  height_mm INT NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_offer_hpl_offer (offer_id),
+  KEY idx_offer_hpl_offer_product (offer_product_id),
+  KEY idx_offer_hpl_board (board_id),
+  CONSTRAINT fk_offer_hpl_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_offer_hpl_offer_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS offer_product_accessories (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  offer_id INT UNSIGNED NOT NULL,
+  offer_product_id BIGINT UNSIGNED NOT NULL,
+  item_id INT UNSIGNED NOT NULL,
+  qty DECIMAL(12,3) NOT NULL DEFAULT 1,
+  unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+  unit_price DECIMAL(12,2) NULL,
+  include_in_deviz TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_offer_acc_offer (offer_id),
+  KEY idx_offer_acc_offer_product (offer_product_id),
+  KEY idx_offer_acc_item (item_id),
+  CONSTRAINT fk_offer_acc_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_offer_acc_offer_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS offer_work_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  offer_id INT UNSIGNED NOT NULL,
+  offer_product_id BIGINT UNSIGNED NULL,
+  work_type ENUM('CNC','ATELIER') NOT NULL,
+  hours_estimated DECIMAL(10,2) NULL,
+  cost_per_hour DECIMAL(12,2) NULL,
+  note VARCHAR(255) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_offer_work_offer (offer_id),
+  KEY idx_offer_work_product (offer_product_id),
+  CONSTRAINT fk_offer_work_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_offer_work_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Produse (piesele din proiect)

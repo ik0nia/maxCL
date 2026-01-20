@@ -27,6 +27,7 @@ use App\Controllers\UsersController;
 use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
 use App\Controllers\ProjectsController;
+use App\Controllers\OffersController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\Api\HplPiecesController as ApiHplPiecesController;
@@ -276,6 +277,27 @@ $projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Au
 $projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsProductStatusMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsProductEditMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+
+$offersReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$offersWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+
+$router->get('/offers', fn() => OffersController::index(), $offersReadMW);
+$router->get('/offers/create', fn() => OffersController::createForm(), $offersWriteMW);
+$router->post('/offers/create', fn() => OffersController::create(), $offersWriteMW);
+$router->get('/offers/{id}', fn($p) => OffersController::show($p), $offersReadMW);
+$router->get('/offers/{id}/bon-general', fn($p) => OffersController::bonGeneral($p), $offersReadMW);
+$router->post('/offers/{id}/edit', fn($p) => OffersController::update($p), $offersWriteMW);
+$router->post('/offers/{id}/convert', fn($p) => OffersController::convertToProject($p), $offersWriteMW);
+$router->post('/offers/{id}/products/add-existing', fn($p) => OffersController::addExistingProduct($p), $offersWriteMW);
+$router->post('/offers/{id}/products/create', fn($p) => OffersController::createProductInOffer($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/update', fn($p) => OffersController::updateOfferProduct($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/delete', fn($p) => OffersController::removeOfferProduct($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/hpl/create', fn($p) => OffersController::addOfferProductHpl($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/hpl/{hplId}/delete', fn($p) => OffersController::deleteOfferProductHpl($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/accessories/create', fn($p) => OffersController::addOfferProductAccessory($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/accessories/{accId}/delete', fn($p) => OffersController::deleteOfferProductAccessory($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/work/create', fn($p) => OffersController::addOfferWorkLog($p), $offersWriteMW);
+$router->post('/offers/{id}/products/{opId}/work/{workId}/delete', fn($p) => OffersController::deleteOfferWorkLog($p), $offersWriteMW);
 
 $router->get('/projects', fn() => ProjectsController::index(), $projectsReadMW);
 $router->get('/projects/create', fn() => ProjectsController::createForm(), $projectsWriteMW);

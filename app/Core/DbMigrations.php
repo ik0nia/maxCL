@@ -1135,6 +1135,179 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-23_01_create_offers',
+                'label' => 'CREATE TABLE offers',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'offers')) return;
+                    $pdo->exec("
+                        CREATE TABLE offers (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          code VARCHAR(64) NOT NULL,
+                          name VARCHAR(190) NOT NULL,
+                          client_id INT UNSIGNED NULL,
+                          client_group_id INT UNSIGNED NULL,
+                          status ENUM('DRAFT','TRIMISA','ACCEPTATA','RESPINSA','ANULATA') NOT NULL DEFAULT 'DRAFT',
+                          category VARCHAR(190) NULL,
+                          description TEXT NULL,
+                          due_date DATE NULL,
+                          notes TEXT NULL,
+                          technical_notes TEXT NULL,
+                          tags TEXT NULL,
+                          converted_project_id INT UNSIGNED NULL,
+                          converted_at DATETIME NULL,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          UNIQUE KEY uq_offers_code (code),
+                          KEY idx_offers_client (client_id),
+                          KEY idx_offers_group (client_group_id),
+                          KEY idx_offers_status (status),
+                          KEY idx_offers_created (created_at),
+                          KEY idx_offers_converted (converted_project_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                    try { if (self::tableExists($pdo, 'clients')) $pdo->exec("ALTER TABLE offers ADD CONSTRAINT fk_offers_client FOREIGN KEY (client_id) REFERENCES clients(id)"); } catch (\Throwable $e) {}
+                    try { if (self::tableExists($pdo, 'client_groups')) $pdo->exec("ALTER TABLE offers ADD CONSTRAINT fk_offers_group FOREIGN KEY (client_group_id) REFERENCES client_groups(id)"); } catch (\Throwable $e) {}
+                    try { if (self::tableExists($pdo, 'projects')) $pdo->exec("ALTER TABLE offers ADD CONSTRAINT fk_offers_converted_project FOREIGN KEY (converted_project_id) REFERENCES projects(id)"); } catch (\Throwable $e) {}
+                    try { if (self::tableExists($pdo, 'users')) $pdo->exec("ALTER TABLE offers ADD CONSTRAINT fk_offers_user FOREIGN KEY (created_by) REFERENCES users(id)"); } catch (\Throwable $e) {}
+                },
+            ],
+            [
+                'id' => '2026-01-23_02_create_offer_products',
+                'label' => 'CREATE TABLE offer_products',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'offer_products')) return;
+                    if (!self::tableExists($pdo, 'offers')) return;
+                    if (!self::tableExists($pdo, 'products')) return;
+                    $pdo->exec("
+                        CREATE TABLE offer_products (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          offer_id INT UNSIGNED NOT NULL,
+                          product_id INT UNSIGNED NOT NULL,
+                          qty DECIMAL(12,2) NOT NULL DEFAULT 1,
+                          unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+                          notes TEXT NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          UNIQUE KEY uq_offer_prod (offer_id, product_id),
+                          KEY idx_offer_prod_offer (offer_id),
+                          KEY idx_offer_prod_product (product_id),
+                          CONSTRAINT fk_offer_prod_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_offer_prod_product FOREIGN KEY (product_id) REFERENCES products(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-23_03_create_offer_product_hpl',
+                'label' => 'CREATE TABLE offer_product_hpl',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'offer_product_hpl')) return;
+                    if (!self::tableExists($pdo, 'offers')) return;
+                    if (!self::tableExists($pdo, 'offer_products')) return;
+                    if (!self::tableExists($pdo, 'hpl_boards')) return;
+                    $pdo->exec("
+                        CREATE TABLE offer_product_hpl (
+                          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          offer_id INT UNSIGNED NOT NULL,
+                          offer_product_id BIGINT UNSIGNED NOT NULL,
+                          board_id INT UNSIGNED NOT NULL,
+                          consume_mode ENUM('FULL','HALF') NOT NULL DEFAULT 'FULL',
+                          qty DECIMAL(12,2) NOT NULL DEFAULT 1,
+                          width_mm INT NULL,
+                          height_mm INT NULL,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_offer_hpl_offer (offer_id),
+                          KEY idx_offer_hpl_offer_product (offer_product_id),
+                          KEY idx_offer_hpl_board (board_id),
+                          CONSTRAINT fk_offer_hpl_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_offer_hpl_offer_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_offer_hpl_board FOREIGN KEY (board_id) REFERENCES hpl_boards(id),
+                          CONSTRAINT fk_offer_hpl_user FOREIGN KEY (created_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-23_04_create_offer_product_accessories',
+                'label' => 'CREATE TABLE offer_product_accessories',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'offer_product_accessories')) return;
+                    if (!self::tableExists($pdo, 'offers')) return;
+                    if (!self::tableExists($pdo, 'offer_products')) return;
+                    if (!self::tableExists($pdo, 'magazie_items')) return;
+                    $pdo->exec("
+                        CREATE TABLE offer_product_accessories (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          offer_id INT UNSIGNED NOT NULL,
+                          offer_product_id BIGINT UNSIGNED NOT NULL,
+                          item_id INT UNSIGNED NOT NULL,
+                          qty DECIMAL(12,3) NOT NULL DEFAULT 1,
+                          unit VARCHAR(32) NOT NULL DEFAULT 'buc',
+                          unit_price DECIMAL(12,2) NULL,
+                          include_in_deviz TINYINT(1) NOT NULL DEFAULT 1,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_offer_acc_offer (offer_id),
+                          KEY idx_offer_acc_offer_product (offer_product_id),
+                          KEY idx_offer_acc_item (item_id),
+                          CONSTRAINT fk_offer_acc_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_offer_acc_offer_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_offer_acc_item FOREIGN KEY (item_id) REFERENCES magazie_items(id),
+                          CONSTRAINT fk_offer_acc_user FOREIGN KEY (created_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-23_05_create_offer_work_logs',
+                'label' => 'CREATE TABLE offer_work_logs',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'offer_work_logs')) return;
+                    if (!self::tableExists($pdo, 'offers')) return;
+                    if (!self::tableExists($pdo, 'offer_products')) return;
+                    $pdo->exec("
+                        CREATE TABLE offer_work_logs (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          offer_id INT UNSIGNED NOT NULL,
+                          offer_product_id BIGINT UNSIGNED NULL,
+                          work_type ENUM('CNC','ATELIER') NOT NULL,
+                          hours_estimated DECIMAL(10,2) NULL,
+                          cost_per_hour DECIMAL(12,2) NULL,
+                          note VARCHAR(255) NULL,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_offer_work_offer (offer_id),
+                          KEY idx_offer_work_product (offer_product_id),
+                          CONSTRAINT fk_offer_work_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_offer_work_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE SET NULL,
+                          CONSTRAINT fk_offer_work_user FOREIGN KEY (created_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
+                'id' => '2026-01-23_06_projects_source_offer',
+                'label' => 'ALTER projects ADD source_offer_id',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    if (self::columnExists($pdo, 'projects', 'source_offer_id')) return;
+                    try {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN source_offer_id INT UNSIGNED NULL AFTER client_group_id");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                    try { $pdo->exec("ALTER TABLE projects ADD KEY idx_projects_source_offer (source_offer_id)"); } catch (\Throwable $e) {}
+                    try { if (self::tableExists($pdo, 'offers')) $pdo->exec("ALTER TABLE projects ADD CONSTRAINT fk_projects_source_offer FOREIGN KEY (source_offer_id) REFERENCES offers(id)"); } catch (\Throwable $e) {}
+                },
+            ],
         ];
     }
 

@@ -254,5 +254,21 @@ final class Project
             ':allocations_locked' => (int)($data['allocations_locked'] ?? 0),
         ]);
     }
+
+    public static function updateSourceOffer(int $id, ?int $offerId): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $val = ($offerId !== null && $offerId > 0) ? $offerId : null;
+        try {
+            $st = $pdo->prepare('UPDATE projects SET source_offer_id = :oid WHERE id = :id');
+            $st->execute([
+                ':id' => $id,
+                ':oid' => $val,
+            ]);
+        } catch (\Throwable $e) {
+            // compat: coloana poate lipsi
+        }
+    }
 }
 
