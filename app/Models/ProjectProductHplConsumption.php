@@ -43,7 +43,8 @@ final class ProjectProductHplConsumption
               sp2.qty AS consumed_piece_qty,
               sp2.location AS consumed_piece_location,
               sp2.notes AS consumed_piece_notes,
-              sp2.area_total_m2 AS consumed_piece_area_total_m2
+              sp2.area_total_m2 AS consumed_piece_area_total_m2,
+              sp2.is_accounting AS consumed_piece_is_accounting
             FROM project_product_hpl_consumptions x
             INNER JOIN hpl_boards b ON b.id = x.board_id
             LEFT JOIN finishes fc ON fc.id = b.face_color_id

@@ -564,7 +564,7 @@ final class ProjectsController
 
     /**
      * @param array<int, array<string,mixed>> $rows
-     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int,display_width_mm:int,display_height_mm:int,display_qty:float,unit_price:?float,total_price:?float}>
+     * @return array<int, array{board_code:string,board_name:string,piece_type:string,width_mm:int,height_mm:int,qty:int,display_width_mm:int,display_height_mm:int,display_qty:float,unit_price:?float,total_price:?float,is_rest:bool}>
      */
     private static function aggregateConsumedHpl(array $rows): array
     {
@@ -600,6 +600,8 @@ final class ProjectsController
             $boardArea = ($stdW > 0 && $stdH > 0) ? (($stdW * $stdH) / 1000000.0) : 0.0;
             $pieceArea = ($pw > 0 && $ph > 0) ? (($pw * $ph) / 1000000.0) : 0.0;
             $consumeMode = strtoupper((string)($r['consume_mode'] ?? ''));
+            $accFlag = $r['consumed_piece_is_accounting'] ?? $r['piece_is_accounting'] ?? 1;
+            $isRest = ((int)$accFlag) === 0;
             $isHalf = $consumeMode === 'HALF';
             if (!$isHalf && $boardArea > 0.0 && $pieceArea > 0.0) {
                 $isHalf = abs(($pieceArea * 2.0) - $boardArea) < 0.0001;
@@ -617,7 +619,7 @@ final class ProjectsController
             if ($boardSale !== null && $boardArea > 0.0 && $pieceArea > 0.0) {
                 $unitPrice = $isHalf ? $boardSale : (($boardSale / $boardArea) * $pieceArea);
             }
-            $key = $bcode . '|' . $bname . '|' . $pt . '|' . $pw . '|' . $ph;
+            $key = $bcode . '|' . $bname . '|' . $pt . '|' . $pw . '|' . $ph . '|' . ($isRest ? 'R' : 'N');
             if (!isset($out[$key])) {
                 $out[$key] = [
                     'board_code' => $bcode,
@@ -631,6 +633,7 @@ final class ProjectsController
                     'display_qty' => 0.0,
                     'unit_price' => $unitPrice,
                     'total_price' => null,
+                    'is_rest' => $isRest,
                 ];
             }
             $out[$key]['qty'] += $qty;
@@ -731,6 +734,7 @@ final class ProjectsController
     .title { font-weight:700; }
     .total { margin-top:12px; text-align:right; font-weight:700; font-size:14px; }
     .logo { max-height:50px; margin-bottom:8px; }
+    .badge-rest { display:inline-block; font-size:11px; padding:2px 6px; border-radius:10px; border:1px solid #d6a600; color:#7a5a00; background:#fff3cd; }
   </style>
 </head>
 <body>
@@ -931,7 +935,12 @@ final class ProjectsController
             ?>
             <tr>
               <td><?= $esc($r['board_code'] ?? '') ?></td>
-              <td><?= $esc($r['board_name'] ?? '') ?></td>
+              <td>
+                <?= $esc($r['board_name'] ?? '') ?>
+                <?php if (!empty($r['is_rest'])): ?>
+                  <span class="badge-rest">REST</span>
+                <?php endif; ?>
+              </td>
               <td><?= $esc($dim) ?></td>
               <td><?= $esc(self::fmtQty($dispQty)) ?></td>
               <td><?= $hplUp !== null ? $esc(self::fmtMoney($hplUp)) : '—' ?></td>
@@ -1081,6 +1090,7 @@ final class ProjectsController
     th { background:#f6f7f8; text-align:left; font-size:12px; }
     .muted { color:#666; }
     .logo { max-height:50px; margin-bottom:8px; }
+    .badge-rest { display:inline-block; font-size:11px; padding:2px 6px; border-radius:10px; border:1px solid #d6a600; color:#7a5a00; background:#fff3cd; }
     .list { margin:6px 0 0 18px; padding:0; }
     .list li { margin-bottom:3px; }
   </style>
@@ -1167,7 +1177,12 @@ final class ProjectsController
             ?>
             <tr>
               <td><?= $esc($r['board_code'] ?? '') ?></td>
-              <td><?= $esc($r['board_name'] ?? '') ?></td>
+              <td>
+                <?= $esc($r['board_name'] ?? '') ?>
+                <?php if (!empty($r['is_rest'])): ?>
+                  <span class="badge-rest">REST</span>
+                <?php endif; ?>
+              </td>
               <td><?= $esc($dim) ?></td>
               <td><?= $esc(self::fmtQty($dispQty)) ?></td>
               <td><?= $hplUp !== null ? $esc(self::fmtMoney($hplUp)) : '—' ?></td>
