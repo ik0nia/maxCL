@@ -253,8 +253,8 @@ $router->get('/catalog/variants', fn() => Response::redirect('/stock'), $catalog
 
 // ---- Rute cu middleware pe roluri (placeholder până implementăm modulele)
 
-// ---- Utilizatori (doar ADMIN)
-$usersMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
+// ---- Utilizatori (ADMIN + GESTIONAR)
+$usersMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $router->get('/users', fn() => UsersController::index(), $usersMW);
 $router->get('/users/create', fn() => UsersController::createForm(), $usersMW);
 $router->post('/users/create', fn() => UsersController::create(), $usersMW);
