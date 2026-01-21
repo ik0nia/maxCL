@@ -15,7 +15,6 @@ $tab = $tab ?? 'general';
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
-$productsAll = $productsAll ?? [];
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
@@ -31,8 +30,8 @@ ob_start();
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/offers')) ?>" class="btn btn-outline-secondary">Înapoi</a>
-    <a class="btn btn-outline-secondary" target="_blank" href="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/bon-general')) ?>">
-      <i class="bi bi-file-earmark-text me-1"></i> Bon ofertă
+    <a class="btn btn-link text-primary fw-semibold" target="_blank" href="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/bon-general')) ?>">
+      <i class="bi bi-printer me-1"></i> PRINT OFERTA
     </a>
     <?php if ($convertedProjectId > 0): ?>
       <a class="btn btn-success" href="<?= htmlspecialchars(Url::to('/projects/' . $convertedProjectId)) ?>">
@@ -186,37 +185,6 @@ ob_start();
       </div>
 
       <div class="card app-card p-3 mb-3">
-        <div class="h5 m-0">Adaugă produs existent</div>
-        <?php if (!$canWrite): ?>
-          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
-        <?php else: ?>
-          <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/add-existing')) ?>" class="row g-2 mt-2">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-            <div class="col-12 col-md-7">
-              <label class="form-label fw-semibold">Produs</label>
-              <select class="form-select" name="product_id" required>
-                <option value="">—</option>
-                <?php foreach ($productsAll as $p): ?>
-                  <option value="<?= (int)($p['id'] ?? 0) ?>">
-                    <?= htmlspecialchars(trim((string)($p['code'] ?? '') . ' · ' . (string)($p['name'] ?? ''))) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">Cantitate</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
-            </div>
-            <div class="col-12 col-md-2 d-flex align-items-end">
-              <button class="btn btn-outline-secondary w-100" type="submit">
-                <i class="bi bi-plus-lg me-1"></i> Adaugă
-              </button>
-            </div>
-          </form>
-        <?php endif; ?>
-      </div>
-
-      <div class="card app-card p-3 mb-3">
         <div class="d-flex align-items-center justify-content-between">
           <div class="h5 m-0">Total ofertă</div>
           <div class="text-end">
@@ -271,11 +239,6 @@ ob_start();
               <div class="col-12 col-md-12 d-flex justify-content-end gap-2">
                 <button class="btn btn-outline-secondary btn-sm" type="submit">Actualizează</button>
               </div>
-            </form>
-            <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/delete')) ?>" class="mt-2"
-                  onsubmit="return confirm('Ștergi produsul din ofertă?');">
-              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-              <button class="btn btn-danger btn-sm" type="submit">Șterge</button>
             </form>
           <?php endif; ?>
 
@@ -478,6 +441,13 @@ ob_start();
             <div class="text-end">
               <div class="fw-semibold">Preț de listă: <?= number_format((float)($tot['cost_total'] ?? 0), 2, '.', '') ?> lei</div>
               <div class="text-muted">Preț cu discount: <?= number_format((float)($tot['sale_total'] ?? 0), 2, '.', '') ?> lei</div>
+              <?php if ($canWrite): ?>
+                <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/delete')) ?>" class="mt-2"
+                      onsubmit="return confirm('Ștergi produsul din ofertă?');">
+                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                  <button class="btn btn-danger btn-sm" type="submit">Șterge produs</button>
+                </form>
+              <?php endif; ?>
             </div>
           </div>
         </div>

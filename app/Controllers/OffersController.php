@@ -327,10 +327,8 @@ final class OffersController
 
         $clients = [];
         $groups = [];
-        $productsAll = [];
         try { $clients = Client::forSelect(); } catch (\Throwable $e) { $clients = []; }
         try { $groups = ClientGroup::all(); } catch (\Throwable $e) { $groups = []; }
-        try { $productsAll = Product::all(null, 2000); } catch (\Throwable $e) { $productsAll = []; }
         $statuses = self::statuses();
         echo View::render('offers/show', [
             'title' => 'Oferta ' . (string)($offer['code'] ?? ''),
@@ -345,7 +343,6 @@ final class OffersController
             'statuses' => $statuses,
             'clients' => $clients,
             'groups' => $groups,
-            'productsAll' => $productsAll,
         ]);
     }
 
