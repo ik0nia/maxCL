@@ -54,7 +54,7 @@ $toastError = Session::flash('toast_error');
       <div class="d-flex align-items-center gap-2">
         <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
           <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/manual')) ?>">
-            <i class="bi bi-journal-bookmark me-1"></i> Manual
+            <i class="bi bi-question-circle me-1"></i> Manual aplicatie
           </a>
         <?php endif; ?>
         <?php if ($user): ?>

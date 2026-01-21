@@ -68,6 +68,19 @@ ob_start();
     </div>
 
     <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Operatiuni uzuale (ce faci in formulare)</h2>
+      <ul class="mb-0">
+        <li><strong>Clienti</strong>: adaugi client nou, editezi date, gestionezi adresele si poti sterge (doar ADMIN).</li>
+        <li><strong>Oferte</strong>: creezi oferta, actualizezi datele, adaugi produse, HPL, accesorii si manopera.</li>
+        <li><strong>Proiecte</strong>: creezi proiect sau convertesti din oferta, actualizezi status, adaugi produse.</li>
+        <li><strong>Consumuri</strong>: aloci HPL si accesorii, apoi consumi in functie de debitare/lucru.</li>
+        <li><strong>Fisiere</strong>: incarci documente pe proiect si le poti sterge ulterior.</li>
+        <li><strong>Livrari</strong>: adaugi livrari si urmaresti ce s-a predat clientului.</li>
+        <li><strong>Utilizatori</strong>: ADMIN poate crea si edita conturi.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
       <h2 class="h5">Povestea unei comenzi (Oferta → Proiect)</h2>
       <p class="mb-2">
         In practica, lucrurile merg asa: un client are o cerere, creezi o <strong>Oferta</strong>,
@@ -92,11 +105,32 @@ ob_start();
     </div>
 
     <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Logica stocului (explicata simplu)</h2>
+      <ul class="mb-0">
+        <li><strong>Placa</strong> este baza: are dimensiuni standard si finisaje fata/verso.</li>
+        <li><strong>Piesa</strong> este unitatea de lucru: dimensiune, cantitate si locatie.</li>
+        <li><strong>Status</strong>: Disponibil → Rezervat → Consumat (sau deseu).</li>
+        <li><strong>Tip piese</strong>: FULL (placa intreaga) sau OFFCUT (rest).</li>
+        <li><strong>Piese interne</strong> sunt nestocabile (nu intra in totaluri de stoc).</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
       <h2 class="h5">Magazie (accesorii) pe scurt</h2>
       <ul class="mb-0">
         <li>In <strong>Receptie marfa</strong> adaugi intrari de produse in magazie.</li>
         <li>In <strong>Stoc Magazie</strong> vezi disponibilul si poti consuma pe proiect.</li>
         <li>Consumurile sunt urmarite si la nivel de produs din proiect.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Formulare: reguli generale</h2>
+      <ul class="mb-0">
+        <li>Campurile obligatorii trebuie completate (validare pe server).</li>
+        <li>Valorile numerice (cantitati, dimensiuni) trebuie sa fie valide.</li>
+        <li>Erorile si confirmarile apar ca mesaje tip toast.</li>
+        <li>Actiunile POST sunt protejate cu token CSRF.</li>
       </ul>
     </div>
 
