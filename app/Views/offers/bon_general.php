@@ -9,6 +9,7 @@ $fmtQty = $fmtQty ?? fn($v) => rtrim(rtrim(number_format((float)$v, 3, '.', ''),
 
 $logo = trim((string)($company['logo_thumb'] ?? $company['logo_url'] ?? ''));
 $companyName = trim((string)($company['name'] ?? ''));
+if ($companyName === '') $companyName = 'HPL Manager';
 ?>
 <!doctype html>
 <html lang="ro">
@@ -63,9 +64,9 @@ $companyName = trim((string)($company['name'] ?? ''));
         <tr>
           <th>Produs</th>
           <th class="text-end">Cantitate</th>
-          <th class="text-end">Preț vânzare</th>
-          <th class="text-end">Total vânzare</th>
-          <th class="text-end">Cost total</th>
+          <th class="text-end">Preț ofertă</th>
+          <th class="text-end">Total ofertă</th>
+          <th class="text-end">Preț de listă</th>
         </tr>
       </thead>
       <tbody>
@@ -91,14 +92,14 @@ $companyName = trim((string)($company['name'] ?? ''));
 
     <div class="totals">
       <div class="box">
-        <div class="row">
-          <div><strong>Cost total</strong></div>
-          <div><strong><?= $fmtMoney($totalCost) ?> lei</strong></div>
-        </div>
-        <div class="row">
-          <div>Preț ofertă</div>
-          <div><?= $fmtMoney($totalSale) ?> lei</div>
-        </div>
+          <div class="row">
+            <div><strong>Preț de listă</strong></div>
+            <div><strong><?= $fmtMoney($totalCost) ?> lei</strong></div>
+          </div>
+          <div class="row">
+            <div>Preț ofertă</div>
+            <div><?= $fmtMoney($totalSale) ?> lei</div>
+          </div>
       </div>
     </div>
   </div>

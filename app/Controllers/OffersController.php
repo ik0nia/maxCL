@@ -412,6 +412,7 @@ final class OffersController
         $desc = trim((string)($_POST['description'] ?? ''));
         $code = trim((string)($_POST['code'] ?? ''));
         $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
+        $desc = trim((string)($_POST['description'] ?? ''));
         $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
@@ -490,7 +491,7 @@ final class OffersController
             OfferProduct::updateFields($opId, [
                 'qty' => $qty,
                 'unit' => $unit !== '' ? $unit : 'buc',
-                'notes' => $op['notes'] ?? null,
+                'notes' => $desc !== '' ? $desc : null,
             ]);
             $prodId = (int)($op['product_id'] ?? 0);
             if ($prodId > 0) {
@@ -800,7 +801,7 @@ final class OffersController
             $totalCost += $costTotal;
             $rows[] = [
                 'product_name' => (string)($op['product_name'] ?? ''),
-                'product_desc' => (string)($op['product_notes'] ?? ''),
+                'product_desc' => (string)($op['notes'] ?? '') !== '' ? (string)($op['notes'] ?? '') : (string)($op['product_notes'] ?? ''),
                 'qty' => $qty,
                 'unit' => (string)($op['unit'] ?? 'buc'),
                 'sale_price' => $salePrice,

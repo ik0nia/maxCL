@@ -233,12 +233,16 @@ ob_start();
           $accRows = $accByProduct[$opId] ?? [];
           $workRows = $workByProduct[$opId] ?? [];
           $tot = $productTotals[$opId] ?? ['hpl_cost' => 0.0, 'acc_cost' => 0.0, 'labor_cost' => 0.0, 'cost_total' => 0.0, 'sale_total' => 0.0];
+          $desc = trim((string)($op['notes'] ?? ''));
+          if ($desc === '') $desc = trim((string)($op['product_notes'] ?? ''));
         ?>
         <div class="card app-card p-3 mb-3" id="op-<?= $opId ?>">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
               <div class="h4 m-0 text-success fw-semibold"><?= htmlspecialchars((string)($op['product_name'] ?? '')) ?></div>
-              <div class="text-muted"><?= htmlspecialchars((string)($op['product_notes'] ?? '')) ?></div>
+              <?php if ($desc !== ''): ?>
+                <div class="text-muted"><?= nl2br(htmlspecialchars($desc)) ?></div>
+              <?php endif; ?>
               <div class="text-muted small">Cantitate: <?= number_format((float)($op['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($op['unit'] ?? 'buc')) ?></div>
             </div>
             <div class="text-end">
@@ -261,7 +265,10 @@ ob_start();
                        value="<?= isset($op['product_sale_price']) && $op['product_sale_price'] !== null ? htmlspecialchars(number_format((float)$op['product_sale_price'], 2, '.', '')) : '' ?>"
                        placeholder="Preț cu discount">
               </div>
-              <div class="col-12 col-md-3 d-flex justify-content-end gap-2">
+              <div class="col-12 col-md-12">
+                <textarea class="form-control form-control-sm" name="description" rows="2" maxlength="4000" placeholder="Descriere (opțional)"><?= htmlspecialchars($desc) ?></textarea>
+              </div>
+              <div class="col-12 col-md-12 d-flex justify-content-end gap-2">
                 <button class="btn btn-outline-secondary btn-sm" type="submit">Actualizează</button>
               </div>
             </form>
