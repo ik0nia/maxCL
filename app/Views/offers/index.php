@@ -10,6 +10,12 @@ $rows = $rows ?? [];
 $q = trim((string)($q ?? ''));
 $status = trim((string)($status ?? ''));
 $statuses = $statuses ?? [];
+$statusLabels = [];
+foreach ($statuses as $s) {
+    if (isset($s['value'], $s['label'])) {
+        $statusLabels[(string)$s['value']] = (string)$s['label'];
+    }
+}
 
 ob_start();
 ?>
@@ -82,7 +88,11 @@ ob_start();
               —
             <?php endif; ?>
           </td>
-          <td class="fw-semibold"><?= htmlspecialchars((string)($r['status'] ?? '')) ?></td>
+          <?php
+            $stVal = (string)($r['status'] ?? '');
+            $stLabel = $statusLabels[$stVal] ?? $stVal;
+          ?>
+          <td class="fw-semibold"><?= htmlspecialchars($stLabel) ?></td>
           <td>
             <?php $pid = (int)($r['converted_project_id'] ?? 0); ?>
             <?php if ($pid > 0): ?>

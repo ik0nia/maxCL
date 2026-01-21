@@ -36,11 +36,11 @@ final class OffersController
     private static function statuses(): array
     {
         return [
-            ['value' => 'DRAFT', 'label' => 'Draft'],
+            ['value' => 'DRAFT', 'label' => 'Generată'],
             ['value' => 'TRIMISA', 'label' => 'Trimisă'],
             ['value' => 'ACCEPTATA', 'label' => 'Acceptată'],
             ['value' => 'RESPINSA', 'label' => 'Respinsă'],
-            ['value' => 'ANULATA', 'label' => 'Anulată'],
+            ['value' => 'ANULATA', 'label' => 'Anulată / Expirată'],
         ];
     }
 
@@ -118,6 +118,7 @@ final class OffersController
         $row = [
             'code' => Offer::nextAutoCode(10000),
             'status' => 'DRAFT',
+            'validity_days' => 30,
         ];
         $statuses = self::statuses();
         $clients = [];
@@ -143,6 +144,11 @@ final class OffersController
         $name = trim((string)($_POST['name'] ?? ''));
         $status = trim((string)($_POST['status'] ?? 'DRAFT'));
         $code = trim((string)($_POST['code'] ?? ''));
+        $validityDaysRaw = trim((string)($_POST['validity_days'] ?? ''));
+        $validityDays = $validityDaysRaw === '' ? 30 : Validator::int($validityDaysRaw, 1, 3650);
+        if ($validityDays === null) {
+            $errors['validity_days'] = 'Zile valabilitate invalide.';
+        }
         $clientId = Validator::int(trim((string)($_POST['client_id'] ?? '')), 1);
         $groupId = Validator::int(trim((string)($_POST['client_group_id'] ?? '')), 1);
         if ($clientId !== null) $groupId = null;
@@ -174,6 +180,7 @@ final class OffersController
                 'category' => $_POST['category'] ?? null,
                 'description' => $_POST['description'] ?? null,
                 'due_date' => $_POST['due_date'] ?? null,
+                'validity_days' => $validityDays,
                 'notes' => $_POST['notes'] ?? null,
                 'technical_notes' => $_POST['technical_notes'] ?? null,
                 'tags' => $_POST['tags'] ?? null,
@@ -209,6 +216,12 @@ final class OffersController
         }
         $status = trim((string)($_POST['status'] ?? (string)($offer['status'] ?? 'DRAFT')));
         if ($status === '') $status = 'DRAFT';
+        $validityDaysRaw = trim((string)($_POST['validity_days'] ?? ''));
+        $validityDays = $validityDaysRaw === '' ? 30 : Validator::int($validityDaysRaw, 1, 3650);
+        if ($validityDays === null) {
+            Session::flash('toast_error', 'Zile valabilitate invalide.');
+            Response::redirect('/offers/' . $offerId);
+        }
         $clientId = Validator::int(trim((string)($_POST['client_id'] ?? '')), 1);
         $groupId = Validator::int(trim((string)($_POST['client_group_id'] ?? '')), 1);
         if ($clientId !== null) $groupId = null;
@@ -220,6 +233,7 @@ final class OffersController
                 'category' => $_POST['category'] ?? null,
                 'description' => $_POST['description'] ?? null,
                 'due_date' => $_POST['due_date'] ?? null,
+                'validity_days' => $validityDays,
                 'notes' => $_POST['notes'] ?? null,
                 'technical_notes' => $_POST['technical_notes'] ?? null,
                 'tags' => $_POST['tags'] ?? null,

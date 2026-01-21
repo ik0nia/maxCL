@@ -36,6 +36,7 @@ final class Offer
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        self::expireIfNeeded($pdo, null);
         $limit = max(1, min(2000, $limit));
         $q = $q !== null ? trim($q) : '';
         $status = $status !== null ? trim($status) : '';
@@ -89,6 +90,7 @@ final class Offer
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        self::expireIfNeeded($pdo, $id);
         $st = $pdo->prepare('SELECT * FROM offers WHERE id = ?');
         $st->execute([$id]);
         $r = $st->fetch();
@@ -102,9 +104,9 @@ final class Offer
         $pdo = DB::pdo();
         $st = $pdo->prepare('
             INSERT INTO offers
-              (code, name, description, category, status, due_date, notes, technical_notes, tags, client_id, client_group_id, created_by)
+              (code, name, description, category, status, due_date, validity_days, notes, technical_notes, tags, client_id, client_group_id, created_by)
             VALUES
-              (:code, :name, :description, :category, :status, :due_date, :notes, :technical_notes, :tags, :client_id, :client_group_id, :created_by)
+              (:code, :name, :description, :category, :status, :due_date, :validity_days, :notes, :technical_notes, :tags, :client_id, :client_group_id, :created_by)
         ');
         $st->execute([
             ':code' => trim((string)($data['code'] ?? '')),
@@ -113,6 +115,7 @@ final class Offer
             ':category' => $data['category'] ?? null,
             ':status' => (string)($data['status'] ?? 'DRAFT'),
             ':due_date' => $data['due_date'] ?? null,
+            ':validity_days' => $data['validity_days'] ?? null,
             ':notes' => $data['notes'] ?? null,
             ':technical_notes' => $data['technical_notes'] ?? null,
             ':tags' => $data['tags'] ?? null,
@@ -136,6 +139,7 @@ final class Offer
               category=:category,
               status=:status,
               due_date=:due_date,
+              validity_days=:validity_days,
               notes=:notes,
               technical_notes=:technical_notes,
               tags=:tags,
@@ -151,12 +155,40 @@ final class Offer
             ':category' => $data['category'] ?? null,
             ':status' => (string)($data['status'] ?? 'DRAFT'),
             ':due_date' => $data['due_date'] ?? null,
+            ':validity_days' => $data['validity_days'] ?? null,
             ':notes' => $data['notes'] ?? null,
             ':technical_notes' => $data['technical_notes'] ?? null,
             ':tags' => $data['tags'] ?? null,
             ':client_id' => $data['client_id'] ?? null,
             ':client_group_id' => $data['client_group_id'] ?? null,
         ]);
+    }
+
+    private static function expireIfNeeded(PDO $pdo, ?int $offerId): void
+    {
+        try {
+            $sql = "
+                UPDATE offers
+                SET status = 'ANULATA'
+                WHERE status IN ('DRAFT','TRIMISA')
+                  AND validity_days IS NOT NULL
+                  AND validity_days > 0
+                  AND DATE_ADD(created_at, INTERVAL validity_days DAY) < NOW()
+            ";
+            $params = [];
+            if ($offerId !== null) {
+                $sql .= ' AND id = ?';
+                $params[] = $offerId;
+            }
+            if ($params) {
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+            } else {
+                $pdo->exec($sql);
+            }
+        } catch (\Throwable $e) {
+            // ignore (compat cu instalări vechi fără coloana validity_days)
+        }
     }
 
     public static function delete(int $id): void

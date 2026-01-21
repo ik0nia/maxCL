@@ -9,6 +9,8 @@ $errors = is_array($errors ?? null) ? $errors : [];
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
+$validityValue = (string)($row['validity_days'] ?? '');
+if ($validityValue === '') $validityValue = '30';
 
 ob_start();
 ?>
@@ -55,6 +57,11 @@ ob_start();
     <div class="col-12 col-md-4">
       <label class="form-label fw-semibold">Deadline</label>
       <input class="form-control" type="date" name="due_date" value="<?= htmlspecialchars((string)($row['due_date'] ?? '')) ?>">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label fw-semibold">Valabilitate ofertă (zile)</label>
+      <input class="form-control <?= isset($errors['validity_days']) ? 'is-invalid' : '' ?>" type="number" min="1" max="3650" name="validity_days" value="<?= htmlspecialchars($validityValue) ?>">
+      <?php if (isset($errors['validity_days'])): ?><div class="invalid-feedback"><?= htmlspecialchars((string)$errors['validity_days']) ?></div><?php endif; ?>
     </div>
 
     <div class="col-12">

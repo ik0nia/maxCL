@@ -16,6 +16,8 @@ $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
 $openNewProduct = empty($offerProducts);
+$validityValue = (string)($offer['validity_days'] ?? '');
+if ($validityValue === '') $validityValue = '30';
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
@@ -98,6 +100,10 @@ ob_start();
       <div class="col-12 col-md-4">
         <label class="form-label fw-semibold">Deadline</label>
         <input class="form-control" type="date" name="due_date" value="<?= htmlspecialchars((string)($offer['due_date'] ?? '')) ?>" <?= $canWrite ? '' : 'readonly' ?>>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label fw-semibold">Valabilitate ofertă (zile)</label>
+        <input class="form-control" type="number" min="1" max="3650" name="validity_days" value="<?= htmlspecialchars($validityValue) ?>" <?= $canWrite ? '' : 'readonly' ?>>
       </div>
       <div class="col-12">
         <label class="form-label fw-semibold">Descriere</label>

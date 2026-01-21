@@ -1169,6 +1169,7 @@ final class DbMigrations
                           category VARCHAR(190) NULL,
                           description TEXT NULL,
                           due_date DATE NULL,
+                              validity_days INT UNSIGNED NULL,
                           notes TEXT NULL,
                           technical_notes TEXT NULL,
                           tags TEXT NULL,
@@ -1324,6 +1325,20 @@ final class DbMigrations
                     }
                     try { $pdo->exec("ALTER TABLE projects ADD KEY idx_projects_source_offer (source_offer_id)"); } catch (\Throwable $e) {}
                     try { if (self::tableExists($pdo, 'offers')) $pdo->exec("ALTER TABLE projects ADD CONSTRAINT fk_projects_source_offer FOREIGN KEY (source_offer_id) REFERENCES offers(id)"); } catch (\Throwable $e) {}
+                },
+            ],
+            [
+                'id' => '2026-02-01_01_offers_validity_days',
+                'label' => 'ALTER offers ADD validity_days',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'offers')) return;
+                    if (!self::columnExists($pdo, 'offers', 'validity_days')) {
+                        try {
+                            $pdo->exec("ALTER TABLE offers ADD COLUMN validity_days INT UNSIGNED NULL AFTER due_date");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
                 },
             ],
             [

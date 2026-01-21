@@ -7,6 +7,8 @@ $company = $company ?? [];
 $client = $client ?? null;
 $fmtMoney = $fmtMoney ?? fn($v) => number_format((float)$v, 2, '.', '');
 $fmtQty = $fmtQty ?? fn($v) => rtrim(rtrim(number_format((float)$v, 3, '.', ''), '0'), '.');
+$validityDays = (int)($offer['validity_days'] ?? 0);
+if ($validityDays <= 0) $validityDays = 30;
 
 $logo = trim((string)($company['logo_thumb'] ?? $company['logo_url'] ?? ''));
 $companyName = trim((string)($company['name'] ?? ''));
@@ -149,6 +151,9 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}/', $createdAt, $m)) {
           </div>
         <?php endif; ?>
       </div>
+    </div>
+    <div class="muted" style="margin-top:12px">
+      Aceasta ofertă este valabilă <?= (int)$validityDays ?> zile de la data emiterii.
     </div>
   </div>
 </body>

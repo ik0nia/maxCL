@@ -302,6 +302,7 @@ CREATE TABLE IF NOT EXISTS offers (
   category VARCHAR(190) NULL,
   description TEXT NULL,
   due_date DATE NULL,
+  validity_days INT UNSIGNED NULL,
   notes TEXT NULL,
   technical_notes TEXT NULL,
   tags TEXT NULL,
