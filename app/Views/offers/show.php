@@ -172,7 +172,7 @@ ob_start();
                 <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
               </div>
               <div class="col-12 col-md-4">
-                <label class="form-label fw-semibold">Preț vânzare (lei)</label>
+                <label class="form-label fw-semibold">Preț cu discount (lei)</label>
                 <input class="form-control" type="number" step="0.01" min="0" name="sale_price" placeholder="opțional">
               </div>
               <div class="col-12 d-flex justify-content-end">
@@ -242,7 +242,7 @@ ob_start();
               <div class="text-muted small">Cantitate: <?= number_format((float)($op['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($op['unit'] ?? 'buc')) ?></div>
             </div>
             <div class="text-end">
-              <div class="text-muted small">Preț vânzare</div>
+              <div class="text-muted small">Preț cu discount</div>
               <div class="fw-semibold"><?= number_format((float)($op['product_sale_price'] ?? 0), 2, '.', '') ?> lei</div>
             </div>
           </div>
@@ -256,7 +256,12 @@ ob_start();
               <div class="col-6 col-md-2">
                 <input class="form-control form-control-sm" name="unit" value="<?= htmlspecialchars((string)($op['unit'] ?? 'buc')) ?>">
               </div>
-              <div class="col-12 col-md-7 d-flex justify-content-end gap-2">
+              <div class="col-12 col-md-4">
+                <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="sale_price"
+                       value="<?= isset($op['product_sale_price']) && $op['product_sale_price'] !== null ? htmlspecialchars(number_format((float)$op['product_sale_price'], 2, '.', '')) : '' ?>"
+                       placeholder="Preț cu discount">
+              </div>
+              <div class="col-12 col-md-3 d-flex justify-content-end gap-2">
                 <button class="btn btn-outline-secondary btn-sm" type="submit">Actualizează</button>
               </div>
             </form>
@@ -464,8 +469,8 @@ ob_start();
 
           <div class="mt-3 d-flex justify-content-end">
             <div class="text-end">
-              <div class="fw-semibold">Cost total produs: <?= number_format((float)($tot['cost_total'] ?? 0), 2, '.', '') ?> lei</div>
-              <div class="text-muted">Preț vânzare: <?= number_format((float)($tot['sale_total'] ?? 0), 2, '.', '') ?> lei</div>
+              <div class="fw-semibold">Preț de listă: <?= number_format((float)($tot['cost_total'] ?? 0), 2, '.', '') ?> lei</div>
+              <div class="text-muted">Preț cu discount: <?= number_format((float)($tot['sale_total'] ?? 0), 2, '.', '') ?> lei</div>
             </div>
           </div>
         </div>

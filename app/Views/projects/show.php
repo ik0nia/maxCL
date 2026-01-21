@@ -294,7 +294,7 @@ ob_start();
                 <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
               </div>
               <div class="col-12 col-md-4">
-                <label class="form-label fw-semibold">Preț vânzare (lei)</label>
+                <label class="form-label fw-semibold">Preț cu discount (lei)</label>
                 <input class="form-control" type="number" step="0.01" min="0" name="sale_price" placeholder="opțional">
               </div>
               <?php /* Suprafața nu mai este obligatorie la creare. Se poate seta ulterior din edit. */ ?>
@@ -1184,10 +1184,10 @@ ob_start();
                       <?php if ($canSeePricesRole): ?>
                         <?php $totalCostCalc = $manCost + $accCostCalc + $hplCostCalc; ?>
                         <div class="text-muted small js-price d-none mt-1">
-                          Total cost produs: <span class="fw-semibold"><?= number_format((float)$totalCostCalc, 2, '.', '') ?> lei</span>
+                          Preț de listă: <span class="fw-semibold"><?= number_format((float)$totalCostCalc, 2, '.', '') ?> lei</span>
                         </div>
                         <div class="text-muted small js-price d-none">
-                          Preț vânzare produs:
+                          Preț cu discount:
                           <span class="fw-semibold">
                             <?= $saleTotal !== null ? number_format((float)$saleTotal, 2, '.', '') . ' lei' : '—' ?>
                           </span>
@@ -1479,7 +1479,7 @@ ob_start();
                           <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="<?= htmlspecialchars((string)$qty) ?>" required>
                         </div>
                         <div class="col-12 col-md-6">
-                          <label class="form-label fw-semibold mb-1">Preț vânzare (lei)</label>
+                          <label class="form-label fw-semibold mb-1">Preț cu discount (lei)</label>
                           <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="sale_price"
                                  value="<?= $pSale !== null ? htmlspecialchars(number_format((float)$pSale, 2, '.', '')) : '' ?>"
                                  placeholder="opțional">

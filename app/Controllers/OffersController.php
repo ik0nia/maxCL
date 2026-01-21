@@ -476,8 +476,14 @@ final class OffersController
         }
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
         $unit = trim((string)($_POST['unit'] ?? (string)($op['unit'] ?? 'buc')));
+        $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
+        $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         if ($qty === null || $qty <= 0) {
             Session::flash('toast_error', 'Cantitate invalidă.');
+            Response::redirect('/offers/' . $offerId . '?tab=products');
+        }
+        if ($salePriceRaw !== '' && ($salePrice === null || $salePrice < 0)) {
+            Session::flash('toast_error', 'Preț cu discount invalid.');
             Response::redirect('/offers/' . $offerId . '?tab=products');
         }
         try {
@@ -486,6 +492,18 @@ final class OffersController
                 'unit' => $unit !== '' ? $unit : 'buc',
                 'notes' => $op['notes'] ?? null,
             ]);
+            $prodId = (int)($op['product_id'] ?? 0);
+            if ($prodId > 0) {
+                $prod = Product::find($prodId);
+                if ($prod) {
+                    Product::updateFields($prodId, [
+                        'code' => $prod['code'] ?? null,
+                        'name' => $prod['name'] ?? '',
+                        'sale_price' => ($salePriceRaw !== '' && $salePrice !== null) ? round((float)$salePrice, 2) : null,
+                        'notes' => $prod['notes'] ?? null,
+                    ]);
+                }
+            }
             Session::flash('toast_success', 'Produs actualizat.');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot actualiza: ' . $e->getMessage());
