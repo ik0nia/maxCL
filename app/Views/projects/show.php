@@ -9,7 +9,7 @@ use App\Core\Session;
 $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
 $canEditProducts = ProjectsController::canEditProjectProducts();
-$canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $canDelete = ProjectsController::canDelete();
 
 $project = $project ?? [];
@@ -588,7 +588,7 @@ ob_start();
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
 
         <?php
-          $canSeePricesRole = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+          $canSeePricesRole = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
 
           $ppStatusesAll = ProjectsController::projectProductStatuses();
           $ppStatusLabel = [];
@@ -596,7 +596,7 @@ ob_start();
           $canSetPPStatus = ProjectsController::canSetProjectProductStatus();
           $canSetPPFinal = ProjectsController::canSetProjectProductFinalStatus();
           $ppAllowedValues = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
-          if (!$canSetPPFinal) $ppAllowedValues = array_values(array_filter($ppAllowedValues, fn($v) => !in_array($v, ['AVIZAT','LIVRAT'], true)));
+          if (!$canSetPPFinal) $ppAllowedValues = array_values(array_filter($ppAllowedValues, fn($v) => !in_array($v, ['AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true)));
 
           // HPL "stoc proiect" pentru CNC->Montaj (din hpl_stock_pieces):
           // - FULL RESERVED per board
@@ -767,6 +767,7 @@ ob_start();
                     $stVal = (string)($pp['production_status'] ?? '');
                     $stLbl = $ppStatusLabel[$stVal] ?? $stVal;
                     $idx = array_search($stVal, $ppAllowedValues, true);
+                    $leftQty = max(0.0, $qty - $del);
                     $avizDateIso = trim((string)($pp['aviz_date'] ?? ''));
                     $avizDateLabel = '';
                     if ($avizDateIso !== '') {
@@ -793,7 +794,7 @@ ob_start();
                             $isCur = ($i === $idxAll);
                             $isNext = ($i === $idxAll + 1);
                             $isVisible = true;
-                            if (!$canSetPPFinal && in_array($v, ['AVIZAT','LIVRAT'], true) && !in_array($stVal, ['AVIZAT','LIVRAT'], true)) {
+                            if (!$canSetPPFinal && in_array($v, ['AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true) && !in_array($stVal, ['AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true)) {
                               // Operator: arătăm statusurile finale ca "locked", dar nu le facem clickabile.
                               $isVisible = true;
                             }
@@ -804,21 +805,26 @@ ob_start();
                             <?php
                               $formAttr = '';
                               if ($nextVal === 'AVIZAT') $formAttr .= ' data-aviz-required="1"';
-                              if ($nextVal === 'LIVRAT') {
+                              if (in_array($nextVal, ['LIVRAT_PARTIAL','LIVRAT'], true)) {
                                 $formAttr .= ' data-delivery-required="1"';
                                 $formAttr .= ' data-delivery-default="' . htmlspecialchars($avizDateLabel) . '"';
+                                $formAttr .= ' data-delivery-max="' . htmlspecialchars(number_format($leftQty, 2, '.', '')) . '"';
+                                $formAttr .= ' data-delivery-qty="' . htmlspecialchars(number_format($leftQty, 2, '.', '')) . '"';
                               }
+                              $btnLbl = $lbl;
+                              if ($nextVal === 'LIVRAT_PARTIAL') $btnLbl = 'Livrat';
                             ?>
                             <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/status')) ?>" class="m-0"<?= $formAttr ?>>
                               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                               <?php if ($nextVal === 'AVIZAT'): ?>
                                 <input type="hidden" name="aviz_number" value="">
                                 <input type="hidden" name="aviz_date" value="">
-                              <?php elseif ($nextVal === 'LIVRAT'): ?>
+                              <?php elseif (in_array($nextVal, ['LIVRAT_PARTIAL','LIVRAT'], true)): ?>
                                 <input type="hidden" name="delivery_date" value="">
+                                <input type="hidden" name="delivery_qty" value="">
                               <?php endif; ?>
                               <button class="btn btn-sm btn-outline-success px-2 py-1" type="submit" title="Treci la următorul status">
-                                <?= htmlspecialchars($lbl) ?>
+                                <?= htmlspecialchars($btnLbl) ?>
                               </button>
                             </form>
                           <?php else: ?>
@@ -837,7 +843,7 @@ ob_start();
                       </div>
 
                       <?php if (!$canSetPPFinal): ?>
-                    <div class="text-muted small">Avizare/Livrat: doar Admin/Gestionar.</div>
+                    <div class="text-muted small">Avizare/Livrare: doar Admin/Gestionar.</div>
                       <?php endif; ?>
                     </div>
                   <?php endif; ?>
@@ -2396,11 +2402,21 @@ ob_start();
                       <th class="text-end" style="width:120px">Total</th>
                       <th class="text-end" style="width:120px">Livrat</th>
                       <th class="text-end" style="width:120px">Rămas</th>
-                      
+                      <th class="text-end" style="width:140px">Livrez acum</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <?php foreach ($projectProducts as $pp): ?>
+                    <?php
+                      $deliveryProducts = array_values(array_filter($projectProducts, function ($ppRow) {
+                        return (string)($ppRow['production_status'] ?? '') === 'AVIZAT';
+                      }));
+                    ?>
+                    <?php if (!$deliveryProducts): ?>
+                      <tr>
+                        <td colspan="5" class="text-muted">Nu există produse avizate pentru livrare.</td>
+                      </tr>
+                    <?php else: ?>
+                      <?php foreach ($deliveryProducts as $pp): ?>
                       <?php
                         $ppId = (int)($pp['id'] ?? 0);
                         $total = (float)($pp['qty'] ?? 0);
@@ -2412,15 +2428,32 @@ ob_start();
                         <td class="text-end"><?= number_format($total, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
                         <td class="text-end"><?= number_format($del, 2, '.', '') ?></td>
                         <td class="text-end fw-semibold"><?= number_format($left, 2, '.', '') ?></td>
-                        
+                        <td class="text-end">
+                          <?php if ($left > 0): ?>
+                            <input class="form-control form-control-sm text-end js-delivery-qty"
+                                   type="number"
+                                   name="delivery_qty[<?= $ppId ?>]"
+                                   min="0"
+                                   max="<?= htmlspecialchars(number_format($left, 2, '.', '')) ?>"
+                                   step="0.01"
+                                   value="0">
+                          <?php else: ?>
+                            <span class="text-muted">—</span>
+                          <?php endif; ?>
+                        </td>
                       </tr>
-                    <?php endforeach; ?>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            
+            <div class="d-flex justify-content-end mt-3">
+              <button class="btn btn-success" type="submit" <?= $deliveryProducts ? '' : 'disabled' ?>>
+                <i class="bi bi-truck me-1"></i> Salvează livrarea
+              </button>
+            </div>
           </form>
         <?php endif; ?>
       </div>
@@ -2988,14 +3021,17 @@ ob_start();
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Data livrare</h5>
+        <h5 class="modal-title">Livrare produs</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <label for="deliveryDateInput" class="form-label fw-semibold">Introdu data livrării</label>
         <input class="form-control" id="deliveryDateInput" maxlength="10" placeholder="zz.ll.aaaa">
         <div class="invalid-feedback">Introdu data în format zz.ll.aaaa.</div>
-        <div class="text-muted small mt-2">Data livrării va fi afișată în tabul Livrări.</div>
+        <label for="deliveryQtyInput" class="form-label fw-semibold mt-3">Cantitate livrată</label>
+        <input class="form-control" id="deliveryQtyInput" type="number" step="0.01" min="0">
+        <div class="invalid-feedback">Introdu cantitatea livrată (maxim cât a rămas).</div>
+        <div class="text-muted small mt-2" id="deliveryQtyHelp">Cantitatea livrată se adaugă la livratul produsului.</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
@@ -3220,6 +3256,8 @@ ob_start();
       ? window.bootstrap.Modal.getOrCreateInstance(modalEl)
       : null;
     const input = document.getElementById('deliveryDateInput');
+    const qtyInput = document.getElementById('deliveryQtyInput');
+    const qtyHelp = document.getElementById('deliveryQtyHelp');
     const confirmBtn = document.getElementById('deliveryDateConfirm');
     let activeForm = null;
 
@@ -3227,6 +3265,10 @@ ob_start();
       if (input) {
         input.value = '';
         input.classList.remove('is-invalid');
+      }
+      if (qtyInput) {
+        qtyInput.value = '';
+        qtyInput.classList.remove('is-invalid');
       }
     }
 
@@ -3248,10 +3290,12 @@ ob_start();
       return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
     }
 
-    function applyAndSubmit(value) {
+    function applyAndSubmit(value, qtyVal) {
       if (!activeForm) return;
       const target = activeForm.querySelector('input[name="delivery_date"]');
+      const qtyTarget = activeForm.querySelector('input[name="delivery_qty"]');
       if (target) target.value = value;
+      if (qtyTarget) qtyTarget.value = String(qtyVal || '');
       activeForm.dataset.deliveryConfirmed = '1';
       if (modal) modal.hide();
       activeForm.submit();
@@ -3265,13 +3309,31 @@ ob_start();
         input.value = def !== '' ? def : fmtDate(new Date());
         input.classList.remove('is-invalid');
       }
+      if (qtyInput) {
+        const maxRaw = (form.dataset.deliveryMax || '').trim();
+        const defQty = (form.dataset.deliveryQty || '').trim();
+        const maxVal = maxRaw !== '' ? parseFloat(maxRaw) : 0;
+        qtyInput.max = isFinite(maxVal) ? String(maxVal) : '';
+        qtyInput.min = '0';
+        qtyInput.step = '0.01';
+        qtyInput.value = defQty !== '' ? defQty : (isFinite(maxVal) && maxVal > 0 ? String(maxVal) : '');
+        qtyInput.classList.remove('is-invalid');
+        if (qtyHelp) {
+          qtyHelp.textContent = (isFinite(maxVal) && maxVal > 0)
+            ? ('Maxim rămas: ' + maxVal.toFixed(2))
+            : 'Cantitatea livrată se adaugă la livratul produsului.';
+        }
+      }
       if (modal) {
         modal.show();
       } else {
         const txt = window.prompt('Data livrării (zz.ll.aaaa):', input ? input.value : '') || '';
         const val = txt.trim();
         if (val === '' || !isValidDate(val)) return;
-        applyAndSubmit(val);
+        const qtyTxt = window.prompt('Cantitate livrată:', qtyInput ? qtyInput.value : '') || '';
+        const qtyVal = parseFloat(qtyTxt.trim());
+        if (!isFinite(qtyVal) || qtyVal <= 0) return;
+        applyAndSubmit(val, qtyVal);
       }
     }
 
@@ -3285,13 +3347,27 @@ ob_start();
           }
           return;
         }
-        applyAndSubmit(val);
+        const qtyVal = qtyInput ? parseFloat(qtyInput.value || '') : NaN;
+        const maxVal = qtyInput && qtyInput.max ? parseFloat(qtyInput.max) : NaN;
+        if (!isFinite(qtyVal) || qtyVal <= 0 || (isFinite(maxVal) && qtyVal > maxVal + 1e-9)) {
+          if (qtyInput) {
+            qtyInput.classList.add('is-invalid');
+            qtyInput.focus();
+          }
+          return;
+        }
+        applyAndSubmit(val, qtyVal);
       });
     }
 
     if (input) {
       input.addEventListener('input', function () {
         input.classList.remove('is-invalid');
+      });
+    }
+    if (qtyInput) {
+      qtyInput.addEventListener('input', function () {
+        qtyInput.classList.remove('is-invalid');
       });
     }
 
@@ -3302,9 +3378,25 @@ ob_start();
           return;
         }
         const current = form.querySelector('input[name="delivery_date"]');
-        if (current && current.value.trim() !== '') return;
+        const currentQty = form.querySelector('input[name="delivery_qty"]');
+        const hasQty = currentQty && parseFloat(currentQty.value || '') > 0;
+        if (current && current.value.trim() !== '' && hasQty) return;
         ev.preventDefault();
         openModal(form);
+      });
+    });
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-delivery-qty').forEach(function (el) {
+      el.addEventListener('input', function () {
+        const max = parseFloat(el.getAttribute('max') || '0');
+        const val = parseFloat(el.value || '0');
+        if (!isFinite(val)) return;
+        if (val > max) el.value = String(max);
+        if (val < 0) el.value = '0';
       });
     });
   });

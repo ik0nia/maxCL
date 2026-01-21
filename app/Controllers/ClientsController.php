@@ -30,9 +30,11 @@ final class ClientsController
     {
         try {
             $rows = Client::allWithProjects();
+            $groups = ClientGroup::allWithMembers();
             echo View::render('clients/index', [
                 'title' => 'Clienți',
                 'rows' => $rows,
+                'groups' => $groups,
             ]);
         } catch (\Throwable $e) {
             echo View::render('system/placeholder', [
@@ -277,6 +279,34 @@ final class ClientsController
         Response::redirect('/clients/' . $id);
     }
 
+    public static function createGroup(): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $name = trim((string)($_POST['name'] ?? ''));
+        if ($name === '') {
+            Session::flash('toast_error', 'Numele grupului este obligatoriu.');
+            Response::redirect('/clients');
+        }
+        if (mb_strlen($name) > 190) {
+            Session::flash('toast_error', 'Numele grupului este prea lung.');
+            Response::redirect('/clients');
+        }
+        try {
+            $gid = ClientGroup::upsertByName($name);
+            if ($gid <= 0) {
+                Session::flash('toast_error', 'Nu pot crea grupul.');
+                Response::redirect('/clients');
+            }
+            Audit::log('CLIENT_GROUP_CREATE', 'client_groups', $gid, null, null, [
+                'message' => 'A creat grup de clienți: ' . $name,
+            ]);
+            Session::flash('toast_success', 'Grup creat.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot crea grupul: ' . $e->getMessage());
+        }
+        Response::redirect('/clients');
+    }
+
     public static function createAddress(array $params): void
     {
         Csrf::verify($_POST['_csrf'] ?? null);
@@ -410,13 +440,13 @@ final class ClientsController
     public static function canWrite(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
     }
 
     public static function isAdmin(): bool
     {
         $u = Auth::user();
-        return $u && (string)$u['role'] === Auth::ROLE_ADMIN;
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
     }
 }
 

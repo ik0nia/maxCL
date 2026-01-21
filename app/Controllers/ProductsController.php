@@ -30,6 +30,7 @@ final class ProductsController
                 SELECT
                   pp.id AS project_product_id,
                   pp.qty, pp.unit, pp.production_status, pp.delivered_qty, pp.aviz_date,
+                  MAX(pd.delivery_date) AS delivery_date,
                   p.id AS product_id, p.code AS product_code, p.name AS product_name,
                   pr.id AS project_id, pr.code AS project_code, pr.name AS project_name, pr.status AS project_status,
                   GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR ", ") AS labels
@@ -38,6 +39,8 @@ final class ProductsController
                 INNER JOIN projects pr ON pr.id = pp.project_id
                 LEFT JOIN entity_labels el ON el.entity_type = "project_products" AND el.entity_id = pp.id
                 LEFT JOIN labels l ON l.id = el.label_id
+                LEFT JOIN project_delivery_items pdi ON pdi.project_product_id = pp.id
+                LEFT JOIN project_deliveries pd ON pd.id = pdi.delivery_id
             ';
             if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
             $sql .= ' GROUP BY pp.id ORDER BY pp.id DESC LIMIT 1500';

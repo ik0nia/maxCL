@@ -73,5 +73,37 @@ final class ClientGroup
         if ($found) return (int)$found['id'];
         return self::create($name);
     }
+
+    /** @return array<int, array{id:int,name:string,client_count:int,client_list:string}> */
+    public static function allWithMembers(): array
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        try {
+            $rows = $pdo->query("
+                SELECT
+                  g.id,
+                  g.name,
+                  COUNT(c.id) AS client_count,
+                  GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR '||') AS client_list
+                FROM client_groups g
+                LEFT JOIN clients c ON c.client_group_id = g.id
+                GROUP BY g.id
+                ORDER BY g.name ASC
+            ")->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => (int)($r['id'] ?? 0),
+                'name' => (string)($r['name'] ?? ''),
+                'client_count' => (int)($r['client_count'] ?? 0),
+                'client_list' => (string)($r['client_list'] ?? ''),
+            ];
+        }
+        return $out;
+    }
 }
 

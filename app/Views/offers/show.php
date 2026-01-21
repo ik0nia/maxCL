@@ -15,6 +15,7 @@ $tab = $tab ?? 'general';
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
+$openNewProduct = empty($offerProducts);
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
@@ -31,8 +32,8 @@ ob_start();
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/offers')) ?>" class="btn btn-outline-secondary">Înapoi</a>
-    <a class="btn btn-link text-primary fw-semibold" target="_blank" href="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/bon-general')) ?>">
-      <i class="bi bi-printer me-1"></i> PRINT OFERTA
+    <a class="btn btn-primary" target="_blank" href="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/bon-general')) ?>">
+      <i class="bi bi-file-earmark-text me-1"></i> Print ofertă
     </a>
     <?php if ($convertedProjectId > 0): ?>
       <a class="btn btn-success" href="<?= htmlspecialchars(Url::to('/projects/' . $convertedProjectId)) ?>">
@@ -150,10 +151,10 @@ ob_start();
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <div class="h5 m-0">Adaugă produs (nou)</div>
-            <div class="text-muted">Fiecare produs se creează direct în ofertă</div>
+            <div class="text-muted">Completează cantitatea, produsul se adaugă direct în ofertă</div>
           </div>
           <?php if ($canWrite): ?>
-            <button class="btn btn-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#offerAddNewCollapse" aria-expanded="false" aria-controls="offerAddNewCollapse">
+            <button class="btn btn-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#offerAddNewCollapse" aria-expanded="<?= $openNewProduct ? 'true' : 'false' ?>" aria-controls="offerAddNewCollapse">
               <i class="bi bi-plus-lg me-1"></i> Creează produs
             </button>
           <?php endif; ?>
@@ -161,7 +162,7 @@ ob_start();
         <?php if (!$canWrite): ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
         <?php else: ?>
-          <div class="collapse mt-3" id="offerAddNewCollapse">
+          <div class="collapse mt-3<?= $openNewProduct ? ' show' : '' ?>" id="offerAddNewCollapse">
             <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/create')) ?>" class="row g-2">
               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
               <div class="col-12">
@@ -252,7 +253,7 @@ ob_start();
             </form>
           <?php endif; ?>
 
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="h5 text-success fw-semibold">Consum HPL</div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -299,28 +300,28 @@ ob_start();
               </table>
             </div>
             <?php if ($canWrite): ?>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/hpl/create')) ?>" class="row g-2 mt-2">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/hpl/create')) ?>" class="row g-2 mt-2 align-items-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <div class="col-12 col-md-6">
-                  <select class="form-select js-offer-hpl-board" name="board_id" data-placeholder="Caută placă HPL…" style="width:100%"></select>
+                  <select class="form-select form-select-sm js-offer-hpl-board" name="board_id" data-placeholder="Caută placă HPL…" style="width:100%"></select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="1">
                 </div>
                 <div class="col-6 col-md-2">
-                  <select class="form-select" name="consume_mode">
+                  <select class="form-select form-select-sm" name="consume_mode">
                     <option value="FULL">Full</option>
                     <option value="HALF">Jumătate</option>
                   </select>
                 </div>
                 <div class="col-12 col-md-1 d-flex align-items-end">
-                  <button class="btn btn-outline-secondary w-100" type="submit">+</button>
+                  <button class="btn btn-success btn-sm w-100" type="submit">+</button>
                 </div>
               </form>
             <?php endif; ?>
           </div>
 
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="h5 text-success fw-semibold">Consum Accesorii</div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -362,28 +363,28 @@ ob_start();
               </table>
             </div>
             <?php if ($canWrite): ?>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/accessories/create')) ?>" class="row g-2 mt-2">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/accessories/create')) ?>" class="row g-2 mt-2 align-items-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <div class="col-12 col-md-6">
-                  <select class="form-select js-offer-magazie-item" name="item_id" data-placeholder="Caută accesoriu…" style="width:100%"></select>
+                  <select class="form-select form-select-sm js-offer-magazie-item" name="item_id" data-placeholder="Caută accesoriu…" style="width:100%"></select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="1">
                 </div>
                 <div class="col-6 col-md-2 d-flex align-items-center">
-                  <div class="form-check mt-3">
-                    <input class="form-check-input" type="checkbox" name="include_in_deviz" id="accDeviz<?= $opId ?>" checked>
-                    <label class="form-check-label" for="accDeviz<?= $opId ?>">Include</label>
+                  <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" name="include_in_deviz" id="accDeviz<?= $opId ?>">
+                    <label class="form-check-label" for="accDeviz<?= $opId ?>">Vizibil pe deviz</label>
                   </div>
                 </div>
                 <div class="col-12 col-md-1 d-flex align-items-end">
-                  <button class="btn btn-outline-secondary w-100" type="submit">+</button>
+                  <button class="btn btn-success btn-sm w-100" type="submit">+</button>
                 </div>
               </form>
             <?php endif; ?>
           </div>
 
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="h5 text-success fw-semibold">Manoperă</div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -426,22 +427,22 @@ ob_start();
               </table>
             </div>
             <?php if ($canWrite): ?>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/work/create')) ?>" class="row g-2 mt-2">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/work/create')) ?>" class="row g-2 mt-2 align-items-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <div class="col-12 col-md-3">
-                  <select class="form-select" name="work_type">
+                  <select class="form-select form-select-sm" name="work_type">
                     <option value="CNC">CNC</option>
                     <option value="ATELIER">Atelier</option>
                   </select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control" type="number" step="0.01" min="0" name="hours_estimated" placeholder="Ore">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="hours_estimated" placeholder="Ore">
                 </div>
                 <div class="col-6 col-md-4">
-                  <input class="form-control" name="note" placeholder="Notă (opțional)">
+                  <input class="form-control form-control-sm" name="note" placeholder="Notă (opțional)">
                 </div>
                 <div class="col-12 col-md-2 d-flex align-items-end">
-                  <button class="btn btn-outline-secondary w-100" type="submit">+</button>
+                  <button class="btn btn-success btn-sm w-100" type="submit">+</button>
                 </div>
               </form>
             <?php endif; ?>
@@ -460,11 +461,25 @@ ob_start();
               <?php endif; ?>
             </div>
           </div>
+          <?php if ($canWrite): ?>
+            <div class="mt-2 d-flex justify-content-end">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/delete')) ?>"
+                    onsubmit="return confirm('Ștergi produsul din ofertă?');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-danger btn-sm" type="submit">Șterge produs</button>
+              </form>
+            </div>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
   </div>
 
+  <style>
+    .s2-thumb{width:28px;height:28px;object-fit:cover;border-radius:8px;border:1px solid #D9E3E6;margin-right:8px}
+    .s2-thumb2{width:28px;height:28px;object-fit:cover;border-radius:8px;border:1px solid #D9E3E6;margin-right:8px;margin-left:-6px}
+    .s2-row{display:flex;align-items:center}
+  </style>
   <script>
     document.addEventListener('DOMContentLoaded', function(){
       if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
@@ -492,6 +507,39 @@ ob_start();
         });
       });
 
+      const basePath = "<?= htmlspecialchars(Url::basePath()) ?>";
+      function normThumb(path){
+        if (!path) return '';
+        const s = String(path);
+        if (/^https?:\/\//i.test(s)) return s;
+        if (basePath && s.startsWith(basePath + '/')) return s;
+        if (s.startsWith('/')) return (basePath || '') + s;
+        return (basePath || '') + '/' + s;
+      }
+      function fmtBoard(opt){
+        if (!opt || opt.loading) return (opt && opt.text) ? opt.text : '';
+        const thumb = normThumb(opt.thumb || '');
+        const thumbBack = normThumb(opt.thumb_back || '');
+        const fc = opt.face_color_code || '';
+        const bc = opt.back_color_code || '';
+        let colors = fc ? String(fc) : '';
+        if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
+        const label = String(opt.text || '');
+        if (!thumb && !thumbBack && !colors) return label;
+        const esc = (s) => String(s || '').replace(/</g,'&lt;');
+        const $row = $('<span class="s2-row"></span>');
+        if (thumb) $row.append($('<img class="s2-thumb" alt="" />').attr('src', thumb));
+        if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" alt="" />').attr('src', thumbBack));
+        const $txt = $('<span></span>');
+        if (colors) {
+          $txt.html('<strong>' + esc(colors) + '</strong>' + (label ? (' · ' + esc(label)) : ''));
+        } else {
+          $txt.text(label);
+        }
+        $row.append($txt);
+        return $row;
+      }
+
       $('.js-offer-hpl-board').each(function(){
         const $el = $(this);
         if ($el.data('select2')) return;
@@ -500,6 +548,9 @@ ob_start();
           placeholder: $el.data('placeholder') || 'Caută placă HPL…',
           allowClear: true,
           minimumInputLength: 1,
+          templateResult: fmtBoard,
+          templateSelection: fmtBoard,
+          escapeMarkup: m => m,
           ajax: {
             url: "<?= htmlspecialchars(Url::to('/api/hpl/boards/search')) ?>",
             dataType: 'json',
@@ -511,10 +562,6 @@ ob_start();
               return { results: items };
             },
             cache: true
-          },
-          templateResult: function(item){
-            if (!item || !item.text) return item.text || '';
-            return item.text;
           }
         });
       });

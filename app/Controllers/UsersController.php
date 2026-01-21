@@ -207,10 +207,47 @@ final class UsersController
         Response::redirect('/users');
     }
 
+    public static function delete(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $id = (int)($params['id'] ?? 0);
+        if ($id <= 0) {
+            Session::flash('toast_error', 'Utilizator invalid.');
+            Response::redirect('/users');
+        }
+        $u = Auth::user();
+        $role = $u ? (string)($u['role'] ?? '') : '';
+        if (!in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true)) {
+            Session::flash('toast_error', 'Nu ai drepturi pentru a șterge utilizatori.');
+            Response::redirect('/users');
+        }
+        if (Auth::id() === $id) {
+            Session::flash('toast_error', 'Nu îți poți șterge propriul cont.');
+            Response::redirect('/users');
+        }
+        $before = User::find($id);
+        if (!$before) {
+            Session::flash('toast_error', 'Utilizator inexistent.');
+            Response::redirect('/users');
+        }
+        try {
+            User::delete($id);
+            Audit::log('USER_DELETE', 'users', $id, $before, null, [
+                'message' => 'A șters utilizator: ' . (string)($before['name'] ?? ''),
+                'email' => (string)($before['email'] ?? ''),
+                'role' => (string)($before['role'] ?? ''),
+            ]);
+            Session::flash('toast_success', 'Utilizator șters.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge utilizatorul.');
+        }
+        Response::redirect('/users');
+    }
+
     /** @return array<int,string> */
     private static function roles(): array
     {
-        return [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR, Auth::ROLE_VIEW];
+        return [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR, Auth::ROLE_VIEW];
     }
 }
 
