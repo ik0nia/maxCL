@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\DB;
 use App\Core\View;
+use App\Models\Offer;
 use App\Models\StockStats;
 
 final class DashboardController
@@ -20,7 +22,7 @@ final class DashboardController
      *   by_thickness:array<int, float>
      * }>
      */
-    private static function buildTopColors(?string $q, int $limit): array
+    private static function aggregateColors(?string $q): array
     {
         $rows = StockStats::availableByAnySideColorAndThickness($q);
 
@@ -46,16 +48,51 @@ final class DashboardController
             $tmp[$cid]['by_thickness'][$t] = ($tmp[$cid]['by_thickness'][$t] ?? 0.0) + (float)$r['m2'];
         }
 
-        $topColors = array_values($tmp);
-        usort($topColors, fn($a, $b) => ($b['total_m2'] <=> $a['total_m2']));
-        $topColors = array_slice($topColors, 0, max(0, $limit));
-
         // sort thickness keys asc
-        foreach ($topColors as &$c) {
+        foreach ($tmp as &$c) {
             ksort($c['by_thickness']);
         }
 
-        return $topColors;
+        return array_values($tmp);
+    }
+
+    /**
+     * @return array<int, array{
+     *   face_color_id:int,
+     *   color_name:string,
+     *   color_code:string,
+     *   thumb_path:string,
+     *   image_path:?string,
+     *   total_m2:float,
+     *   total_qty:int,
+     *   by_thickness:array<int, float>
+     * }>
+     */
+    private static function buildTopColors(?string $q, int $limit): array
+    {
+        $colors = self::aggregateColors($q);
+        usort($colors, fn($a, $b) => ($b['total_m2'] <=> $a['total_m2']));
+        return array_slice($colors, 0, max(0, $limit));
+    }
+
+    /**
+     * @return array<int, array{
+     *   face_color_id:int,
+     *   color_name:string,
+     *   color_code:string,
+     *   thumb_path:string,
+     *   image_path:?string,
+     *   total_m2:float,
+     *   total_qty:int,
+     *   by_thickness:array<int, float>
+     * }>
+     */
+    private static function buildBottomColors(?string $q, int $limit): array
+    {
+        $colors = array_filter(self::aggregateColors($q), fn($c) => (float)($c['total_m2'] ?? 0) > 0);
+        $colors = array_values($colors);
+        usort($colors, fn($a, $b) => ($a['total_m2'] <=> $b['total_m2']));
+        return array_slice($colors, 0, max(0, $limit));
     }
 
     public static function index(): void
@@ -63,18 +100,142 @@ final class DashboardController
         $byThickness = [];
         $topColors = [];
         $stockError = null;
+        $bottomColors = [];
+        $readyProductsCount = null;
+        $readyProducts = [];
+        $readyProductsError = null;
+        $projectsInWorkCount = null;
+        $projectsInWork = [];
+        $projectsInWorkError = null;
+        $latestOffers = [];
+        $latestOffersError = null;
+        $lowMagazieItems = [];
+        $lowMagazieError = null;
         try {
             $byThickness = StockStats::availableByThickness();
-            $topColors = self::buildTopColors(null, 18);
+            $topColors = self::buildTopColors(null, 6);
+            $bottomColors = self::buildBottomColors(null, 6);
         } catch (\Throwable $e) {
             $stockError = $e->getMessage();
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT COUNT(*) AS c
+                FROM project_products pp
+                INNER JOIN projects p ON p.id = pp.project_id
+                WHERE pp.production_status IN ('GATA_DE_LIVRARE','GATA')
+                  AND p.status NOT IN ('DRAFT','ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+            ");
+            $st->execute();
+            $readyProductsCount = (int)($st->fetchColumn() ?? 0);
+        } catch (\Throwable $e) {
+            $readyProductsCount = null;
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT
+                  pp.id AS project_product_id,
+                  pp.project_id,
+                  pp.production_status,
+                  pp.qty,
+                  pp.unit,
+                  pp.finalized_at,
+                  pp.updated_at,
+                  pr.code AS project_code,
+                  pr.name AS project_name,
+                  p.code AS product_code,
+                  p.name AS product_name
+                FROM project_products pp
+                INNER JOIN projects pr ON pr.id = pp.project_id
+                INNER JOIN products p ON p.id = pp.product_id
+                WHERE pp.production_status IN ('GATA_DE_LIVRARE','GATA')
+                  AND pr.status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+                ORDER BY pp.finalized_at DESC, pp.updated_at DESC, pp.id DESC
+                LIMIT 5
+            ");
+            $st->execute();
+            $readyProducts = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $readyProductsError = $e->getMessage();
+            $readyProducts = [];
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT COUNT(*) AS c
+                FROM projects
+                WHERE status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+            ");
+            $st->execute();
+            $projectsInWorkCount = (int)($st->fetchColumn() ?? 0);
+        } catch (\Throwable $e) {
+            $projectsInWorkCount = null;
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT id, code, name, status, updated_at
+                FROM projects
+                WHERE status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 5
+            ");
+            $st->execute();
+            $projectsInWork = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $projectsInWorkError = $e->getMessage();
+            $projectsInWork = [];
+        }
+
+        try {
+            $latestOffers = Offer::all(null, null, 5);
+        } catch (\Throwable $e) {
+            $latestOffersError = $e->getMessage();
+            $latestOffers = [];
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare('
+                SELECT id, winmentor_code, name, unit, stock_qty
+                FROM magazie_items
+                ORDER BY stock_qty ASC, name ASC
+                LIMIT 5
+            ');
+            $st->execute();
+            $lowMagazieItems = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $lowMagazieError = $e->getMessage();
+            $lowMagazieItems = [];
         }
 
         echo View::render('dashboard/index', [
             'title' => 'Panou',
             'byThickness' => $byThickness,
             'topColors' => $topColors,
+            'bottomColors' => $bottomColors,
             'stockError' => $stockError,
+            'readyProductsCount' => $readyProductsCount,
+            'readyProducts' => $readyProducts,
+            'readyProductsError' => $readyProductsError,
+            'projectsInWorkCount' => $projectsInWorkCount,
+            'projectsInWork' => $projectsInWork,
+            'projectsInWorkError' => $projectsInWorkError,
+            'latestOffers' => $latestOffers,
+            'latestOffersError' => $latestOffersError,
+            'lowMagazieItems' => $lowMagazieItems,
+            'lowMagazieError' => $lowMagazieError,
         ]);
     }
 
@@ -86,7 +247,7 @@ final class DashboardController
             $qq = $q !== null ? trim($q) : '';
             // Pentru search afișăm mai multe rezultate (grid-ul poate avea mai multe rânduri),
             // dar când q e gol păstrăm aceeași logică ca pe dashboard (top 18).
-            $limit = ($qq === '') ? 18 : 36;
+            $limit = 6;
             $topColors = self::buildTopColors($q, $limit);
             $html = View::render('dashboard/_top_colors_grid', [
                 'topColors' => $topColors,

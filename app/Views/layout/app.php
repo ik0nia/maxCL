@@ -40,18 +40,23 @@ $toastError = Session::flash('toast_error');
         <button class="btn btn-outline-secondary d-lg-none" id="sidebarToggle" type="button" aria-label="Meniu">
           <i class="bi bi-list"></i>
         </button>
-        <div class="app-brand">
+        <a class="app-brand" href="<?= htmlspecialchars(Url::to('/')) ?>">
           <?php if ($brandLogo !== ''): ?>
-            <img src="<?= htmlspecialchars($brandLogo) ?>" alt="<?= htmlspecialchars($brandName) ?>" style="height:34px;width:auto;display:block">
+            <img src="<?= htmlspecialchars($brandLogo) ?>" alt="<?= htmlspecialchars($brandName) ?>" style="height:44px;width:auto;display:block">
             <span class="visually-hidden"><?= htmlspecialchars($brandName) ?></span>
           <?php else: ?>
             <span class="app-dot"></span>
             <span class="fw-bold"><?= htmlspecialchars($brandName) ?></span>
           <?php endif; ?>
-        </div>
+        </a>
       </div>
 
       <div class="d-flex align-items-center gap-2">
+        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
+          <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/manual')) ?>">
+            <i class="bi bi-question-circle me-1"></i> Manual aplicatie
+          </a>
+        <?php endif; ?>
         <?php if ($user): ?>
           <div class="text-end me-2 d-none d-md-block">
             <div class="fw-semibold" style="line-height: 1.1"><?= htmlspecialchars((string)$user['name']) ?></div>
@@ -72,16 +77,12 @@ $toastError = Session::flash('toast_error');
     <aside class="app-sidebar" id="sidebar">
       <nav class="app-nav">
         <?php $p = Url::currentPath(); ?>
-        <a class="app-nav-link <?= $p === '/' ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/')) ?>">
-          <i class="bi bi-grid me-2"></i> Panou
-        </a>
-
         <div class="app-nav-section">Proiecte</div>
-        <a class="app-nav-link <?= str_starts_with($p, '/projects') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
-          <i class="bi bi-kanban me-2"></i> Proiecte
-        </a>
         <a class="app-nav-link <?= str_starts_with($p, '/offers') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
           <i class="bi bi-clipboard-check me-2"></i> Oferte
+        </a>
+        <a class="app-nav-link <?= str_starts_with($p, '/projects') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
+          <i class="bi bi-kanban me-2"></i> Proiecte
         </a>
         <a class="app-nav-link <?= str_starts_with($p, '/products') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/products')) ?>">
           <i class="bi bi-box2-heart me-2"></i> Produse
@@ -100,17 +101,17 @@ $toastError = Session::flash('toast_error');
           <i class="bi bi-palette2 me-2"></i> Tip culoare
         </a>
         <a class="app-nav-link <?= str_starts_with($p, '/stock') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
-          <i class="bi bi-box-seam me-2"></i> Stoc
+          <i class="bi bi-box-seam me-2"></i> Stoc HPL
         </a>
         <?php
           $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
         ?>
         <?php if ($canInternal): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/hpl/bucati-rest') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
-            <i class="bi bi-bounding-box-circles me-2"></i> Bucăți rest
+            <i class="bi bi-bounding-box-circles me-2"></i> Bucăți rest HPL
           </a>
           <a class="app-nav-link <?= str_starts_with($p, '/hpl/piese-interne') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
-            <i class="bi bi-scissors me-2"></i> Adăugare plăci mici (nestocabile)
+            <i class="bi bi-scissors me-2"></i> Adaugă plăci nestocabile
           </a>
         <?php endif; ?>
 
