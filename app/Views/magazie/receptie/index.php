@@ -5,7 +5,7 @@ use App\Core\Url;
 use App\Core\View;
 
 $u = Auth::user();
-$canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
+$canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $canSeePrices = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
 
 $recent = $recent ?? [];
@@ -26,7 +26,7 @@ ob_start();
 
 <?php if (!$canWrite): ?>
   <div class="alert alert-warning">
-    Nu ai drepturi pentru recepție marfă (doar Admin/Gestionar).
+    Nu ai drepturi pentru recepție marfă (doar Admin/Manager/Gestionar/Operator).
   </div>
 <?php else: ?>
   <div class="card app-card p-3 mb-3">
