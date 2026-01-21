@@ -83,7 +83,7 @@ $toastError = Session::flash('toast_error');
             <i class="bi bi-grid-3x3-gap me-2"></i> Catalog HPL
           </a>
         <?php else: ?>
-          <div class="app-nav-section">Proiecte</div>
+          <div class="app-nav-section text-success">Proiecte</div>
           <a class="app-nav-link <?= str_starts_with($p, '/offers') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
             <i class="bi bi-clipboard-check me-2"></i> Oferte
           </a>
@@ -94,12 +94,12 @@ $toastError = Session::flash('toast_error');
             <i class="bi bi-box2-heart me-2"></i> Produse
           </a>
 
-          <div class="app-nav-section">Clienți</div>
+          <div class="app-nav-section text-success">Clienți</div>
           <a class="app-nav-link <?= str_starts_with($p, '/clients') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/clients')) ?>">
             <i class="bi bi-people me-2"></i> Clienți
           </a>
 
-          <div class="app-nav-section">Plăci HPL</div>
+          <div class="app-nav-section text-success">Plăci HPL</div>
           <a class="app-nav-link <?= str_starts_with($p, '/hpl/catalog') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>">
             <i class="bi bi-grid-3x3-gap me-2"></i> Catalog
           </a>
@@ -121,7 +121,7 @@ $toastError = Session::flash('toast_error');
             </a>
           <?php endif; ?>
 
-          <div class="app-nav-section">Magazie</div>
+          <div class="app-nav-section text-success">Magazie</div>
           <a class="app-nav-link <?= str_starts_with($p, '/magazie/stoc') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>">
             <i class="bi bi-boxes me-2"></i> Stoc Magazie
           </a>
@@ -130,7 +130,7 @@ $toastError = Session::flash('toast_error');
           </a>
 
           <?php if (!$user || (string)($user['role'] ?? '') !== Auth::ROLE_OPERATOR): ?>
-            <div class="app-nav-section">Sistem</div>
+            <div class="app-nav-section text-success">Sistem</div>
             <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
               <i class="bi bi-journal-text me-2"></i> Jurnal activitate
             </a>
