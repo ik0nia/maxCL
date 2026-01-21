@@ -23,21 +23,26 @@ final class OffcutsController
     public static function index(): void
     {
         $bucket = isset($_GET['bucket']) ? trim((string)$_GET['bucket']) : '';
+        $scrapOnly = isset($_GET['scrap']) && (string)$_GET['scrap'] === '1';
         if ($bucket !== '' && !in_array($bucket, self::BUCKETS, true)) {
             Response::redirect('/hpl/bucati-rest');
         }
+        if ($scrapOnly) $bucket = '';
 
         $rows = HplOffcuts::nonStandardPieces(6000);
 
         // Calcul bucket în PHP (mai robust / compat)
         $items = [];
-        $counts = ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0];
+        $counts = ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0, 'scrap' => 0];
 
         foreach ($rows as $r) {
             $stdW = (int)($r['std_width_mm'] ?? 0);
             $stdH = (int)($r['std_height_mm'] ?? 0);
             $w = (int)($r['width_mm'] ?? 0);
             $h = (int)($r['height_mm'] ?? 0);
+            $status = (string)($r['status'] ?? '');
+            $location = (string)($r['location'] ?? '');
+            $isScrap = ($status === 'SCRAP' || $location === 'Depozit (Stricat)');
             $ratio = null;
             if ($stdW > 0 && $stdH > 0 && $w > 0 && $h > 0) {
                 $ratio = ($w * $h) / ($stdW * $stdH);
@@ -49,12 +54,22 @@ final class OffcutsController
                 else $b = 'lt_quarter';
             }
 
+            if ($isScrap) {
+                $counts['scrap']++;
+                $r['_area_ratio'] = $ratio;
+                $r['_bucket'] = $b;
+                if ($scrapOnly) {
+                    $items[] = $r;
+                }
+                continue;
+            }
+
             $counts['all']++;
             $counts[$b]++;
 
             $r['_area_ratio'] = $ratio;
             $r['_bucket'] = $b;
-            if ($bucket === '' || $bucket === $b) {
+            if (!$scrapOnly && ($bucket === '' || $bucket === $b)) {
                 $items[] = $r;
             }
         }
@@ -111,9 +126,67 @@ final class OffcutsController
             unset($it);
         }
 
+        // Atașează info despre marcarea ca "stricat" (user + notă).
+        $trashByPieceId = [];
+        $scrapPieceIds = [];
+        foreach ($items as $it) {
+            $status = (string)($it['status'] ?? '');
+            $location = (string)($it['location'] ?? '');
+            if ($status === 'SCRAP' || $location === 'Depozit (Stricat)') {
+                $pid = (int)($it['piece_id'] ?? 0);
+                if ($pid > 0) $scrapPieceIds[] = $pid;
+            }
+        }
+        $scrapPieceIds = array_values(array_unique($scrapPieceIds));
+        if ($scrapPieceIds) {
+            try {
+                /** @var \PDO $pdo */
+                $pdo = DB::pdo();
+                $chunks = array_chunk($scrapPieceIds, 500);
+                foreach ($chunks as $chunk) {
+                    $ph = implode(',', array_fill(0, count($chunk), '?'));
+                    $st = $pdo->prepare("
+                        SELECT a.entity_id, a.meta_json, a.actor_user_id, a.created_at, u.name AS user_name
+                        FROM audit_log a
+                        LEFT JOIN users u ON u.id = a.actor_user_id
+                        WHERE a.entity_type = 'hpl_stock_pieces'
+                          AND a.action = 'HPL_STOCK_TRASH'
+                          AND a.entity_id IN ($ph)
+                        ORDER BY a.id DESC
+                    ");
+                    $st->execute($chunk);
+                    $rowsAudit = $st->fetchAll();
+                    foreach ($rowsAudit as $ar) {
+                        $eid = (int)($ar['entity_id'] ?? 0);
+                        if ($eid <= 0 || isset($trashByPieceId[$eid])) continue;
+                        $meta = is_string($ar['meta_json'] ?? null) ? json_decode((string)$ar['meta_json'], true) : null;
+                        $note = is_array($meta) ? trim((string)($meta['note'] ?? '')) : '';
+                        $trashByPieceId[$eid] = [
+                            'user_name' => (string)($ar['user_name'] ?? ''),
+                            'user_id' => (int)($ar['actor_user_id'] ?? 0),
+                            'note' => $note,
+                            'created_at' => (string)($ar['created_at'] ?? ''),
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $trashByPieceId = [];
+            }
+        }
+        if ($trashByPieceId) {
+            foreach ($items as &$it) {
+                $pid = (int)($it['piece_id'] ?? 0);
+                if ($pid > 0 && isset($trashByPieceId[$pid])) {
+                    $it['_trash'] = $trashByPieceId[$pid];
+                }
+            }
+            unset($it);
+        }
+
         echo View::render('hpl/offcuts/index', [
             'title' => 'Bucăți rest',
             'bucket' => $bucket,
+            'scrapOnly' => $scrapOnly,
             'counts' => $counts,
             'items' => $items,
         ]);
