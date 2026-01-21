@@ -69,6 +69,8 @@ final class SearchIndex
               label VARCHAR(255) NOT NULL,
               sub VARCHAR(255) NULL,
               href VARCHAR(255) NOT NULL,
+              thumb_url VARCHAR(255) NULL,
+              thumb_url2 VARCHAR(255) NULL,
               search_text TEXT NOT NULL,
               updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -85,9 +87,9 @@ final class SearchIndex
         if ($stmt === null) {
             $stmt = $pdo->prepare("
                 INSERT INTO search_index
-                  (entity_type, entity_id, label, sub, href, search_text, updated_at)
+                  (entity_type, entity_id, label, sub, href, thumb_url, thumb_url2, search_text, updated_at)
                 VALUES
-                  (:entity_type, :entity_id, :label, :sub, :href, :search_text, :updated_at)
+                  (:entity_type, :entity_id, :label, :sub, :href, :thumb_url, :thumb_url2, :search_text, :updated_at)
             ");
         }
         $stmt->execute([
@@ -96,6 +98,8 @@ final class SearchIndex
             ':label' => $row['label'],
             ':sub' => $row['sub'],
             ':href' => $row['href'],
+            ':thumb_url' => $row['thumb_url'] ?? null,
+            ':thumb_url2' => $row['thumb_url2'] ?? null,
             ':search_text' => $row['search_text'],
             ':updated_at' => $row['updated_at'],
         ]);
@@ -371,7 +375,7 @@ final class SearchIndex
     private static function indexFinishes(PDO $pdo, string $now): int
     {
         $rows = self::fetchAllSafe($pdo, "
-            SELECT id, code, color_name, color_code
+            SELECT id, code, color_name, color_code, thumb_path
             FROM finishes
             ORDER BY id DESC
         ");
@@ -391,6 +395,7 @@ final class SearchIndex
             $colorCode = trim((string)($r['color_code'] ?? ''));
             $label = 'Tip culoare: ' . ($code !== '' ? ($code . ' · ' . $name) : $name);
             $sub = $colorCode !== '' ? ('Cod culoare: ' . $colorCode) : '';
+            $thumb = self::normalizeThumb((string)($r['thumb_path'] ?? ''));
             $searchText = self::joinText([$code, $name, $colorCode]);
             self::insertRow($pdo, [
                 'entity_type' => 'finish',
@@ -398,6 +403,7 @@ final class SearchIndex
                 'label' => $label,
                 'sub' => $sub,
                 'href' => \App\Core\Url::to('/hpl/catalog'),
+                'thumb_url' => $thumb !== '' ? $thumb : null,
                 'search_text' => $searchText,
                 'updated_at' => $now,
             ]);
@@ -409,9 +415,14 @@ final class SearchIndex
     private static function indexHplBoards(PDO $pdo, string $now): int
     {
         $rows = self::fetchAllSafe($pdo, "
-            SELECT id, code, name, brand, thickness_mm
-            FROM hpl_boards
-            ORDER BY id DESC
+            SELECT
+              b.id, b.code, b.name, b.brand, b.thickness_mm,
+              f1.thumb_path AS face_thumb,
+              f2.thumb_path AS back_thumb
+            FROM hpl_boards b
+            LEFT JOIN finishes f1 ON f1.id = b.face_color_id
+            LEFT JOIN finishes f2 ON f2.id = b.back_color_id
+            ORDER BY b.id DESC
         ");
         if (!$rows) {
             $rows = self::fetchAllSafe($pdo, "
@@ -432,6 +443,8 @@ final class SearchIndex
             $subParts = [];
             if ($brand !== '') $subParts[] = $brand;
             if ($th > 0) $subParts[] = $th . ' mm';
+            $faceThumb = self::normalizeThumb((string)($r['face_thumb'] ?? ''));
+            $backThumb = self::normalizeThumb((string)($r['back_thumb'] ?? ''));
             $searchText = self::joinText([$code, $name, $brand, (string)$th]);
             self::insertRow($pdo, [
                 'entity_type' => 'hpl_board',
@@ -439,6 +452,8 @@ final class SearchIndex
                 'label' => $label,
                 'sub' => $subParts ? implode(' · ', $subParts) : '',
                 'href' => \App\Core\Url::to('/stock/boards/' . $id),
+                'thumb_url' => $faceThumb !== '' ? $faceThumb : null,
+                'thumb_url2' => $backThumb !== '' ? $backThumb : null,
                 'search_text' => $searchText,
                 'updated_at' => $now,
             ]);
@@ -547,6 +562,16 @@ final class SearchIndex
             return substr($clean, 0, $max - 1) . '…';
         }
         return $clean;
+    }
+
+    private static function normalizeThumb(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '') return '';
+        if (str_starts_with($path, '/uploads/')) {
+            return \App\Core\Url::to($path);
+        }
+        return $path;
     }
 
     /** @return array<int, array<string,mixed>> */

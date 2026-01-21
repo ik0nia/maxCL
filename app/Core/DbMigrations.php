@@ -1354,6 +1354,8 @@ final class DbMigrations
                           label VARCHAR(255) NOT NULL,
                           sub VARCHAR(255) NULL,
                           href VARCHAR(255) NOT NULL,
+                          thumb_url VARCHAR(255) NULL,
+                          thumb_url2 VARCHAR(255) NULL,
                           search_text TEXT NOT NULL,
                           updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1362,6 +1364,19 @@ final class DbMigrations
                           KEY idx_search_updated (updated_at)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     ");
+                },
+            ],
+            [
+                'id' => '2026-02-02_01_search_index_thumbs',
+                'label' => 'ALTER search_index ADD thumbs',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'search_index')) return;
+                    if (!self::columnExists($pdo, 'search_index', 'thumb_url')) {
+                        try { $pdo->exec("ALTER TABLE search_index ADD COLUMN thumb_url VARCHAR(255) NULL AFTER href"); } catch (\Throwable $e) {}
+                    }
+                    if (!self::columnExists($pdo, 'search_index', 'thumb_url2')) {
+                        try { $pdo->exec("ALTER TABLE search_index ADD COLUMN thumb_url2 VARCHAR(255) NULL AFTER thumb_url"); } catch (\Throwable $e) {}
+                    }
                 },
             ],
             [

@@ -111,7 +111,7 @@ final class SearchController
     {
         try {
             $st = $pdo->prepare("
-                SELECT entity_id, label, sub, href
+                SELECT entity_id, label, sub, href, thumb_url, thumb_url2
                 FROM search_index
                 WHERE entity_type = :t
                   AND search_text LIKE :q
@@ -143,6 +143,8 @@ final class SearchController
                 'label' => (string)($r['label'] ?? ''),
                 'sub' => (string)($r['sub'] ?? ''),
                 'href' => $href,
+                'thumb' => (string)($r['thumb_url'] ?? ''),
+                'thumb2' => (string)($r['thumb_url2'] ?? ''),
             ];
         }
         return $items;

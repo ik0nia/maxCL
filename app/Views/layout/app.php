@@ -268,11 +268,22 @@ $toastError = Session::flash('toast_error');
             const label = escapeHtml(it.label || '');
             const sub = escapeHtml(it.sub || '');
             const href = escapeHtml(it.href || '#');
+            const t1 = escapeHtml(it.thumb || '');
+            const t2 = escapeHtml(it.thumb2 || '');
             html += '<a class="list-group-item list-group-item-action" href="' + href + '">';
+            html += '<div class="d-flex align-items-start gap-2">';
+            if (t1) {
+              html += '<img src="' + t1 + '" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid #D9E3E6;">';
+            }
+            if (t2) {
+              html += '<img src="' + t2 + '" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid #D9E3E6;">';
+            }
+            html += '<div>';
             html += '<div class="fw-semibold">' + label + '</div>';
             if (sub) {
               html += '<div class="small text-muted">' + sub + '</div>';
             }
+            html += '</div></div>';
             html += '</a>';
           });
         });
