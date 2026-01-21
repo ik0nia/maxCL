@@ -47,8 +47,10 @@ final class SearchController
         }
 
         if (in_array($role, $opsRoles, true)) {
-            $items = self::searchIndex($pdo, 'product', $like, $limit, $role);
-            if ($items) $results[] = ['category' => 'Produse', 'items' => $items];
+            $items = self::searchIndex($pdo, 'project_product', $like, $limit, $role);
+            $extra = self::searchIndex($pdo, 'product', $like, $limit, $role);
+            $merged = array_slice(array_merge($items, $extra), 0, $limit);
+            if ($merged) $results[] = ['category' => 'Produse', 'items' => $merged];
         }
 
         if (in_array($role, $opsRoles, true)) {

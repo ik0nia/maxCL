@@ -22,6 +22,7 @@ final class SearchIndex
             'offer' => self::indexOffers($pdo, $now),
             'project' => self::indexProjects($pdo, $now),
             'product' => self::indexProducts($pdo, $now),
+            'project_product' => self::indexProjectProducts($pdo, $now),
             'label' => self::indexLabels($pdo, $now),
             'finish' => self::indexFinishes($pdo, $now),
             'hpl_board' => self::indexHplBoards($pdo, $now),
@@ -115,9 +116,14 @@ final class SearchIndex
     private static function indexProjects(PDO $pdo, string $now): int
     {
         $rows = self::fetchAllSafe($pdo, "
-            SELECT id, code, name, description, notes, technical_notes
-            FROM projects
-            ORDER BY id DESC
+            SELECT
+              pr.id, pr.code, pr.name, pr.description, pr.notes, pr.technical_notes,
+              GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR ', ') AS labels
+            FROM projects pr
+            LEFT JOIN entity_labels el ON el.entity_type = 'projects' AND el.entity_id = pr.id
+            LEFT JOIN labels l ON l.id = el.label_id
+            GROUP BY pr.id
+            ORDER BY pr.id DESC
         ");
         if (!$rows) {
             $rows = self::fetchAllSafe($pdo, "
@@ -134,12 +140,13 @@ final class SearchIndex
             $name = trim((string)($r['name'] ?? ''));
             $label = $code !== '' ? ('Proiect ' . $code . ' · ' . $name) : ('Proiect #' . $id);
             $desc = self::firstNonEmpty($r['description'] ?? null, $r['notes'] ?? null, $r['technical_notes'] ?? null);
-            $searchText = self::joinText([$code, $name, $desc]);
+            $labels = trim((string)($r['labels'] ?? ''));
+            $searchText = self::joinText([$code, $name, $desc, $labels]);
             self::insertRow($pdo, [
                 'entity_type' => 'project',
                 'entity_id' => $id,
                 'label' => $label,
-                'sub' => self::snippet($desc),
+                'sub' => self::snippet($labels !== '' ? ('Etichete: ' . $labels) : $desc),
                 'href' => \App\Core\Url::to('/projects/' . $id),
                 'search_text' => $searchText,
                 'updated_at' => $now,
@@ -179,6 +186,65 @@ final class SearchIndex
                 'label' => $label,
                 'sub' => self::snippet($desc),
                 'href' => \App\Core\Url::to('/products') . '?q=' . rawurlencode($q),
+                'search_text' => $searchText,
+                'updated_at' => $now,
+            ]);
+            $count++;
+        }
+        return $count;
+    }
+
+    private static function indexProjectProducts(PDO $pdo, string $now): int
+    {
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT
+              pp.id AS pp_id, pp.project_id, pp.notes,
+              p.code AS product_code, p.name AS product_name,
+              pr.code AS project_code, pr.name AS project_name,
+              GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR ', ') AS labels
+            FROM project_products pp
+            INNER JOIN products p ON p.id = pp.product_id
+            INNER JOIN projects pr ON pr.id = pp.project_id
+            LEFT JOIN entity_labels el ON el.entity_type = 'project_products' AND el.entity_id = pp.id
+            LEFT JOIN labels l ON l.id = el.label_id
+            GROUP BY pp.id
+            ORDER BY pp.id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT
+                  pp.id AS pp_id, pp.project_id, pp.notes,
+                  p.code AS product_code, p.name AS product_name,
+                  pr.code AS project_code, pr.name AS project_name
+                FROM project_products pp
+                INNER JOIN products p ON p.id = pp.product_id
+                INNER JOIN projects pr ON pr.id = pp.project_id
+                ORDER BY pp.id DESC
+            ");
+        }
+        if (!$rows) return 0;
+        $count = 0;
+        foreach ($rows as $r) {
+            $ppId = (int)($r['pp_id'] ?? 0);
+            $projectId = (int)($r['project_id'] ?? 0);
+            $code = trim((string)($r['product_code'] ?? ''));
+            $name = trim((string)($r['product_name'] ?? ''));
+            $projCode = trim((string)($r['project_code'] ?? ''));
+            $projName = trim((string)($r['project_name'] ?? ''));
+            $labels = trim((string)($r['labels'] ?? ''));
+            $label = $code !== '' ? ('Produs: ' . $code . ' · ' . $name) : ('Produs: ' . $name);
+            $subParts = [];
+            if ($projName !== '' || $projCode !== '') {
+                $subParts[] = 'Proiect: ' . trim(($projCode !== '' ? $projCode : '') . ' ' . $projName);
+            }
+            if ($labels !== '') $subParts[] = 'Etichete: ' . $labels;
+            $searchText = self::joinText([$code, $name, $projCode, $projName, (string)($r['notes'] ?? ''), $labels]);
+            self::insertRow($pdo, [
+                'entity_type' => 'project_product',
+                'entity_id' => $ppId,
+                'label' => $label,
+                'sub' => $subParts ? implode(' · ', $subParts) : '',
+                'href' => \App\Core\Url::to('/projects/' . $projectId . '?tab=products#pp-' . $ppId),
                 'search_text' => $searchText,
                 'updated_at' => $now,
             ]);
