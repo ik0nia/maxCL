@@ -262,7 +262,7 @@ $router->get('/users/{id}/edit', fn($p) => UsersController::editForm($p), $users
 $router->post('/users/{id}/edit', fn($p) => UsersController::update($p), $usersMW);
 $router->post('/users/{id}/delete', fn($p) => UsersController::delete($p), $usersMW);
 
-$auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
+$auditMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $router->get('/audit', fn() => AuditController::index(), $auditMW);
 $router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW);
 
