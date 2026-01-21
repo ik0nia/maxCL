@@ -28,7 +28,15 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
         <h1 class="m-0">Panou</h1>
         <div class="text-muted">Privire de ansamblu</div>
       </div>
-      <?php if (!$isViewRole): ?>
+      <?php
+        $canStockButtons = $u && in_array((string)($u['role'] ?? ''), [
+            \App\Core\Auth::ROLE_ADMIN,
+            \App\Core\Auth::ROLE_MANAGER,
+            \App\Core\Auth::ROLE_GESTIONAR,
+            \App\Core\Auth::ROLE_OPERATOR,
+        ], true);
+      ?>
+      <?php if ($canStockButtons): ?>
         <div class="d-flex gap-2">
           <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-primary"><i class="bi bi-box-seam me-1"></i> Stoc HPL</a>
           <a href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>" class="btn btn-success"><i class="bi bi-boxes me-1"></i> Stoc Magazie</a>
