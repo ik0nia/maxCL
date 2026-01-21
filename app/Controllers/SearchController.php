@@ -23,8 +23,12 @@ final class SearchController
         $limit = max(1, min(10, $limit));
         $like = '%' . $qRaw . '%';
 
-        /** @var PDO $pdo */
-        $pdo = DB::pdo();
+        try {
+            /** @var PDO $pdo */
+            $pdo = DB::pdo();
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => 'db_unavailable']);
+        }
         $user = Auth::user();
         $role = (string)($user['role'] ?? '');
 
@@ -68,19 +72,23 @@ final class SearchController
     /** @return array<int, array{label:string,sub?:string,href:string}> */
     private static function searchOffers(PDO $pdo, string $like, int $limit): array
     {
-        $st = $pdo->prepare("
-            SELECT id, code, name, description, notes, technical_notes
-            FROM offers
-            WHERE code LIKE :q
-               OR name LIKE :q
-               OR description LIKE :q
-               OR notes LIKE :q
-               OR technical_notes LIKE :q
-            ORDER BY updated_at DESC
-            LIMIT " . (int)$limit
-        );
-        $st->execute([':q' => $like]);
-        $rows = $st->fetchAll();
+        try {
+            $st = $pdo->prepare("
+                SELECT id, code, name, description, notes, technical_notes
+                FROM offers
+                WHERE code LIKE :q
+                   OR name LIKE :q
+                   OR description LIKE :q
+                   OR notes LIKE :q
+                   OR technical_notes LIKE :q
+                ORDER BY updated_at DESC
+                LIMIT " . (int)$limit
+            );
+            $st->execute([':q' => $like]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
         $items = [];
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -100,19 +108,23 @@ final class SearchController
     /** @return array<int, array{label:string,sub?:string,href:string}> */
     private static function searchProjects(PDO $pdo, string $like, int $limit): array
     {
-        $st = $pdo->prepare("
-            SELECT id, code, name, description, notes, technical_notes
-            FROM projects
-            WHERE code LIKE :q
-               OR name LIKE :q
-               OR description LIKE :q
-               OR notes LIKE :q
-               OR technical_notes LIKE :q
-            ORDER BY updated_at DESC
-            LIMIT " . (int)$limit
-        );
-        $st->execute([':q' => $like]);
-        $rows = $st->fetchAll();
+        try {
+            $st = $pdo->prepare("
+                SELECT id, code, name, description, notes, technical_notes
+                FROM projects
+                WHERE code LIKE :q
+                   OR name LIKE :q
+                   OR description LIKE :q
+                   OR notes LIKE :q
+                   OR technical_notes LIKE :q
+                ORDER BY updated_at DESC
+                LIMIT " . (int)$limit
+            );
+            $st->execute([':q' => $like]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
         $items = [];
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -132,17 +144,21 @@ final class SearchController
     /** @return array<int, array{label:string,sub?:string,href:string}> */
     private static function searchProducts(PDO $pdo, string $like, int $limit): array
     {
-        $st = $pdo->prepare("
-            SELECT id, code, name, notes
-            FROM products
-            WHERE code LIKE :q
-               OR name LIKE :q
-               OR notes LIKE :q
-            ORDER BY updated_at DESC
-            LIMIT " . (int)$limit
-        );
-        $st->execute([':q' => $like]);
-        $rows = $st->fetchAll();
+        try {
+            $st = $pdo->prepare("
+                SELECT id, code, name, notes
+                FROM products
+                WHERE code LIKE :q
+                   OR name LIKE :q
+                   OR notes LIKE :q
+                ORDER BY updated_at DESC
+                LIMIT " . (int)$limit
+            );
+            $st->execute([':q' => $like]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
         $items = [];
         foreach ($rows as $r) {
             $code = trim((string)($r['code'] ?? ''));
@@ -161,15 +177,19 @@ final class SearchController
     /** @return array<int, array{label:string,sub?:string,href:string}> */
     private static function searchLabels(PDO $pdo, string $like, int $limit): array
     {
-        $st = $pdo->prepare("
-            SELECT id, name
-            FROM labels
-            WHERE name LIKE :q
-            ORDER BY name ASC
-            LIMIT " . (int)$limit
-        );
-        $st->execute([':q' => $like]);
-        $rows = $st->fetchAll();
+        try {
+            $st = $pdo->prepare("
+                SELECT id, name
+                FROM labels
+                WHERE name LIKE :q
+                ORDER BY name ASC
+                LIMIT " . (int)$limit
+            );
+            $st->execute([':q' => $like]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
         $items = [];
         foreach ($rows as $r) {
             $name = trim((string)($r['name'] ?? ''));
@@ -186,17 +206,21 @@ final class SearchController
     /** @return array<int, array{label:string,sub?:string,href:string}> */
     private static function searchFinishes(PDO $pdo, string $like, int $limit, string $role): array
     {
-        $st = $pdo->prepare("
-            SELECT id, code, color_name, color_code
-            FROM finishes
-            WHERE code LIKE :q
-               OR color_name LIKE :q
-               OR color_code LIKE :q
-            ORDER BY updated_at DESC
-            LIMIT " . (int)$limit
-        );
-        $st->execute([':q' => $like]);
-        $rows = $st->fetchAll();
+        try {
+            $st = $pdo->prepare("
+                SELECT id, code, color_name, color_code
+                FROM finishes
+                WHERE code LIKE :q
+                   OR color_name LIKE :q
+                   OR color_code LIKE :q
+                ORDER BY updated_at DESC
+                LIMIT " . (int)$limit
+            );
+            $st->execute([':q' => $like]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
         $items = [];
         $canEdit = in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
         foreach ($rows as $r) {
@@ -219,17 +243,21 @@ final class SearchController
     /** @return array<int, array{label:string,sub?:string,href:string}> */
     private static function searchHplBoards(PDO $pdo, string $like, int $limit): array
     {
-        $st = $pdo->prepare("
-            SELECT id, code, name, brand, thickness_mm
-            FROM hpl_boards
-            WHERE code LIKE :q
-               OR name LIKE :q
-               OR brand LIKE :q
-            ORDER BY updated_at DESC
-            LIMIT " . (int)$limit
-        );
-        $st->execute([':q' => $like]);
-        $rows = $st->fetchAll();
+        try {
+            $st = $pdo->prepare("
+                SELECT id, code, name, brand, thickness_mm
+                FROM hpl_boards
+                WHERE code LIKE :q
+                   OR name LIKE :q
+                   OR brand LIKE :q
+                ORDER BY updated_at DESC
+                LIMIT " . (int)$limit
+            );
+            $st->execute([':q' => $like]);
+            $rows = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
         $items = [];
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
