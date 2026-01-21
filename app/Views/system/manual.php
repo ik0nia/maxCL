@@ -135,6 +135,7 @@ ob_start();
           <li>Note</li>
           <li>Note tehnice</li>
         </ul>
+        <div class="text-muted small mt-1">Telefonul si emailul clientului sunt optionale la crearea proiectului.</div>
       </div>
       <div class="mt-2">
         <div class="fw-semibold">Formular: Schimbare status proiect</div>
@@ -175,6 +176,7 @@ ob_start();
           <li>Note</li>
           <li>Note tehnice</li>
         </ul>
+        <div class="text-muted small mt-1">Telefonul si emailul clientului sunt optionale la crearea ofertei.</div>
       </div>
       <div class="mt-2">
         <div class="fw-semibold">Formulare in tabul Produse (oferta)</div>
@@ -218,8 +220,8 @@ ob_start();
           <li>Grup nou (optional)</li>
           <li>CUI (doar pentru firma)</li>
           <li>Persoana contact (optional)</li>
-          <li>Telefon</li>
-          <li>Email</li>
+          <li>Telefon (optional)</li>
+          <li>Email (optional)</li>
           <li>Adresa livrare</li>
           <li>Note (optional)</li>
         </ul>
@@ -598,6 +600,13 @@ ob_start();
         <li>Nu sunt introduse functionalitati sau campuri inexistente.</li>
         <li>Toate actiunile POST sunt protejate cu token CSRF (<code>_csrf</code>).</li>
         <li>Rolurile sunt aplicate la nivel de ruta prin <code>Auth::requireRole()</code>.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Actualizari recente</h2>
+      <ul class="mb-0">
+        <li><strong>v1.0.1</strong> – Telefonul si emailul clientului sunt optionale la crearea ofertelor si proiectelor.</li>
       </ul>
     </div>
 
@@ -1117,8 +1126,8 @@ ob_start();
       <tr><td>Grup nou (optional)</td><td>client_group_new</td><td>text</td><td>max 190</td><td>client_groups.name</td><td>Creeaza grup si il asociaza.</td></tr>
       <tr><td>CUI (doar pentru firma) *</td><td>cui</td><td>text</td><td>Obligatoriu la FIRMA</td><td>clients.cui</td><td>—</td></tr>
       <tr><td>Persoana contact</td><td>contact_person</td><td>text</td><td>Optional</td><td>clients.contact_person</td><td>—</td></tr>
-      <tr><td>Telefon *</td><td>phone</td><td>text</td><td>Obligatoriu</td><td>clients.phone</td><td>—</td></tr>
-      <tr><td>Email *</td><td>email</td><td>text</td><td>Email valid</td><td>clients.email</td><td>Validator::email.</td></tr>
+      <tr><td>Telefon (optional)</td><td>phone</td><td>text</td><td>Optional</td><td>clients.phone</td><td>—</td></tr>
+      <tr><td>Email (optional)</td><td>email</td><td>text</td><td>Email valid (daca e completat)</td><td>clients.email</td><td>Validator::email.</td></tr>
       <tr><td>Adresa livrare *</td><td>address</td><td>textarea</td><td>Obligatoriu</td><td>clients.address</td><td>Se sincronizeaza si in client_addresses (best-effort).</td></tr>
       <tr><td>Note</td><td>notes</td><td>textarea</td><td>Optional</td><td>clients.notes</td><td>—</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
