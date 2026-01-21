@@ -16,6 +16,7 @@ $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
 $productsAll = $productsAll ?? [];
+$openNewProduct = empty($offerProducts);
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
@@ -141,10 +142,10 @@ ob_start();
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <div class="h5 m-0">Adaugă produs (nou)</div>
-            <div class="text-muted">Fiecare produs se creează direct în ofertă</div>
+            <div class="text-muted">Completează cantitatea, produsul se adaugă direct în ofertă</div>
           </div>
           <?php if ($canWrite): ?>
-            <button class="btn btn-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#offerAddNewCollapse" aria-expanded="false" aria-controls="offerAddNewCollapse">
+            <button class="btn btn-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#offerAddNewCollapse" aria-expanded="<?= $openNewProduct ? 'true' : 'false' ?>" aria-controls="offerAddNewCollapse">
               <i class="bi bi-plus-lg me-1"></i> Creează produs
             </button>
           <?php endif; ?>
@@ -152,7 +153,7 @@ ob_start();
         <?php if (!$canWrite): ?>
           <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
         <?php else: ?>
-          <div class="collapse mt-3" id="offerAddNewCollapse">
+          <div class="collapse mt-3<?= $openNewProduct ? ' show' : '' ?>" id="offerAddNewCollapse">
             <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/create')) ?>" class="row g-2">
               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
               <div class="col-12">
