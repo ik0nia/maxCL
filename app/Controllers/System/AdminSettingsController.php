@@ -19,7 +19,7 @@ final class AdminSettingsController
     {
         $u = Auth::user();
         $role = $u ? (string)($u['role'] ?? '') : '';
-        if ($role !== Auth::ROLE_ADMIN) {
+        if (!in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true)) {
             Session::flash('toast_error', 'Acces interzis.');
             Response::redirect('/');
         }

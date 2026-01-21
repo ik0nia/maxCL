@@ -5,7 +5,7 @@ use App\Core\Url;
 use App\Core\View;
 
 $u = Auth::user();
-$can = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$can = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $boards = $boards ?? [];
 
 if (!function_exists('_hplInternalNormThumb')) {

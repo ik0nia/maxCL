@@ -440,13 +440,13 @@ final class ClientsController
     public static function canWrite(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
     }
 
     public static function isAdmin(): bool
     {
         $u = Auth::user();
-        return $u && (string)$u['role'] === Auth::ROLE_ADMIN;
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
     }
 }
 

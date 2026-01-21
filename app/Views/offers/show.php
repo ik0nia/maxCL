@@ -18,7 +18,7 @@ $groups = $groups ?? [];
 $openNewProduct = empty($offerProducts);
 
 $u = Auth::user();
-$canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $offerId = (int)($offer['id'] ?? 0);
 $convertedProjectId = (int)($offer['converted_project_id'] ?? 0);
 

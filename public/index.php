@@ -259,6 +259,7 @@ $router->get('/users/create', fn() => UsersController::createForm(), $usersMW);
 $router->post('/users/create', fn() => UsersController::create(), $usersMW);
 $router->get('/users/{id}/edit', fn($p) => UsersController::editForm($p), $usersMW);
 $router->post('/users/{id}/edit', fn($p) => UsersController::update($p), $usersMW);
+$router->post('/users/{id}/delete', fn($p) => UsersController::delete($p), $usersMW);
 
 $auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
 $router->get('/audit', fn() => AuditController::index(), $auditMW);

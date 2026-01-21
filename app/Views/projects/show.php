@@ -9,7 +9,7 @@ use App\Core\Session;
 $u = Auth::user();
 $canWrite = ProjectsController::canWrite();
 $canEditProducts = ProjectsController::canEditProjectProducts();
-$canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $canDelete = ProjectsController::canDelete();
 
 $project = $project ?? [];
@@ -588,7 +588,7 @@ ob_start();
         <div class="text-muted">Status producție + cantități (livrate) — totul se loghează</div>
 
         <?php
-          $canSeePricesRole = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+          $canSeePricesRole = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
 
           $ppStatusesAll = ProjectsController::projectProductStatuses();
           $ppStatusLabel = [];

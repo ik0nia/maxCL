@@ -3345,13 +3345,13 @@ final class ProjectsController
     public static function canWrite(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     public static function canDelete(): bool
     {
         $u = Auth::user();
-        return $u && (string)($u['role'] ?? '') === Auth::ROLE_ADMIN;
+        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
     }
 
     public static function delete(array $params): void
@@ -3411,7 +3411,7 @@ final class ProjectsController
     public static function canEditProjectProducts(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     /** Operator-ul nu mai poate edita după Gata de livrare (inclusiv). */
@@ -3428,13 +3428,13 @@ final class ProjectsController
     public static function canSetProjectProductStatus(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     public static function canSetProjectProductFinalStatus(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
     }
 
     /** @return array<int, array{value:string,label:string}> */
@@ -6498,7 +6498,7 @@ final class ProjectsController
         $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
         $u = Auth::user();
         $role = $u ? (string)($u['role'] ?? '') : '';
-        if (!$u || !in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true)) {
+        if (!$u || !in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true)) {
             Session::flash('toast_error', 'Nu ai drepturi.');
             Response::redirect($consumRedirect);
         }

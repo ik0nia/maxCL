@@ -8,7 +8,7 @@ $scrapOnly = !empty($scrapOnly);
 $counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0, 'scrap' => 0];
 $items = $items ?? [];
 $u = Auth::user();
-$canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
 function _normImg2(string $p): string {
   $p = trim($p);

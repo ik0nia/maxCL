@@ -84,5 +84,13 @@ final class User
         $st = $pdo->prepare('UPDATE users SET password_hash = :h WHERE id = :id');
         $st->execute([':id' => $id, ':h' => $passwordHash]);
     }
+
+    public static function delete(int $id): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('DELETE FROM users WHERE id = ?');
+        $st->execute([$id]);
+    }
 }
 
