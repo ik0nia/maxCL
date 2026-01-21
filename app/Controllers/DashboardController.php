@@ -102,7 +102,11 @@ final class DashboardController
         $stockError = null;
         $bottomColors = [];
         $readyProductsCount = null;
+        $readyProducts = [];
+        $readyProductsError = null;
         $projectsInWorkCount = null;
+        $projectsInWork = [];
+        $projectsInWorkError = null;
         $latestOffers = [];
         $latestOffersError = null;
         $lowMagazieItems = [];
@@ -135,6 +139,37 @@ final class DashboardController
             /** @var \PDO $pdo */
             $pdo = DB::pdo();
             $st = $pdo->prepare("
+                SELECT
+                  pp.id AS project_product_id,
+                  pp.project_id,
+                  pp.production_status,
+                  pp.qty,
+                  pp.unit,
+                  pp.finalized_at,
+                  pp.updated_at,
+                  pr.code AS project_code,
+                  pr.name AS project_name,
+                  p.code AS product_code,
+                  p.name AS product_name
+                FROM project_products pp
+                INNER JOIN projects pr ON pr.id = pp.project_id
+                INNER JOIN products p ON p.id = pp.product_id
+                WHERE pp.production_status IN ('GATA_DE_LIVRARE','GATA')
+                  AND pr.status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+                ORDER BY pp.finalized_at DESC, pp.updated_at DESC, pp.id DESC
+                LIMIT 5
+            ");
+            $st->execute();
+            $readyProducts = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $readyProductsError = $e->getMessage();
+            $readyProducts = [];
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
                 SELECT COUNT(*) AS c
                 FROM projects
                 WHERE status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
@@ -143,6 +178,23 @@ final class DashboardController
             $projectsInWorkCount = (int)($st->fetchColumn() ?? 0);
         } catch (\Throwable $e) {
             $projectsInWorkCount = null;
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT id, code, name, status, updated_at
+                FROM projects
+                WHERE status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 5
+            ");
+            $st->execute();
+            $projectsInWork = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $projectsInWorkError = $e->getMessage();
+            $projectsInWork = [];
         }
 
         try {
@@ -175,7 +227,11 @@ final class DashboardController
             'bottomColors' => $bottomColors,
             'stockError' => $stockError,
             'readyProductsCount' => $readyProductsCount,
+            'readyProducts' => $readyProducts,
+            'readyProductsError' => $readyProductsError,
             'projectsInWorkCount' => $projectsInWorkCount,
+            'projectsInWork' => $projectsInWork,
+            'projectsInWorkError' => $projectsInWorkError,
             'latestOffers' => $latestOffers,
             'latestOffersError' => $latestOffersError,
             'lowMagazieItems' => $lowMagazieItems,
