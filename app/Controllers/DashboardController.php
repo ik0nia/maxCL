@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\DB;
 use App\Core\View;
+use App\Models\Offer;
 use App\Models\StockStats;
 
 final class DashboardController
@@ -63,11 +65,70 @@ final class DashboardController
         $byThickness = [];
         $topColors = [];
         $stockError = null;
+        $readyProductsCount = null;
+        $projectsInWorkCount = null;
+        $latestOffers = [];
+        $latestOffersError = null;
+        $lowMagazieItems = [];
+        $lowMagazieError = null;
         try {
             $byThickness = StockStats::availableByThickness();
-            $topColors = self::buildTopColors(null, 18);
+            $topColors = self::buildTopColors(null, 6);
         } catch (\Throwable $e) {
             $stockError = $e->getMessage();
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT COUNT(*) AS c
+                FROM project_products pp
+                INNER JOIN projects p ON p.id = pp.project_id
+                WHERE pp.production_status IN ('GATA_DE_LIVRARE','GATA')
+                  AND p.status NOT IN ('DRAFT','ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+            ");
+            $st->execute();
+            $readyProductsCount = (int)($st->fetchColumn() ?? 0);
+        } catch (\Throwable $e) {
+            $readyProductsCount = null;
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare("
+                SELECT COUNT(*) AS c
+                FROM projects
+                WHERE status NOT IN ('DRAFT','ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+            ");
+            $st->execute();
+            $projectsInWorkCount = (int)($st->fetchColumn() ?? 0);
+        } catch (\Throwable $e) {
+            $projectsInWorkCount = null;
+        }
+
+        try {
+            $latestOffers = Offer::all(null, null, 5);
+        } catch (\Throwable $e) {
+            $latestOffersError = $e->getMessage();
+            $latestOffers = [];
+        }
+
+        try {
+            /** @var \PDO $pdo */
+            $pdo = DB::pdo();
+            $st = $pdo->prepare('
+                SELECT id, winmentor_code, name, unit, stock_qty
+                FROM magazie_items
+                ORDER BY stock_qty ASC, name ASC
+                LIMIT 5
+            ');
+            $st->execute();
+            $lowMagazieItems = $st->fetchAll();
+        } catch (\Throwable $e) {
+            $lowMagazieError = $e->getMessage();
+            $lowMagazieItems = [];
         }
 
         echo View::render('dashboard/index', [
@@ -75,6 +136,12 @@ final class DashboardController
             'byThickness' => $byThickness,
             'topColors' => $topColors,
             'stockError' => $stockError,
+            'readyProductsCount' => $readyProductsCount,
+            'projectsInWorkCount' => $projectsInWorkCount,
+            'latestOffers' => $latestOffers,
+            'latestOffersError' => $latestOffersError,
+            'lowMagazieItems' => $lowMagazieItems,
+            'lowMagazieError' => $lowMagazieError,
         ]);
     }
 
@@ -86,7 +153,7 @@ final class DashboardController
             $qq = $q !== null ? trim($q) : '';
             // Pentru search afișăm mai multe rezultate (grid-ul poate avea mai multe rânduri),
             // dar când q e gol păstrăm aceeași logică ca pe dashboard (top 18).
-            $limit = ($qq === '') ? 18 : 36;
+            $limit = 6;
             $topColors = self::buildTopColors($q, $limit);
             $html = View::render('dashboard/_top_colors_grid', [
                 'topColors' => $topColors,
