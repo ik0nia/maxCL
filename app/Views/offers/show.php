@@ -17,7 +17,7 @@ $clients = $clients ?? [];
 $groups = $groups ?? [];
 $openNewProduct = empty($offerProducts);
 $validityValue = (string)($offer['validity_days'] ?? '');
-if ($validityValue === '') $validityValue = '30';
+if ($validityValue === '') $validityValue = '14';
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);

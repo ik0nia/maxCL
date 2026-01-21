@@ -10,7 +10,7 @@ $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
 $validityValue = (string)($row['validity_days'] ?? '');
-if ($validityValue === '') $validityValue = '30';
+if ($validityValue === '') $validityValue = '14';
 
 ob_start();
 ?>

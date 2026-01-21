@@ -8,7 +8,7 @@ $client = $client ?? null;
 $fmtMoney = $fmtMoney ?? fn($v) => number_format((float)$v, 2, '.', '');
 $fmtQty = $fmtQty ?? fn($v) => rtrim(rtrim(number_format((float)$v, 3, '.', ''), '0'), '.');
 $validityDays = (int)($offer['validity_days'] ?? 0);
-if ($validityDays <= 0) $validityDays = 30;
+if ($validityDays <= 0) $validityDays = 14;
 
 $logo = trim((string)($company['logo_thumb'] ?? $company['logo_url'] ?? ''));
 $companyName = trim((string)($company['name'] ?? ''));

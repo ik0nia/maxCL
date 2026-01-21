@@ -118,7 +118,7 @@ final class OffersController
         $row = [
             'code' => Offer::nextAutoCode(10000),
             'status' => 'DRAFT',
-            'validity_days' => 30,
+            'validity_days' => 14,
         ];
         $statuses = self::statuses();
         $clients = [];
@@ -145,7 +145,7 @@ final class OffersController
         $status = trim((string)($_POST['status'] ?? 'DRAFT'));
         $code = trim((string)($_POST['code'] ?? ''));
         $validityDaysRaw = trim((string)($_POST['validity_days'] ?? ''));
-        $validityDays = $validityDaysRaw === '' ? 30 : Validator::int($validityDaysRaw, 1, 3650);
+        $validityDays = $validityDaysRaw === '' ? 14 : Validator::int($validityDaysRaw, 1, 3650);
         if ($validityDays === null) {
             $errors['validity_days'] = 'Zile valabilitate invalide.';
         }
@@ -217,7 +217,7 @@ final class OffersController
         $status = trim((string)($_POST['status'] ?? (string)($offer['status'] ?? 'DRAFT')));
         if ($status === '') $status = 'DRAFT';
         $validityDaysRaw = trim((string)($_POST['validity_days'] ?? ''));
-        $validityDays = $validityDaysRaw === '' ? 30 : Validator::int($validityDaysRaw, 1, 3650);
+        $validityDays = $validityDaysRaw === '' ? 14 : Validator::int($validityDaysRaw, 1, 3650);
         if ($validityDays === null) {
             Session::flash('toast_error', 'Zile valabilitate invalide.');
             Response::redirect('/offers/' . $offerId);
