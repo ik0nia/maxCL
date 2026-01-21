@@ -129,6 +129,18 @@ ob_start();
   </form>
 </div>
 
+<div class="card app-card p-3 mb-3">
+  <div class="h5 m-0">Indexare căutare globală</div>
+  <div class="text-muted">Regenerează indexul pentru căutarea din bara de sus</div>
+  <form method="post" action="<?= htmlspecialchars(Url::to('/system/admin-settings/search-index/rebuild')) ?>" class="mt-3"
+        onsubmit="return confirm('Regenerezi indexul de căutare?');">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+    <button class="btn btn-outline-secondary" type="submit">
+      <i class="bi bi-arrow-repeat me-1"></i> Reindexează
+    </button>
+  </form>
+</div>
+
 <div class="card app-card p-3">
   <div class="h5 m-0">Snapshot-uri</div>
   <div class="text-muted">Restaurarea va suprascrie baza de date curentă</div>

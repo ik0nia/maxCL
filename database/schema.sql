@@ -395,6 +395,21 @@ CREATE TABLE IF NOT EXISTS offer_work_logs (
   CONSTRAINT fk_offer_work_product FOREIGN KEY (offer_product_id) REFERENCES offer_products(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS search_index (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  entity_type VARCHAR(32) NOT NULL,
+  entity_id BIGINT UNSIGNED NULL,
+  label VARCHAR(255) NOT NULL,
+  sub VARCHAR(255) NULL,
+  href VARCHAR(255) NOT NULL,
+  search_text TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_search_entity (entity_type, entity_id),
+  KEY idx_search_updated (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---- Produse (piesele din proiect)
 CREATE TABLE IF NOT EXISTS products (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,

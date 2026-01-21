@@ -12,6 +12,7 @@ use App\Core\Session;
 use App\Core\Upload;
 use App\Core\View;
 use App\Models\AppSetting;
+use App\Models\SearchIndex;
 
 final class AdminSettingsController
 {
@@ -405,6 +406,22 @@ final class AdminSettingsController
         }
 
         Session::flash('toast_success', 'Datele firmei au fost salvate.');
+        Response::redirect('/system/admin-settings');
+    }
+
+    public static function rebuildSearchIndex(): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        self::requireAdmin();
+
+        try {
+            $res = SearchIndex::rebuild();
+            $total = (int)($res['total'] ?? 0);
+            Session::flash('toast_success', 'Index căutare actualizat (' . $total . ' înregistrări).');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot actualiza indexul: ' . $e->getMessage());
+        }
+
         Response::redirect('/system/admin-settings');
     }
 }

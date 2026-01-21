@@ -1342,6 +1342,29 @@ final class DbMigrations
                 },
             ],
             [
+                'id' => '2026-02-01_02_search_index',
+                'label' => 'CREATE TABLE search_index',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'search_index')) return;
+                    $pdo->exec("
+                        CREATE TABLE search_index (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          entity_type VARCHAR(32) NOT NULL,
+                          entity_id BIGINT UNSIGNED NULL,
+                          label VARCHAR(255) NOT NULL,
+                          sub VARCHAR(255) NULL,
+                          href VARCHAR(255) NOT NULL,
+                          search_text TEXT NOT NULL,
+                          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_search_entity (entity_type, entity_id),
+                          KEY idx_search_updated (updated_at)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
+            [
                 'id' => '2026-01-26_02_users_role_manager',
                 'label' => 'ALTER users.role add MANAGER',
                 'fn' => function (PDO $pdo): void {

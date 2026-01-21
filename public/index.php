@@ -279,6 +279,7 @@ $router->get('/system/admin-settings', fn() => AdminSettingsController::index(),
 $router->post('/system/admin-settings/company/update', fn() => AdminSettingsController::updateCompany(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/snapshot/create', fn() => AdminSettingsController::createSnapshot(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/snapshot/restore', fn() => AdminSettingsController::restoreSnapshot(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
+$router->post('/system/admin-settings/search-index/rebuild', fn() => AdminSettingsController::rebuildSearchIndex(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 
 $projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
