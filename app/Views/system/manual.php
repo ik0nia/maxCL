@@ -101,6 +101,12 @@ ob_start();
         <li><strong>Contine:</strong> lista cu culori/top cantitate, cautare rapida si link catre Stoc.</li>
         <li><strong>Foloseste-o pentru:</strong> orientare rapida si acces rapid la stoc.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Campuri (filtru rapid)</div>
+        <ul class="mb-0">
+          <li>Cauta dupa cod / culoare / cod culoare (camp text).</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card app-card p-3 mb-3">
@@ -112,6 +118,41 @@ ob_start();
         <li><strong>Contine:</strong> lista proiectelor, acces la detalii, tab-uri cu produse, consumuri, livrari, fisiere, ore si discutii.</li>
         <li><strong>Operatiuni tipice:</strong> creare proiect, schimbare status, adaugare produse, alocare/consum materiale.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Proiect nou / Editare (camp cu camp)</div>
+        <ul class="mb-0">
+          <li>Cod (automat, readonly)</li>
+          <li>Nume</li>
+          <li>Status</li>
+          <li>Prioritate</li>
+          <li>Categorie</li>
+          <li>Deadline</li>
+          <li>Descriere</li>
+          <li>Client (optional)</li>
+          <li>Grup clienti (optional)</li>
+          <li>Etichete (labels)</li>
+          <li>Note</li>
+          <li>Note tehnice</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Schimbare status proiect</div>
+        <ul class="mb-0">
+          <li>Status nou</li>
+          <li>Nota (optional)</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formulare in tabul Produse (proiect)</div>
+        <ul class="mb-0">
+          <li>Adauga produs nou: Denumire, Descriere, Cod (optional), Cantitate, Pret cu discount.</li>
+          <li>Consum HPL pe produs: Sursa (proiect/REST), Placa/Piesa, Consum (1/2 placa pentru FULL).</li>
+          <li>Accesorii pe produs: Accesoriu, Cantitate, Apare pe deviz (checkbox).</li>
+          <li>Manopera pe produs: Tip (CNC/Atelier), Ore estimate, Nota.</li>
+          <li>Observatii produs: Mesaj.</li>
+          <li>Facturare/Livrare: Firma facturare, Adresa livrare.</li>
+        </ul>
+      </div>
 
       <h3 id="basic-oferte" class="h6 mt-3">Oferte</h3>
       <p class="mb-2">Configurezi oferta pentru client inainte sa inceapa executia.</p>
@@ -119,6 +160,32 @@ ob_start();
         <li><strong>Contine:</strong> lista oferte, formular creare, pagina de oferta cu produse, HPL, accesorii si manopera.</li>
         <li><strong>Operatiuni tipice:</strong> creare/actualizare oferta, adaugare produse, conversie in proiect.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Oferta noua / Editare (camp cu camp)</div>
+        <ul class="mb-0">
+          <li>Cod (automat, readonly)</li>
+          <li>Nume</li>
+          <li>Status</li>
+          <li>Categorie</li>
+          <li>Deadline</li>
+          <li>Descriere</li>
+          <li>Client (optional)</li>
+          <li>Grup clienti (optional)</li>
+          <li>Note</li>
+          <li>Note tehnice</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formulare in tabul Produse (oferta)</div>
+        <ul class="mb-0">
+          <li>Adauga produs nou: Denumire, Descriere, Cod (optional), Cantitate, Pret cu discount.</li>
+          <li>Adauga produs existent: Produs, Cantitate.</li>
+          <li>Actualizeaza produs: Cantitate, Unitate, Pret cu discount, Descriere.</li>
+          <li>Consum HPL: Placa, Cantitate, Mod (Full/Jumatate).</li>
+          <li>Consum accesorii: Accesoriu, Cantitate, Include in deviz (checkbox).</li>
+          <li>Manopera: Tip (CNC/Atelier), Ore estimate, Nota.</li>
+        </ul>
+      </div>
 
       <h3 id="basic-produse" class="h6 mt-3">Produse</h3>
       <p class="mb-2">Lista produselor definite in sistem, folosite in oferte si proiecte.</p>
@@ -126,6 +193,12 @@ ob_start();
         <li><strong>Contine:</strong> tabel cu produse si detalii de baza.</li>
         <li><strong>Foloseste-o pentru:</strong> verificare rapida a produselor disponibile.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formulare</div>
+        <ul class="mb-0">
+          <li>Pagina este de tip lista (fara formular dedicat).</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card app-card p-3 mb-3">
@@ -135,6 +208,30 @@ ob_start();
         <li><strong>Contine:</strong> lista clienti, pagina detalii client si adrese.</li>
         <li><strong>Operatiuni tipice:</strong> creare client, editare, adaugare adrese, stergere (doar ADMIN).</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Client nou / Editare</div>
+        <ul class="mb-0">
+          <li>Tip client</li>
+          <li>Nume (client/companie)</li>
+          <li>Grup de firme (optional)</li>
+          <li>Grup nou (optional)</li>
+          <li>CUI (doar pentru firma)</li>
+          <li>Persoana contact (optional)</li>
+          <li>Telefon</li>
+          <li>Email</li>
+          <li>Adresa livrare</li>
+          <li>Note (optional)</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Adauga / Editeaza adresa</div>
+        <ul class="mb-0">
+          <li>Eticheta (ex: Sediu / Santier)</li>
+          <li>Adresa</li>
+          <li>Note (optional)</li>
+          <li>Seteaza ca implicita (checkbox)</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card app-card p-3 mb-3">
@@ -153,6 +250,22 @@ ob_start();
         <li><strong>Contine:</strong> lista culori, imagini, texturi si formulare de adaugare/editare.</li>
         <li><strong>Operatiuni tipice:</strong> creare/editare tip culoare, gestionare texturi inline.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Tip culoare nou / Editare</div>
+        <ul class="mb-0">
+          <li>Cod</li>
+          <li>Nume culoare</li>
+          <li>Cod culoare (optional)</li>
+          <li>Imagine (JPG/PNG/WEBP)</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Texturi (adaugare / editare)</div>
+        <ul class="mb-0">
+          <li>Cod (optional)</li>
+          <li>Denumire</li>
+        </ul>
+      </div>
 
       <h3 id="basic-hpl-stoc" class="h6 mt-3">Stoc</h3>
       <p class="mb-2">Gestionezi placile HPL si piesele rezultate.</p>
@@ -160,6 +273,44 @@ ob_start();
         <li><strong>Contine:</strong> lista placilor, formular de adaugare/editare, detalii placa cu piese.</li>
         <li><strong>Operatiuni tipice:</strong> adaugare placa, adaugare piese, mutare piese, stergere piese/placi.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Placa noua / Editare</div>
+        <ul class="mb-0">
+          <li>Cod</li>
+          <li>Denumire</li>
+          <li>Brand</li>
+          <li>Grosime (mm)</li>
+          <li>Lungime standard (mm)</li>
+          <li>Latime standard (mm)</li>
+          <li>Pret vanzare (placa standard)</li>
+          <li>Culoare fata</li>
+          <li>Textura fata</li>
+          <li>Culoare verso (optional)</li>
+          <li>Textura verso (optional)</li>
+          <li>Note</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Adauga piesa in stoc</div>
+        <ul class="mb-0">
+          <li>Tip (FULL / OFFCUT)</li>
+          <li>Lungime (mm)</li>
+          <li>Latime (mm)</li>
+          <li>Buc</li>
+          <li>Locatie</li>
+          <li>Note</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Mutare stoc</div>
+        <ul class="mb-0">
+          <li>Din piesa</li>
+          <li>Bucati de mutat</li>
+          <li>Status destinatie</li>
+          <li>Locatie destinatie</li>
+          <li>Notita (obligatoriu)</li>
+        </ul>
+      </div>
 
       <h3 id="basic-hpl-bucati-rest" class="h6 mt-3">Bucati rest</h3>
       <p class="mb-2">Vedere rapida a resturilor (offcut) si a pieselor disponibile.</p>
@@ -174,6 +325,17 @@ ob_start();
         <li><strong>Contine:</strong> formular cu dimensiuni si cantitati.</li>
         <li><strong>Foloseste-o pentru:</strong> evidenta placilor mici folosite intern.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Piese interne</div>
+        <ul class="mb-0">
+          <li>Tip placa (selectata din lista)</li>
+          <li>Lungime (mm)</li>
+          <li>Latime (mm)</li>
+          <li>Buc</li>
+          <li>Locatie</li>
+          <li>Note (optional)</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card app-card p-3 mb-3">
@@ -185,6 +347,19 @@ ob_start();
         <li><strong>Contine:</strong> stoc curent, pagina de detalii si consum pe proiect.</li>
         <li><strong>Operatiuni tipice:</strong> consum, vizualizare istoric, stergere (doar ADMIN).</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Cautare stoc</div>
+        <ul class="mb-0">
+          <li>Cauta (cod WinMentor sau denumire)</li>
+        </ul>
+      </div>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Consum din stoc</div>
+        <ul class="mb-0">
+          <li>Cantitate</li>
+          <li>Cod proiect (optional)</li>
+        </ul>
+      </div>
 
       <h3 id="basic-magazie-receptie" class="h6 mt-3">Receptie marfa</h3>
       <p class="mb-2">Introduci intrari noi in magazie.</p>
@@ -192,6 +367,16 @@ ob_start();
         <li><strong>Contine:</strong> formular de receptie marfa.</li>
         <li><strong>Foloseste-o pentru:</strong> cresterea stocului de accesorii.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Receptie marfa (camp cu camp)</div>
+        <ul class="mb-0">
+          <li>Cod WinMentor (pe fiecare linie)</li>
+          <li>Denumire (pe fiecare linie)</li>
+          <li>Bucati (pe fiecare linie)</li>
+          <li>Pret / buc (pe fiecare linie)</li>
+          <li>Nota (optional, pentru receptie)</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card app-card p-3 mb-3">
@@ -203,6 +388,15 @@ ob_start();
         <li><strong>Contine:</strong> lista log-uri, filtre pe user/actiune/perioada si detalii.</li>
         <li><strong>Foloseste-o pentru:</strong> verificarea istoricului actiunilor.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Filtre (camp cu camp)</div>
+        <ul class="mb-0">
+          <li>Utilizator</li>
+          <li>Actiune</li>
+          <li>De la (data)</li>
+          <li>Pana la (data)</li>
+        </ul>
+      </div>
 
       <h3 id="basic-consumuri-materiale" class="h6 mt-3">Consumuri materiale</h3>
       <p class="mb-2">Centralizare consumuri HPL si accesorii, filtrabila pe perioada.</p>
@@ -210,6 +404,15 @@ ob_start();
         <li><strong>Contine:</strong> tab-uri HPL/Accesorii, filtre pe date si mod (consumat/rezervat/toate).</li>
         <li><strong>Foloseste-o pentru:</strong> raportare si verificare consumuri.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Filtre (camp cu camp)</div>
+        <ul class="mb-0">
+          <li>De la (data)</li>
+          <li>Pana la (data)</li>
+          <li>Mod (consumat / rezervat / toate)</li>
+          <li>Tab (Consum HPL / Consum accesorii)</li>
+        </ul>
+      </div>
 
       <h3 id="basic-utilizatori" class="h6 mt-3">Utilizatori</h3>
       <p class="mb-2">Administrare conturi (doar ADMIN).</p>
@@ -217,6 +420,18 @@ ob_start();
         <li><strong>Contine:</strong> lista utilizatori, creare si editare.</li>
         <li><strong>Foloseste-o pentru:</strong> control acces si roluri.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Utilizator nou / Editare</div>
+        <ul class="mb-0">
+          <li>Email</li>
+          <li>Nume</li>
+          <li>Rol</li>
+          <li>Cont activ (checkbox)</li>
+          <li>Parola</li>
+          <li>Confirmare parola</li>
+          <li>Ultimul login (doar la editare, readonly)</li>
+        </ul>
+      </div>
 
       <h3 id="basic-setari-costuri" class="h6 mt-3">Setari costuri</h3>
       <p class="mb-2">Valori globale pentru costurile de manopera si CNC.</p>
@@ -224,6 +439,13 @@ ob_start();
         <li><strong>Contine:</strong> formular cu cost pe ora (atelier) si cost CNC.</li>
         <li><strong>Foloseste-o pentru:</strong> calculul corect al costurilor in proiecte.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Costuri</div>
+        <ul class="mb-0">
+          <li>Cost manopera / ora</li>
+          <li>Cost CNC / ora</li>
+        </ul>
+      </div>
 
       <h3 id="basic-setari-admin" class="h6 mt-3">Setari admin</h3>
       <p class="mb-2">Datele firmei si snapshot-uri ale bazei de date.</p>
@@ -231,6 +453,22 @@ ob_start();
         <li><strong>Contine:</strong> formular date firma + logo, sectiune snapshot (creare/restaurare).</li>
         <li><strong>Foloseste-o pentru:</strong> administrare avansata.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Formular: Date firma</div>
+        <ul class="mb-0">
+          <li>Nume firma</li>
+          <li>CUI</li>
+          <li>Nr. Reg. Com.</li>
+          <li>Adresa firma</li>
+          <li>Telefon firma</li>
+          <li>Email firma</li>
+          <li>Functie contact</li>
+          <li>Persoana contact</li>
+          <li>Telefon contact</li>
+          <li>Email contact</li>
+          <li>Logo firma (fisier imagine)</li>
+        </ul>
+      </div>
 
       <h3 id="basic-update-db" class="h6 mt-3">Update DB</h3>
       <p class="mb-2">Rulezi migrari atunci cand apar modificari de schema.</p>
@@ -238,6 +476,12 @@ ob_start();
         <li><strong>Contine:</strong> plan de verificare si buton de rulare update.</li>
         <li><strong>Foloseste-o pentru:</strong> actualizari dupa update-uri din Git.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Actiune</div>
+        <ul class="mb-0">
+          <li>Ruleaza update DB (buton, cu confirmare).</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card app-card p-3 mb-3">
