@@ -6,20 +6,148 @@ ob_start();
 ?>
 <div class="app-page-title">
   <div>
-    <h1 class="m-0">Manual avansat pentru utilizatori</h1>
-    <div class="text-muted">Documentatie operationala bazata strict pe codul aplicatiei</div>
+    <h1 class="m-0">Manual</h1>
+    <div class="text-muted">Ghid practic de utilizare + documentatie avansata</div>
   </div>
 </div>
 
-<div class="card app-card p-3 mb-3">
-  <h2 id="scop" class="h5">Scop si principii</h2>
-  <ul class="mb-0">
-    <li>Acest manual descrie functionalitatile existente in cod (rute, formulare, validari, procese).</li>
-    <li>Nu sunt introduse functionalitati sau campuri inexistente.</li>
-    <li>Toate actiunile POST sunt protejate cu token CSRF (<code>_csrf</code>).</li>
-    <li>Rolurile sunt aplicate la nivel de ruta prin <code>Auth::requireRole()</code>.</li>
-  </ul>
-</div>
+<ul class="nav nav-tabs mb-3" id="manualTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="manual-basic-tab" data-bs-toggle="tab" data-bs-target="#manual-basic" type="button" role="tab" aria-controls="manual-basic" aria-selected="true">
+      Manual
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="manual-advanced-tab" data-bs-toggle="tab" data-bs-target="#manual-advanced" type="button" role="tab" aria-controls="manual-advanced" aria-selected="false">
+      Manual avansat
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="manual-basic" role="tabpanel" aria-labelledby="manual-basic-tab">
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Bine ai venit</h2>
+      <p class="mb-2">
+        Acest ghid este versiunea prietenoasa pentru utilizatorii aplicatiei. Iti explica pe intelesul tuturor
+        ce face fiecare modul si cum se leaga intre ele. Daca ai nevoie de detalii tehnice (rute, tabele, validari),
+        foloseste tab-ul <strong>Manual avansat</strong>.
+      </p>
+      <ul class="mb-0">
+        <li>Aplicatia urmareste fluxul complet: <strong>Client → Oferta → Proiect → Consum → Livrare</strong>.</li>
+        <li>Stocul HPL si magazia sunt actualizate la fiecare consum/rezervare.</li>
+        <li>Daca nu vezi un buton sau un meniu, rolul tau nu permite acces.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Start rapid (5 pasi)</h2>
+      <ol class="mb-0">
+        <li><strong>Autentificare</strong> in aplicatie.</li>
+        <li><strong>Verifica Panoul</strong> (Dashboard) pentru stocuri si culori dominante.</li>
+        <li><strong>Configureaza HPL</strong>: Tip culoare, texturi si placi in Stoc.</li>
+        <li><strong>Creaza Client + Oferta</strong> si adauga produse, HPL si accesorii.</li>
+        <li><strong>Converteste Oferta in Proiect</strong> si consuma materiale pe masura lucrarilor.</li>
+      </ol>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Modulele, pe intelesul tuturor</h2>
+      <ul class="mb-0">
+        <li><strong>Panou</strong> – vedere rapida asupra stocului HPL si culorilor dominante.</li>
+        <li><strong>HPL / Tip culoare</strong> – definesti culori si texturi folosite la placi.</li>
+        <li><strong>Stoc HPL</strong> – gestionezi placi si piese (full/offcut).</li>
+        <li><strong>Bucati rest / Piese interne</strong> – evidenta resturilor si a placilor mici nestocabile.</li>
+        <li><strong>Magazie</strong> – accesorii: receptie marfa, stoc, consum.</li>
+        <li><strong>Clienti</strong> – lista clienti si adresele lor.</li>
+        <li><strong>Oferte</strong> – configurare produse, HPL, accesorii si manopera.</li>
+        <li><strong>Proiecte</strong> – executia comenzii, consumuri si livrari.</li>
+        <li><strong>Utilizatori</strong> – administrare conturi (doar ADMIN).</li>
+        <li><strong>Sistem & Audit</strong> – setari si jurnal de activitate.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Povestea unei comenzi (Oferta → Proiect)</h2>
+      <p class="mb-2">
+        In practica, lucrurile merg asa: un client are o cerere, creezi o <strong>Oferta</strong>,
+        adaugi produsele necesare si materialele aferente (HPL, accesorii, manopera).
+        Cand oferta este acceptata, o <strong>convertesti in Proiect</strong>.
+      </p>
+      <p class="mb-0">
+        In proiect, fiecare produs poate avea consumuri de HPL si magazie. Pe masura ce debitezi,
+        stocul se scade automat, iar resturile pot fi intoarse in stoc ca bucati disponibile.
+      </p>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Stoc HPL pe scurt</h2>
+      <ul class="mb-0">
+        <li><strong>Placi</strong> – sunt definite cu dimensiuni, brand si finisaje.</li>
+        <li><strong>Piese</strong> – pot fi <em>FULL</em> sau <em>OFFCUT</em>, cu status: disponibil/rezervat/consumat.</li>
+        <li><strong>Rezervare</strong> – o piesa se poate aloca unui proiect.</li>
+        <li><strong>Consum</strong> – piesele trec in status consumat la debitare.</li>
+        <li><strong>Retur</strong> – resturile pot fi reintroduse in stoc.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Magazie (accesorii) pe scurt</h2>
+      <ul class="mb-0">
+        <li>In <strong>Receptie marfa</strong> adaugi intrari de produse in magazie.</li>
+        <li>In <strong>Stoc Magazie</strong> vezi disponibilul si poti consuma pe proiect.</li>
+        <li>Consumurile sunt urmarite si la nivel de produs din proiect.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Lucrul in proiect (util, zi de zi)</h2>
+      <ul class="mb-0">
+        <li><strong>Produse</strong> – adaugi produse in proiect si le actualizezi statusul.</li>
+        <li><strong>Consumuri</strong> – aloci HPL si accesorii, apoi consumi pe masura debitarii.</li>
+        <li><strong>Livrari</strong> – creezi livrari si urmaresti ce s-a predat clientului.</li>
+        <li><strong>Fisiere</strong> – incarci documente tehnice sau poze la proiect.</li>
+        <li><strong>Ore lucrate</strong> – notezi timpul pe proiect sau produs.</li>
+        <li><strong>Discutii & etichete</strong> – pastrezi contextul si organizarea.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Roluri si acces</h2>
+      <ul class="mb-0">
+        <li><strong>ADMIN</strong> – acces complet, utilizatori si setari sistem.</li>
+        <li><strong>GESTIONAR</strong> – operatiuni complete pe stoc si proiecte.</li>
+        <li><strong>OPERATOR</strong> – acces operational (citire + actiuni permise in stoc/proiect).</li>
+        <li><strong>VIZUALIZARE</strong> – acces doar la citire unde este permis.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Cand ai nevoie de detalii tehnice</h2>
+      <p class="mb-0">
+        Pentru rute, tabele, validari si explicatii complete ale formularului, mergi la tab-ul
+        <strong>Manual avansat</strong>.
+      </p>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="manual-advanced" role="tabpanel" aria-labelledby="manual-advanced-tab">
+    <div class="app-page-title">
+      <div>
+        <h1 class="m-0">Manual avansat pentru utilizatori</h1>
+        <div class="text-muted">Documentatie operationala bazata strict pe codul aplicatiei</div>
+      </div>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 id="scop" class="h5">Scop si principii</h2>
+      <ul class="mb-0">
+        <li>Acest manual descrie functionalitatile existente in cod (rute, formulare, validari, procese).</li>
+        <li>Nu sunt introduse functionalitati sau campuri inexistente.</li>
+        <li>Toate actiunile POST sunt protejate cu token CSRF (<code>_csrf</code>).</li>
+        <li>Rolurile sunt aplicate la nivel de ruta prin <code>Auth::requireRole()</code>.</li>
+      </ul>
+    </div>
 
 <div class="card app-card p-3 mb-3">
   <h2 id="cuprins" class="h5">Cuprins</h2>
@@ -1368,6 +1496,9 @@ flowchart LR
     <li><code>/hpl/texturi</code> redirectioneaza catre <code>/hpl/tip-culoare#texturi</code>.</li>
     <li>Modulele vechi Materiale/Variante exista in cod, dar nu mai sunt expuse in meniuri.</li>
   </ul>
+</div>
+
+  </div>
 </div>
 
 <?php

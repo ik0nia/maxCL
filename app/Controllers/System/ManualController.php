@@ -10,7 +10,7 @@ final class ManualController
     public static function index(): void
     {
         echo View::render('system/manual', [
-            'title' => 'Manual avansat',
+            'title' => 'Manual',
         ]);
     }
 }

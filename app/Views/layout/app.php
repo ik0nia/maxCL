@@ -52,6 +52,11 @@ $toastError = Session::flash('toast_error');
       </div>
 
       <div class="d-flex align-items-center gap-2">
+        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
+          <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/manual')) ?>">
+            <i class="bi bi-journal-bookmark me-1"></i> Manual
+          </a>
+        <?php endif; ?>
         <?php if ($user): ?>
           <div class="text-end me-2 d-none d-md-block">
             <div class="fw-semibold" style="line-height: 1.1"><?= htmlspecialchars((string)$user['name']) ?></div>
@@ -126,11 +131,6 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
           <i class="bi bi-journal-text me-2"></i> Jurnal activitate
         </a>
-        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/manual') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/manual')) ?>">
-            <i class="bi bi-journal-bookmark me-2"></i> Manual avansat
-          </a>
-        <?php endif; ?>
         <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
             <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
