@@ -236,6 +236,41 @@ final class OffersController
         Response::redirect('/offers/' . $offerId);
     }
 
+    public static function canDelete(): bool
+    {
+        $u = Auth::user();
+        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
+    }
+
+    public static function delete(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $offerId = (int)($params['id'] ?? 0);
+        if ($offerId <= 0) {
+            Session::flash('toast_error', 'Ofertă invalidă.');
+            Response::redirect('/offers');
+        }
+        $offer = Offer::find($offerId);
+        if (!$offer) {
+            Session::flash('toast_error', 'Oferta nu există.');
+            Response::redirect('/offers');
+        }
+        if (!self::canDelete()) {
+            Session::flash('toast_error', 'Nu ai drepturi să ștergi oferta.');
+            Response::redirect('/offers/' . $offerId);
+        }
+        try {
+            Offer::delete($offerId);
+            Audit::log('OFFER_DELETE', 'offers', $offerId, $offer, null, [
+                'message' => 'A șters oferta: ' . (string)($offer['code'] ?? '') . ' · ' . (string)($offer['name'] ?? ''),
+            ]);
+            Session::flash('toast_success', 'Oferta a fost ștearsă.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge oferta: ' . $e->getMessage());
+        }
+        Response::redirect('/offers');
+    }
+
     public static function show(array $params): void
     {
         $id = (int)($params['id'] ?? 0);

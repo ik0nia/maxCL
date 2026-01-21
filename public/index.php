@@ -288,6 +288,7 @@ $router->get('/offers/{id}', fn($p) => OffersController::show($p), $offersReadMW
 $router->get('/offers/{id}/bon-general', fn($p) => OffersController::bonGeneral($p), $offersReadMW);
 $router->post('/offers/{id}/edit', fn($p) => OffersController::update($p), $offersWriteMW);
 $router->post('/offers/{id}/convert', fn($p) => OffersController::convertToProject($p), $offersWriteMW);
+$router->post('/offers/{id}/delete', fn($p) => OffersController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/offers/{id}/products/add-existing', fn($p) => OffersController::addExistingProduct($p), $offersWriteMW);
 $router->post('/offers/{id}/products/create', fn($p) => OffersController::createProductInOffer($p), $offersWriteMW);
 $router->post('/offers/{id}/products/{opId}/update', fn($p) => OffersController::updateOfferProduct($p), $offersWriteMW);
