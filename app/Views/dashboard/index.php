@@ -93,10 +93,10 @@ $lowMagazieError = $lowMagazieError ?? null;
                 </li>
               <?php endforeach; ?>
             </ul>
-            <a class="btn btn-outline-secondary btn-sm mt-2" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
-              Vezi ofertele
-            </a>
           <?php endif; ?>
+          <a class="btn btn-outline-secondary btn-sm mt-2" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
+            Vezi ofertele
+          </a>
         </div>
       </div>
     </div>
