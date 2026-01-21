@@ -93,6 +93,22 @@ ob_start();
     </div>
 
     <div class="card app-card p-3 mb-3">
+      <h2 id="basic-cautare" class="h5">Cautare globala (bara de sus)</h2>
+      <p class="mb-2">
+        In bara de sus (centru) exista o cautare globala. Introdu minim 2 caractere si rezultatele apar in lista,
+        grupate pe categorii.
+      </p>
+      <ul class="mb-0">
+        <li>Oferte, Proiecte, Produse (inclusiv produse din proiecte).</li>
+        <li>Clienti, Grupuri clienti, Etichete.</li>
+        <li>Tip culoare, Stoc HPL, Grosimi HPL (cu thumbnail-uri unde exista).</li>
+        <li>Magazie (accesorii / cod WinMentor).</li>
+      </ul>
+      <div class="text-muted small mt-2">Categorii afisate in functie de rol si acces.</div>
+      <div class="text-muted small">Indexarea se actualizeaza automat; pentru rezultate urgente, adminul poate reindexa din Setari admin.</div>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
       <h2 id="basic-panou" class="h5">Panou</h2>
       <p class="mb-2">
         Este pagina de start. Ofera o privire rapida asupra stocului HPL si a culorilor dominante.
@@ -606,6 +622,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.2</strong> – Documentatie completa pentru cautarea globala (topnav) si indexare.</li>
         <li><strong>v1.0.1</strong> – Telefonul si emailul clientului sunt optionale la crearea ofertelor si proiectelor.</li>
       </ul>
     </div>
@@ -1822,6 +1839,20 @@ ob_start();
         <td>Endpoint de verificare.</td>
       </tr>
       <tr>
+        <td><code>/api/search/global</code></td>
+        <td>GET</td>
+        <td><code>q</code>, <code>limit</code></td>
+        <td><code>{ok, query, results}</code></td>
+        <td>Cautare globala (topnav), rezultate pe categorii.</td>
+      </tr>
+      <tr>
+        <td><code>/api/search/reindex-if-needed</code></td>
+        <td>GET</td>
+        <td>—</td>
+        <td><code>{ok, ran, total}</code></td>
+        <td>Reindexare automata (max 1/15 minute).</td>
+      </tr>
+      <tr>
         <td><code>/api/dashboard/top-colors</code></td>
         <td>GET</td>
         <td><code>q</code> (optional)</td>
@@ -1879,6 +1910,32 @@ ob_start();
       </tr>
     </tbody>
   </table>
+
+  <h3 class="h6 mt-3">Cautare globala (topnav) – indexare si logica</h3>
+  <p class="mb-2">
+    Cautarea globala foloseste o tabela dedicata (<code>search_index</code>) pentru a evita interogari grele la runtime.
+    Indexarea se face prin <code>SearchIndex::rebuild()</code>, declansata manual din Setari admin sau automat prin
+    <code>/api/search/reindex-if-needed</code> (minim 15 minute, cheie <code>search_index_last_run_at</code>).
+  </p>
+  <ul>
+    <li><strong>Structura index:</strong> <code>entity_type</code>, <code>entity_id</code>, <code>label</code>, <code>sub</code>,
+      <code>href</code>, <code>thumb_url</code>, <code>thumb_url2</code>, <code>search_text</code>, <code>updated_at</code>.</li>
+    <li><strong>Filtrare:</strong> <code>/api/search/global</code> face <code>LIKE</code> pe <code>search_text</code>
+      (minim 2 caractere, limit 1–10) si ordoneaza dupa <code>updated_at</code> desc.</li>
+    <li><strong>Roluri:</strong> afiseaza doar categoriile permise; pentru rolul VIZUALIZARE, linkurile HPL duc in Catalog.</li>
+  </ul>
+  <div class="fw-semibold">Campuri incluse in index:</div>
+  <ul class="mb-0">
+    <li><strong>Oferte:</strong> cod, nume, descriere, note, note tehnice.</li>
+    <li><strong>Proiecte:</strong> cod, nume, descriere, note, note tehnice, etichete.</li>
+    <li><strong>Produse:</strong> cod, nume, note + produse din proiect (cod/nume produs, cod/nume proiect, etichete, note).</li>
+    <li><strong>Clienti:</strong> nume, CUI, persoana contact, telefon, email, adresa.</li>
+    <li><strong>Grupuri clienti</strong> si <strong>Etichete:</strong> nume.</li>
+    <li><strong>Tip culoare:</strong> cod, nume culoare, cod culoare (cu thumbnail).</li>
+    <li><strong>Stoc HPL:</strong> cod material, nume, brand, grosime (cu 2 thumbnails fata/spate).</li>
+    <li><strong>Grosimi HPL:</strong> valoare in mm.</li>
+    <li><strong>Magazie:</strong> cod WinMentor si denumire accesoriu.</li>
+  </ul>
 </div>
 
 <div class="card app-card p-3 mb-3">
