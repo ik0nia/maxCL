@@ -15,7 +15,6 @@ $tab = $tab ?? 'general';
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
-$productsAll = $productsAll ?? [];
 $openNewProduct = empty($offerProducts);
 
 $u = Auth::user();
@@ -183,37 +182,6 @@ ob_start();
               </div>
             </form>
           </div>
-        <?php endif; ?>
-      </div>
-
-      <div class="card app-card p-3 mb-3">
-        <div class="h5 m-0">Adaugă produs existent</div>
-        <?php if (!$canWrite): ?>
-          <div class="text-muted mt-2">Nu ai drepturi de editare.</div>
-        <?php else: ?>
-          <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/add-existing')) ?>" class="row g-2 mt-2">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-            <div class="col-12 col-md-7">
-              <label class="form-label fw-semibold">Produs</label>
-              <select class="form-select" name="product_id" required>
-                <option value="">—</option>
-                <?php foreach ($productsAll as $p): ?>
-                  <option value="<?= (int)($p['id'] ?? 0) ?>">
-                    <?= htmlspecialchars(trim((string)($p['code'] ?? '') . ' · ' . (string)($p['name'] ?? ''))) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">Cantitate</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1" required>
-            </div>
-            <div class="col-12 col-md-2 d-flex align-items-end">
-              <button class="btn btn-outline-secondary w-100" type="submit">
-                <i class="bi bi-plus-lg me-1"></i> Adaugă
-              </button>
-            </div>
-          </form>
         <?php endif; ?>
       </div>
 
