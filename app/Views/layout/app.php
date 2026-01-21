@@ -35,7 +35,7 @@ $toastError = Session::flash('toast_error');
 </head>
 <body class="app-body">
   <header class="app-header">
-    <div class="container-fluid d-flex align-items-center justify-content-between">
+    <div class="container-fluid d-flex align-items-center gap-2">
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-outline-secondary d-lg-none" id="sidebarToggle" type="button" aria-label="Meniu">
           <i class="bi bi-list"></i>
@@ -51,7 +51,20 @@ $toastError = Session::flash('toast_error');
         </a>
       </div>
 
-      <div class="d-flex align-items-center gap-2">
+      <div class="flex-grow-1 d-none d-md-flex justify-content-center">
+        <?php if ($user): ?>
+          <div class="position-relative w-100" id="globalSearchBox" style="max-width:520px">
+            <input class="form-control" id="globalSearchInput" type="search"
+                   placeholder="Caută în oferte, proiecte, produse, etichete, culori, stoc..."
+                   data-endpoint="<?= htmlspecialchars(Url::to('/api/search/global')) ?>"
+                   autocomplete="off" aria-label="Căutare globală">
+            <div class="list-group position-absolute w-100 shadow-sm" id="globalSearchResults"
+                 style="top:100%;z-index:1050;display:none;max-height:320px;overflow:auto"></div>
+          </div>
+        <?php endif; ?>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 ms-auto">
         <?php if ($user && (string)($user['role'] ?? '') !== Auth::ROLE_VIEW): ?>
           <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/manual')) ?>">
             <i class="bi bi-question-circle me-1"></i> Manual aplicatie
@@ -200,6 +213,117 @@ $toastError = Session::flash('toast_error');
   <script>
     window.__APP_TOAST_SUCCESS__ = <?= json_encode($toastSuccess, JSON_UNESCAPED_UNICODE) ?>;
     window.__APP_TOAST_ERROR__ = <?= json_encode($toastError, JSON_UNESCAPED_UNICODE) ?>;
+  </script>
+  <script>
+    (function () {
+      const input = document.getElementById('globalSearchInput');
+      const results = document.getElementById('globalSearchResults');
+      const box = document.getElementById('globalSearchBox');
+      const endpoint = input ? (input.getAttribute('data-endpoint') || '') : '';
+      if (!input || !results || !box || !endpoint) return;
+
+      let timer = null;
+      let lastQuery = '';
+      let ctrl = null;
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/[&<>"']/g, function (c) {
+          return ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+          })[c] || c;
+        });
+      }
+
+      function hideResults() {
+        results.style.display = 'none';
+        results.innerHTML = '';
+      }
+
+      function showResults(html) {
+        results.innerHTML = html;
+        results.style.display = 'block';
+      }
+
+      function renderResults(data) {
+        if (!data || data.ok !== true) {
+          showResults('<div class="list-group-item text-muted">Nu pot căuta acum.</div>');
+          return;
+        }
+        const groups = Array.isArray(data.results) ? data.results : [];
+        if (!groups.length) {
+          showResults('<div class="list-group-item text-muted">Niciun rezultat.</div>');
+          return;
+        }
+        let html = '';
+        groups.forEach(function (g) {
+          const title = escapeHtml(g.category || '');
+          const items = Array.isArray(g.items) ? g.items : [];
+          if (!items.length) return;
+          html += '<div class="list-group-item fw-semibold bg-light">' + title + '</div>';
+          items.forEach(function (it) {
+            const label = escapeHtml(it.label || '');
+            const sub = escapeHtml(it.sub || '');
+            const href = escapeHtml(it.href || '#');
+            html += '<a class="list-group-item list-group-item-action" href="' + href + '">';
+            html += '<div class="fw-semibold">' + label + '</div>';
+            if (sub) {
+              html += '<div class="small text-muted">' + sub + '</div>';
+            }
+            html += '</a>';
+          });
+        });
+        showResults(html);
+      }
+
+      async function doSearch(q) {
+        if (ctrl) ctrl.abort();
+        ctrl = new AbortController();
+        showResults('<div class="list-group-item text-muted">Caut...</div>');
+        try {
+          const url = endpoint + '?q=' + encodeURIComponent(q);
+          const res = await fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+            signal: ctrl.signal
+          });
+          const data = await res.json();
+          renderResults(data);
+        } catch (e) {
+          if (e && String(e.name || '') === 'AbortError') return;
+          showResults('<div class="list-group-item text-muted">Nu pot căuta acum.</div>');
+        }
+      }
+
+      input.addEventListener('input', function () {
+        const q = String(input.value || '').trim();
+        if (timer) window.clearTimeout(timer);
+        if (q.length < 2) {
+          hideResults();
+          return;
+        }
+        timer = window.setTimeout(function () {
+          if (q === lastQuery) return;
+          lastQuery = q;
+          doSearch(q);
+        }, 250);
+      });
+
+      input.addEventListener('focus', function () {
+        const q = String(input.value || '').trim();
+        if (q.length >= 2 && results.innerHTML.trim() !== '') {
+          results.style.display = 'block';
+        }
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!box.contains(e.target)) hideResults();
+      });
+    })();
   </script>
 </body>
 </html>

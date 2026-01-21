@@ -28,6 +28,7 @@ use App\Controllers\AuditController;
 use App\Controllers\ClientsController;
 use App\Controllers\ProjectsController;
 use App\Controllers\OffersController;
+use App\Controllers\SearchController;
 use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\Api\HplPiecesController as ApiHplPiecesController;
@@ -391,6 +392,8 @@ $router->post('/magazie/receptie/create', fn() => MagazieReceptionController::cr
 $router->get('/api/health', function () {
     Response::json(['ok' => true, 'env' => Env::get('APP_ENV', 'local')]);
 });
+
+$router->get('/api/search/global', fn() => SearchController::global(), [Auth::requireLogin()]);
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);
