@@ -811,6 +811,11 @@ final class OffersController
         }
 
         $company = self::companySettingsForDocs();
+        $client = null;
+        $cid = isset($offer['client_id']) ? (int)($offer['client_id'] ?? 0) : 0;
+        if ($cid > 0) {
+            try { $client = Client::find($cid); } catch (\Throwable $e) { $client = null; }
+        }
         $title = 'Bon ofertă';
         $html = View::render('offers/bon_general', [
             'offer' => $offer,
@@ -818,6 +823,7 @@ final class OffersController
             'totalCost' => $totalCost,
             'totalSale' => $totalSale,
             'company' => $company,
+            'client' => $client,
             'fmtMoney' => fn($v) => self::fmtMoney($v),
             'fmtQty' => fn($v) => self::fmtQty($v),
         ]);

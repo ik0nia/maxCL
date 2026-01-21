@@ -4,12 +4,18 @@ $rows = $rows ?? [];
 $totalCost = $totalCost ?? 0.0;
 $totalSale = $totalSale ?? 0.0;
 $company = $company ?? [];
+$client = $client ?? null;
 $fmtMoney = $fmtMoney ?? fn($v) => number_format((float)$v, 2, '.', '');
 $fmtQty = $fmtQty ?? fn($v) => rtrim(rtrim(number_format((float)$v, 3, '.', ''), '0'), '.');
 
 $logo = trim((string)($company['logo_thumb'] ?? $company['logo_url'] ?? ''));
 $companyName = trim((string)($company['name'] ?? ''));
 if ($companyName === '') $companyName = 'HPL Manager';
+$createdAt = trim((string)($offer['created_at'] ?? ''));
+$dateOnly = $createdAt;
+if (preg_match('/^\d{4}-\d{2}-\d{2}/', $createdAt, $m)) {
+  $dateOnly = $m[0];
+}
 ?>
 <!doctype html>
 <html lang="ro">
@@ -40,11 +46,22 @@ if ($companyName === '') $companyName = 'HPL Manager';
   <div class="doc-wrap">
     <div class="doc-header">
       <div>
-        <h1 class="doc-title">Ofertă</h1>
+        <h1 class="doc-title">Ofertă #<?= htmlspecialchars((string)($offer['code'] ?? '')) ?></h1>
         <div class="meta">
-          <div>Oferta: <strong><?= htmlspecialchars((string)($offer['code'] ?? '')) ?></strong></div>
           <div>Denumire: <?= htmlspecialchars((string)($offer['name'] ?? '')) ?></div>
-          <div>Data: <?= htmlspecialchars((string)($offer['created_at'] ?? '')) ?></div>
+          <div>Data ofertă: <?= htmlspecialchars($dateOnly) ?></div>
+          <?php if ($client && !empty($client['name'])): ?>
+            <div style="margin-top:6px"><strong>Date facturare client</strong></div>
+            <div><?= htmlspecialchars((string)($client['name'] ?? '')) ?></div>
+            <?php if (!empty($client['cui'])): ?><div>CUI: <?= htmlspecialchars((string)$client['cui']) ?></div><?php endif; ?>
+            <?php if (!empty($client['contact_person'])): ?><div>Contact: <?= htmlspecialchars((string)$client['contact_person']) ?></div><?php endif; ?>
+            <?php if (!empty($client['phone'])): ?><div>Telefon: <?= htmlspecialchars((string)$client['phone']) ?></div><?php endif; ?>
+            <?php if (!empty($client['email'])): ?><div>Email: <?= htmlspecialchars((string)$client['email']) ?></div><?php endif; ?>
+            <?php if (!empty($client['address'])): ?><div>Adresă: <?= nl2br(htmlspecialchars((string)$client['address'])) ?></div><?php endif; ?>
+          <?php else: ?>
+            <div style="margin-top:6px"><strong>Date facturare client</strong></div>
+            <div class="muted">—</div>
+          <?php endif; ?>
         </div>
       </div>
       <div class="company">
