@@ -185,7 +185,7 @@ final class OffersController
                 'message' => 'A creat oferta: ' . $code . ' · ' . $name,
             ]);
             Session::flash('toast_success', 'Oferta a fost creată.');
-            Response::redirect('/offers/' . $id);
+            Response::redirect('/offers/' . $id . '?tab=products');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot crea oferta: ' . $e->getMessage());
             Response::redirect('/offers/create');
