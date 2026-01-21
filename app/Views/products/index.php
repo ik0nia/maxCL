@@ -27,24 +27,6 @@ ob_start();
 </div>
 
 <div class="card app-card p-3">
-  <form method="get" action="<?= htmlspecialchars(Url::to('/products')) ?>" class="row g-2 align-items-end mb-3">
-    <div style="min-width:320px;flex:1">
-      <label class="form-label fw-semibold mb-1">Caută</label>
-      <input class="form-control" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Cod sau nume…">
-    </div>
-    <div class="col-12 col-md-4">
-      <label class="form-label fw-semibold mb-1">Etichetă (label)</label>
-      <input class="form-control" name="label" value="<?= htmlspecialchars($label) ?>" placeholder="ex: urgent">
-    </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary" type="submit">
-        <i class="bi bi-search me-1"></i> Caută
-      </button>
-      <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/products')) ?>">
-        <i class="bi bi-x-lg me-1"></i> Reset
-      </a>
-    </div>
-  </form>
   <table class="table table-hover align-middle mb-0" id="productsTable">
     <thead>
       <tr>
