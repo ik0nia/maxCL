@@ -1,6 +1,5 @@
 <?php
 use App\Core\Auth;
-use App\Core\Auth;
 use App\Core\Url;
 use App\Core\View;
 
@@ -8,8 +7,6 @@ $bucket = (string)($bucket ?? '');
 $scrapOnly = !empty($scrapOnly);
 $counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0, 'scrap' => 0];
 $items = $items ?? [];
-$u = Auth::user();
-$canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $u = Auth::user();
 $canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
