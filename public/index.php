@@ -270,7 +270,7 @@ $router->get('/system/costuri', fn() => CostSettingsController::index(), $usersM
 $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersMW);
 
 $systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR])];
-$manualMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$manualMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
 $router->get('/manual', fn() => ManualController::index(), $manualMW);
 $router->get('/system/consumuri/reset', fn() => ConsumptionsResetController::run(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
