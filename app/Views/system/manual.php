@@ -71,16 +71,15 @@ ob_start();
       <h2 class="h5">Meniu principal (stanga) - cuprins</h2>
       <p class="mb-2">Elementele apar in functie de rolul tau.</p>
       <ul class="mb-0">
-        <li><a href="#basic-panou">Panou</a></li>
-        <li><a href="#basic-proiecte">Proiecte</a></li>
         <li><a href="#basic-oferte">Oferte</a></li>
+        <li><a href="#basic-proiecte">Proiecte</a></li>
         <li><a href="#basic-produse">Produse</a></li>
         <li><a href="#basic-clienti">Clienti</a></li>
         <li><a href="#basic-hpl-catalog">HPL · Catalog</a></li>
         <li><a href="#basic-hpl-tip-culoare">HPL · Tip culoare</a></li>
-        <li><a href="#basic-hpl-stoc">HPL · Stoc</a></li>
-        <li><a href="#basic-hpl-bucati-rest">HPL · Bucati rest</a></li>
-        <li><a href="#basic-hpl-piese-interne">HPL · Adaugare placi mici (nestocabile)</a></li>
+        <li><a href="#basic-hpl-stoc">HPL · Stoc HPL</a></li>
+        <li><a href="#basic-hpl-bucati-rest">HPL · Bucati rest HPL</a></li>
+        <li><a href="#basic-hpl-piese-interne">HPL · Adauga placi nestocabile</a></li>
         <li><a href="#basic-magazie-stoc">Magazie · Stoc Magazie</a></li>
         <li><a href="#basic-magazie-receptie">Magazie · Receptie marfa</a></li>
         <li><a href="#basic-audit">Sistem · Jurnal activitate</a></li>
@@ -90,6 +89,7 @@ ob_start();
         <li><a href="#basic-setari-admin">Sistem · Setari admin</a></li>
         <li><a href="#basic-update-db">Sistem · Update DB</a></li>
       </ul>
+      <div class="text-muted small mt-2">Panou se acceseaza din logo (vezi <a href="#basic-panou">sectiunea Panou</a>).</div>
     </div>
 
     <div class="card app-card p-3 mb-3">
@@ -101,6 +101,7 @@ ob_start();
         <li><strong>Contine:</strong> lista cu culori/top cantitate, cautare rapida si link catre Stoc.</li>
         <li><strong>Foloseste-o pentru:</strong> orientare rapida si acces rapid la stoc.</li>
       </ul>
+      <div class="text-muted small mt-2">Acces rapid: click pe logo (stanga sus).</div>
       <div class="mt-2">
         <div class="fw-semibold">Campuri (filtru rapid)</div>
         <ul class="mb-0">
@@ -267,7 +268,7 @@ ob_start();
         </ul>
       </div>
 
-      <h3 id="basic-hpl-stoc" class="h6 mt-3">Stoc</h3>
+      <h3 id="basic-hpl-stoc" class="h6 mt-3">Stoc HPL</h3>
       <p class="mb-2">Gestionezi placile HPL si piesele rezultate.</p>
       <ul class="mb-0">
         <li><strong>Contine:</strong> lista placilor, formular de adaugare/editare, detalii placa cu piese.</li>
@@ -312,14 +313,14 @@ ob_start();
         </ul>
       </div>
 
-      <h3 id="basic-hpl-bucati-rest" class="h6 mt-3">Bucati rest</h3>
+      <h3 id="basic-hpl-bucati-rest" class="h6 mt-3">Bucati rest HPL</h3>
       <p class="mb-2">Vedere rapida a resturilor (offcut) si a pieselor disponibile.</p>
       <ul class="mb-0">
         <li><strong>Contine:</strong> lista bucati rest si statusul lor.</li>
         <li><strong>Foloseste-o pentru:</strong> identificarea rapida a pieselor reutilizabile.</li>
       </ul>
 
-      <h3 id="basic-hpl-piese-interne" class="h6 mt-3">Adaugare placi mici (nestocabile)</h3>
+      <h3 id="basic-hpl-piese-interne" class="h6 mt-3">Adauga placi nestocabile</h3>
       <p class="mb-2">Introduci piese interne care nu intra in totalurile de stoc.</p>
       <ul class="mb-0">
         <li><strong>Contine:</strong> formular cu dimensiuni si cantitati.</li>
