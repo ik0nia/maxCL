@@ -6970,6 +6970,11 @@ final class ProjectsController
             if ($qty <= 0) continue;
 
             $pp = $ppById[$ppId];
+            $status = (string)($pp['production_status'] ?? '');
+            if ($status !== 'AVIZAT') {
+                Session::flash('toast_error', 'Poți livra doar produse avizate. (' . (string)($pp['product_name'] ?? '') . ')');
+                Response::redirect('/projects/' . $projectId . '?tab=deliveries');
+            }
             $max = max(0.0, (float)($pp['qty'] ?? 0) - (float)($pp['delivered_qty'] ?? 0));
             if ($qty > $max + 1e-9) {
                 Session::flash('toast_error', 'Nu poți livra peste cantitatea rămasă pentru produsul ' . (string)($pp['product_name'] ?? '') . '.');

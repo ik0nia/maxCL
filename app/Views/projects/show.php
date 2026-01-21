@@ -2396,11 +2396,21 @@ ob_start();
                       <th class="text-end" style="width:120px">Total</th>
                       <th class="text-end" style="width:120px">Livrat</th>
                       <th class="text-end" style="width:120px">Rămas</th>
-                      
+                      <th class="text-end" style="width:140px">Livrez acum</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <?php foreach ($projectProducts as $pp): ?>
+                    <?php
+                      $deliveryProducts = array_values(array_filter($projectProducts, function ($ppRow) {
+                        return (string)($ppRow['production_status'] ?? '') === 'AVIZAT';
+                      }));
+                    ?>
+                    <?php if (!$deliveryProducts): ?>
+                      <tr>
+                        <td colspan="5" class="text-muted">Nu există produse avizate pentru livrare.</td>
+                      </tr>
+                    <?php else: ?>
+                      <?php foreach ($deliveryProducts as $pp): ?>
                       <?php
                         $ppId = (int)($pp['id'] ?? 0);
                         $total = (float)($pp['qty'] ?? 0);
@@ -2412,15 +2422,32 @@ ob_start();
                         <td class="text-end"><?= number_format($total, 2, '.', '') ?> <?= htmlspecialchars((string)($pp['unit'] ?? '')) ?></td>
                         <td class="text-end"><?= number_format($del, 2, '.', '') ?></td>
                         <td class="text-end fw-semibold"><?= number_format($left, 2, '.', '') ?></td>
-                        
+                        <td class="text-end">
+                          <?php if ($left > 0): ?>
+                            <input class="form-control form-control-sm text-end js-delivery-qty"
+                                   type="number"
+                                   name="delivery_qty[<?= $ppId ?>]"
+                                   min="0"
+                                   max="<?= htmlspecialchars(number_format($left, 2, '.', '')) ?>"
+                                   step="0.01"
+                                   value="0">
+                          <?php else: ?>
+                            <span class="text-muted">—</span>
+                          <?php endif; ?>
+                        </td>
                       </tr>
-                    <?php endforeach; ?>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            
+            <div class="d-flex justify-content-end mt-3">
+              <button class="btn btn-success" type="submit" <?= $deliveryProducts ? '' : 'disabled' ?>>
+                <i class="bi bi-truck me-1"></i> Salvează livrarea
+              </button>
+            </div>
           </form>
         <?php endif; ?>
       </div>
@@ -3305,6 +3332,20 @@ ob_start();
         if (current && current.value.trim() !== '') return;
         ev.preventDefault();
         openModal(form);
+      });
+    });
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-delivery-qty').forEach(function (el) {
+      el.addEventListener('input', function () {
+        const max = parseFloat(el.getAttribute('max') || '0');
+        const val = parseFloat(el.value || '0');
+        if (!isFinite(val)) return;
+        if (val > max) el.value = String(max);
+        if (val < 0) el.value = '0';
       });
     });
   });
