@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace App\Controllers\Hpl;
 
+use App\Core\DB;
 use App\Core\Response;
+use App\Core\Url;
 use App\Core\View;
 use App\Models\HplOffcuts;
 
@@ -48,6 +50,58 @@ final class OffcutsController
             if ($bucket === '' || $bucket === $b) {
                 $items[] = $r;
             }
+        }
+
+        // Atașează ultima poză (dacă există) pentru fiecare piesă.
+        $photoByPieceId = [];
+        $pieceIds = [];
+        foreach ($items as $it) {
+            $pid = (int)($it['piece_id'] ?? 0);
+            if ($pid > 0) $pieceIds[] = $pid;
+        }
+        $pieceIds = array_values(array_unique($pieceIds));
+        if ($pieceIds) {
+            try {
+                /** @var \PDO $pdo */
+                $pdo = DB::pdo();
+                $chunks = array_chunk($pieceIds, 500);
+                foreach ($chunks as $chunk) {
+                    $ph = implode(',', array_fill(0, count($chunk), '?'));
+                    $st = $pdo->prepare("
+                        SELECT entity_id, stored_name, original_name, mime, category, created_at, id
+                        FROM entity_files
+                        WHERE entity_type = 'hpl_stock_pieces'
+                          AND entity_id IN ($ph)
+                          AND (category = 'internal_piece_photo' OR mime LIKE 'image/%')
+                        ORDER BY created_at DESC, id DESC
+                    ");
+                    $st->execute($chunk);
+                    $rowsFiles = $st->fetchAll();
+                    foreach ($rowsFiles as $rf) {
+                        $eid = (int)($rf['entity_id'] ?? 0);
+                        if ($eid <= 0 || isset($photoByPieceId[$eid])) continue;
+                        $stored = (string)($rf['stored_name'] ?? '');
+                        if ($stored === '') continue;
+                        $photoByPieceId[$eid] = [
+                            'stored_name' => $stored,
+                            'original_name' => (string)($rf['original_name'] ?? ''),
+                            'mime' => (string)($rf['mime'] ?? ''),
+                            'url' => Url::to('/uploads/files/' . $stored),
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $photoByPieceId = [];
+            }
+        }
+        if ($photoByPieceId) {
+            foreach ($items as &$it) {
+                $pid = (int)($it['piece_id'] ?? 0);
+                if ($pid > 0 && isset($photoByPieceId[$pid])) {
+                    $it['_photo'] = $photoByPieceId[$pid];
+                }
+            }
+            unset($it);
         }
 
         echo View::render('hpl/offcuts/index', [

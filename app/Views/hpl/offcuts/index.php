@@ -142,6 +142,9 @@ ob_start();
         $ratio = $it['_area_ratio'] ?? null;
         $ratioPct = (is_numeric($ratio) ? ((float)$ratio * 100.0) : null);
         $bucketKey = (string)($it['_bucket'] ?? '');
+        $photo = is_array($it['_photo'] ?? null) ? $it['_photo'] : null;
+        $photoUrl = $photo ? (string)($photo['url'] ?? '') : '';
+        $photoTitle = $photo ? (string)($photo['original_name'] ?? 'Poză piesă') : '';
       ?>
       <div class="col-12 col-md-6 col-lg-3">
         <div class="card app-card p-3 h-100 js-card-link"
@@ -155,8 +158,18 @@ ob_start();
               <span class="badge text-bg-light"><?= htmlspecialchars(_statusLabel($status)) ?></span>
               <span class="badge text-bg-light"><?= htmlspecialchars($location) ?></span>
             </div>
-            <div class="text-muted small text-end" title="Suprafață piesă raportată la placa standard">
-              <?= htmlspecialchars(_ratioLabel($ratioPct !== null ? (float)$ratioPct : null)) ?>
+            <div class="text-end">
+              <div class="text-muted small" title="Suprafață piesă raportată la placa standard">
+                <?= htmlspecialchars(_ratioLabel($ratioPct !== null ? (float)$ratioPct : null)) ?>
+              </div>
+              <?php if ($photoUrl !== ''): ?>
+                <a class="btn btn-sm btn-outline-secondary mt-1"
+                   href="<?= htmlspecialchars($photoUrl) ?>"
+                   data-lightbox-src="<?= htmlspecialchars($photoUrl) ?>"
+                   data-lightbox-title="<?= htmlspecialchars($photoTitle !== '' ? $photoTitle : 'Poză piesă') ?>">
+                  <i class="bi bi-camera me-1"></i> Poză
+                </a>
+              <?php endif; ?>
             </div>
           </div>
 
