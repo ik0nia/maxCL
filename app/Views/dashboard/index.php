@@ -180,7 +180,9 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
           <div class="h5 m-0">Culori cu cea mai mare cantitate</div>
           <div class="text-muted">Agregat pe Tip culoare (față + verso), indiferent de textură · evidențiere pe grosimi</div>
         </div>
-        <?php if (!$isViewRole): ?>
+        <?php if ($isViewRole): ?>
+          <a href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Catalog</a>
+        <?php else: ?>
           <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
         <?php endif; ?>
       </div>
@@ -193,22 +195,28 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
       <?php else: ?>
         <div class="mt-2">
           <div id="dashboardTopColorsGrid">
-            <?= View::render('dashboard/_top_colors_grid', ['topColors' => $topColors]) ?>
+            <?= View::render('dashboard/_top_colors_grid', [
+              'topColors' => $topColors,
+              'linkBase' => $isViewRole ? '/hpl/catalog' : '/stock',
+            ]) ?>
           </div>
         </div>
       <?php endif; ?>
     </div>
   </div>
 
-  <?php if (!$isViewRole): ?>
-    <div class="col-12 col-lg-6">
-      <div class="card app-card p-3">
+  <div class="col-12 col-lg-6">
+    <div class="card app-card p-3">
       <div class="d-flex align-items-center justify-content-between">
         <div>
           <div class="h5 m-0">Stoc disponibil pe grosimi</div>
           <div class="text-muted">Total bucăți și mp (status AVAILABLE)</div>
         </div>
-        <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+        <?php if ($isViewRole): ?>
+          <a href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Catalog</a>
+        <?php else: ?>
+          <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+        <?php endif; ?>
       </div>
 
       <?php if ($stockError): ?>
@@ -232,9 +240,10 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
               <?php endif; ?>
               <?php foreach ($byThickness as $r): ?>
                 <tr>
+                  <?php $thicknessHref = $isViewRole ? Url::to('/hpl/catalog') : (Url::to('/stock') . '?thickness_mm=' . (int)$r['thickness_mm']); ?>
                   <td class="fw-semibold">
                     <a class="text-decoration-none" style="color:#111"
-                       href="<?= htmlspecialchars(Url::to('/stock') . '?thickness_mm=' . (int)$r['thickness_mm']) ?>">
+                       href="<?= htmlspecialchars($thicknessHref) ?>">
                       <?= (int)$r['thickness_mm'] ?> mm
                     </a>
                   </td>
@@ -250,6 +259,7 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
 
   </div>
 
+  <?php if (!$isViewRole): ?>
   <div class="col-12 col-lg-6">
     <div class="card app-card p-3">
       <div class="d-flex align-items-center justify-content-between">
@@ -319,7 +329,10 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
         </div>
       <?php else: ?>
         <div class="mt-2">
-          <?= View::render('dashboard/_top_colors_grid', ['topColors' => $bottomColors]) ?>
+          <?= View::render('dashboard/_top_colors_grid', [
+            'topColors' => $bottomColors,
+            'linkBase' => '/stock',
+          ]) ?>
         </div>
       <?php endif; ?>
     </div>

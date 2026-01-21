@@ -1,5 +1,6 @@
 <?php
 $topColors = $topColors ?? [];
+$linkBase = $linkBase ?? '/stock';
 ?>
 <div class="row g-2">
   <?php foreach ($topColors as $c): ?>
@@ -8,7 +9,10 @@ $topColors = $topColors ?? [];
       $big = (string)($c['image_path'] ?? '') ?: $thumb;
       $code = (string)($c['color_code'] ?? '');
       if ($code === '') $code = '—';
-      $href = \App\Core\Url::to('/stock') . ($code !== '—' ? ('?color=' . rawurlencode($code)) : '');
+      $href = \App\Core\Url::to($linkBase);
+      if ($linkBase === '/stock' && $code !== '—') {
+          $href .= '?color=' . rawurlencode($code);
+      }
     ?>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="border rounded-4 p-2 h-100" style="border-color:#D9E3E6;background:#fff">
