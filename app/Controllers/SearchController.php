@@ -7,6 +7,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\Response;
 use App\Core\Url;
+use App\Models\SearchIndex;
 use PDO;
 
 final class SearchController
@@ -54,6 +55,16 @@ final class SearchController
         }
 
         if (in_array($role, $opsRoles, true)) {
+            $items = self::searchIndex($pdo, 'client', $like, $limit, $role);
+            if ($items) $results[] = ['category' => 'Clienți', 'items' => $items];
+        }
+
+        if (in_array($role, $opsRoles, true)) {
+            $items = self::searchIndex($pdo, 'client_group', $like, $limit, $role);
+            if ($items) $results[] = ['category' => 'Grupuri clienți', 'items' => $items];
+        }
+
+        if (in_array($role, $opsRoles, true)) {
             $items = self::searchIndex($pdo, 'label', $like, $limit, $role);
             if ($items) $results[] = ['category' => 'Etichete', 'items' => $items];
         }
@@ -68,12 +79,31 @@ final class SearchController
             if ($items) $results[] = ['category' => 'Stoc HPL', 'items' => $items];
         }
 
+        if (in_array($role, $hplReadRoles, true)) {
+            $items = self::searchIndex($pdo, 'hpl_thickness', $like, $limit, $role);
+            if ($items) $results[] = ['category' => 'Grosimi HPL', 'items' => $items];
+        }
+
         if (in_array($role, $opsRoles, true)) {
             $items = self::searchIndex($pdo, 'magazie_item', $like, $limit, $role);
             if ($items) $results[] = ['category' => 'Magazie', 'items' => $items];
         }
 
         Response::json(['ok' => true, 'query' => $qRaw, 'results' => $results]);
+    }
+
+    public static function reindexIfNeeded(): void
+    {
+        $user = Auth::user();
+        if (!$user) {
+            Response::json(['ok' => false, 'error' => 'unauthorized'], 401);
+        }
+        try {
+            $res = SearchIndex::rebuildIfDue(900, Auth::id());
+            Response::json(['ok' => true, 'ran' => (bool)($res['ran'] ?? false), 'total' => (int)($res['total'] ?? 0)]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     /** @return array<int, array{label:string,sub?:string,href:string}> */
@@ -104,6 +134,9 @@ final class SearchController
                     : Url::to('/hpl/catalog');
             }
             if ($type === 'hpl_board' && $role === Auth::ROLE_VIEW) {
+                $href = Url::to('/hpl/catalog');
+            }
+            if ($type === 'hpl_thickness' && $role === Auth::ROLE_VIEW) {
                 $href = Url::to('/hpl/catalog');
             }
             $items[] = [

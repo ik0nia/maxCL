@@ -395,6 +395,7 @@ $router->get('/api/health', function () {
 });
 
 $router->get('/api/search/global', fn() => SearchController::global(), [Auth::requireLogin()]);
+$router->get('/api/search/reindex-if-needed', fn() => SearchController::reindexIfNeeded(), [Auth::requireLogin()]);
 
 $router->get('/api/finishes/search', fn() => ApiFinishesController::search(), [Auth::requireLogin()]);
 $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(), $hplReadMW);

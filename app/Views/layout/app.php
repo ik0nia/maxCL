@@ -323,6 +323,17 @@ $toastError = Session::flash('toast_error');
       document.addEventListener('click', function (e) {
         if (!box.contains(e.target)) hideResults();
       });
+
+      try {
+        const reindexUrl = <?= json_encode(Url::to('/api/search/reindex-if-needed')) ?>;
+        const now = Date.now();
+        const last = Number(localStorage.getItem('search_reindex_ping') || 0);
+        if (now - last > 5 * 60 * 1000) {
+          localStorage.setItem('search_reindex_ping', String(now));
+          fetch(reindexUrl, { method: 'GET', credentials: 'same-origin', keepalive: true })
+            .catch(function () {});
+        }
+      } catch (e) {}
     })();
   </script>
 </body>

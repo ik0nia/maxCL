@@ -23,15 +23,40 @@ final class SearchIndex
             'project' => self::indexProjects($pdo, $now),
             'product' => self::indexProducts($pdo, $now),
             'project_product' => self::indexProjectProducts($pdo, $now),
+            'client' => self::indexClients($pdo, $now),
+            'client_group' => self::indexClientGroups($pdo, $now),
             'label' => self::indexLabels($pdo, $now),
             'finish' => self::indexFinishes($pdo, $now),
             'hpl_board' => self::indexHplBoards($pdo, $now),
+            'hpl_thickness' => self::indexHplThickness($pdo, $now),
             'magazie_item' => self::indexMagazieItems($pdo, $now),
         ];
 
         $total = 0;
         foreach ($counts as $c) $total += (int)$c;
         return ['total' => $total, 'byType' => $counts];
+    }
+
+    /** @return array{ran:bool,total:int} */
+    public static function rebuildIfDue(int $minSeconds, ?int $userId = null): array
+    {
+        $key = 'search_index_last_run_at';
+        $prev = AppSetting::get($key);
+        $prevTs = $prev ? strtotime($prev) : 0;
+        $nowTs = time();
+        if ($prevTs > 0 && ($nowTs - $prevTs) < $minSeconds) {
+            return ['ran' => false, 'total' => 0];
+        }
+
+        $now = date('Y-m-d H:i:s', $nowTs);
+        AppSetting::set($key, $now, $userId);
+        try {
+            $res = self::rebuild();
+            return ['ran' => true, 'total' => (int)($res['total'] ?? 0)];
+        } catch (\Throwable $e) {
+            AppSetting::set($key, $prev !== null ? (string)$prev : null, $userId);
+            throw $e;
+        }
     }
 
     private static function ensureTable(PDO $pdo): void
@@ -253,6 +278,70 @@ final class SearchIndex
         return $count;
     }
 
+    private static function indexClients(PDO $pdo, string $now): int
+    {
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, name, cui, contact_person, phone, email, address
+            FROM clients
+            ORDER BY id DESC
+        ");
+        if (!$rows) return 0;
+        $count = 0;
+        foreach ($rows as $r) {
+            $id = (int)($r['id'] ?? 0);
+            $name = trim((string)($r['name'] ?? ''));
+            if ($name === '') continue;
+            $cui = trim((string)($r['cui'] ?? ''));
+            $contact = trim((string)($r['contact_person'] ?? ''));
+            $phone = trim((string)($r['phone'] ?? ''));
+            $email = trim((string)($r['email'] ?? ''));
+            $label = $cui !== '' ? ('Client: ' . $name . ' · CUI ' . $cui) : ('Client: ' . $name);
+            $subParts = [];
+            if ($contact !== '') $subParts[] = $contact;
+            if ($phone !== '') $subParts[] = $phone;
+            if ($email !== '') $subParts[] = $email;
+            $searchText = self::joinText([$name, $cui, $contact, $phone, $email, (string)($r['address'] ?? '')]);
+            self::insertRow($pdo, [
+                'entity_type' => 'client',
+                'entity_id' => $id,
+                'label' => $label,
+                'sub' => $subParts ? implode(' · ', $subParts) : '',
+                'href' => \App\Core\Url::to('/clients/' . $id),
+                'search_text' => $searchText,
+                'updated_at' => $now,
+            ]);
+            $count++;
+        }
+        return $count;
+    }
+
+    private static function indexClientGroups(PDO $pdo, string $now): int
+    {
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, name
+            FROM client_groups
+            ORDER BY name ASC
+        ");
+        if (!$rows) return 0;
+        $count = 0;
+        foreach ($rows as $r) {
+            $id = (int)($r['id'] ?? 0);
+            $name = trim((string)($r['name'] ?? ''));
+            if ($name === '') continue;
+            self::insertRow($pdo, [
+                'entity_type' => 'client_group',
+                'entity_id' => $id,
+                'label' => 'Grup clienți: ' . $name,
+                'sub' => '',
+                'href' => \App\Core\Url::to('/clients'),
+                'search_text' => $name,
+                'updated_at' => $now,
+            ]);
+            $count++;
+        }
+        return $count;
+    }
+
     private static function indexLabels(PDO $pdo, string $now): int
     {
         $rows = self::fetchAllSafe($pdo, "
@@ -350,6 +439,35 @@ final class SearchIndex
                 'label' => $label,
                 'sub' => $subParts ? implode(' · ', $subParts) : '',
                 'href' => \App\Core\Url::to('/stock/boards/' . $id),
+                'search_text' => $searchText,
+                'updated_at' => $now,
+            ]);
+            $count++;
+        }
+        return $count;
+    }
+
+    private static function indexHplThickness(PDO $pdo, string $now): int
+    {
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT DISTINCT thickness_mm
+            FROM hpl_boards
+            WHERE thickness_mm IS NOT NULL
+            ORDER BY thickness_mm ASC
+        ");
+        if (!$rows) return 0;
+        $count = 0;
+        foreach ($rows as $r) {
+            $th = (int)($r['thickness_mm'] ?? 0);
+            if ($th <= 0) continue;
+            $label = 'Grosime HPL: ' . $th . ' mm';
+            $searchText = self::joinText([(string)$th, $th . ' mm', 'grosime']);
+            self::insertRow($pdo, [
+                'entity_type' => 'hpl_thickness',
+                'entity_id' => $th,
+                'label' => $label,
+                'sub' => '',
+                'href' => \App\Core\Url::to('/stock') . '?thickness_mm=' . $th,
                 'search_text' => $searchText,
                 'updated_at' => $now,
             ]);
