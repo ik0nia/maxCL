@@ -80,7 +80,7 @@ $toastError = Session::flash('toast_error');
         <?php $isViewRole = $user && (string)($user['role'] ?? '') === Auth::ROLE_VIEW; ?>
         <?php if ($isViewRole): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/hpl/catalog') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>">
-            <i class="bi bi-grid-3x3-gap me-2"></i> Catalog
+            <i class="bi bi-grid-3x3-gap me-2"></i> Catalog HPL
           </a>
         <?php else: ?>
           <div class="app-nav-section">Proiecte</div>
