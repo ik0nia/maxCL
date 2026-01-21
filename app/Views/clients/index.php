@@ -37,6 +37,7 @@ ob_start();
             <th>Email</th>
             <th>Adresă livrare</th>
             <th>Proiecte</th>
+            <th>Oferte</th>
             <th class="text-end" style="width:240px">Acțiuni</th>
           </tr>
         </thead>
@@ -48,6 +49,9 @@ ob_start();
               $plist = (string)($r['project_list'] ?? '');
               $projects = $plist !== '' ? explode('||', $plist) : [];
               $pCount = (int)($r['project_count'] ?? 0);
+              $olist = (string)($r['offer_list'] ?? '');
+              $offers = $olist !== '' ? explode('||', $olist) : [];
+              $oCount = (int)($r['offer_count'] ?? 0);
             ?>
             <tr class="js-row-link" data-href="<?= htmlspecialchars(Url::to('/clients/' . (int)$r['id'])) ?>" role="button" tabindex="0">
               <td>
@@ -79,6 +83,21 @@ ob_start();
                   </div>
                 <?php endif; ?>
               </td>
+          <td>
+            <?php if ($oCount <= 0): ?>
+              <span class="text-muted">—</span>
+            <?php else: ?>
+              <div class="small text-muted mb-1"><?= $oCount ?> ofertă(e)</div>
+              <div class="d-flex flex-wrap gap-1">
+                <?php foreach (array_slice($offers, 0, 4) as $o): ?>
+                  <span class="badge app-badge"><?= htmlspecialchars($o) ?></span>
+                <?php endforeach; ?>
+                <?php if (count($offers) > 4): ?>
+                  <span class="text-muted small">+<?= (int)(count($offers) - 4) ?></span>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+          </td>
               <td class="text-end">
                 <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/clients/' . (int)$r['id'])) ?>">
                   <i class="bi bi-eye me-1"></i> Vezi

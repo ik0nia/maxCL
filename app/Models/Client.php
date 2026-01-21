@@ -14,6 +14,12 @@ final class Client
         return str_contains($m, 'unknown column') && str_contains($m, strtolower($col));
     }
 
+    private static function isMissingTable(\Throwable $e, string $table): bool
+    {
+        $m = strtolower($e->getMessage());
+        return (str_contains($m, "doesn't exist") || str_contains($m, 'not found')) && str_contains($m, strtolower($table));
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function allWithProjects(): array
     {
@@ -24,45 +30,97 @@ final class Client
                 SELECT
                   c.*,
                   cg.name AS client_group_name,
-                  COUNT(p.id) AS project_count,
-                  GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
+                  COALESCE(p.project_count,0) AS project_count,
+                  p.project_list,
+                  COALESCE(o.offer_count,0) AS offer_count,
+                  o.offer_list
                 FROM clients c
                 LEFT JOIN client_groups cg ON cg.id = c.client_group_id
-                LEFT JOIN projects p
-                  ON p.client_id = c.id
-                 AND (p.deleted_at IS NULL OR p.deleted_at = '' OR p.deleted_at = '0000-00-00 00:00:00')
-                GROUP BY c.id
+                LEFT JOIN (
+                  SELECT
+                    client_id,
+                    COUNT(id) AS project_count,
+                    GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
+                  FROM projects
+                  WHERE (deleted_at IS NULL OR deleted_at = '' OR deleted_at = '0000-00-00 00:00:00')
+                  GROUP BY client_id
+                ) p ON p.client_id = c.id
+                LEFT JOIN (
+                  SELECT
+                    client_id,
+                    COUNT(id) AS offer_count,
+                    GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
+                  FROM offers
+                  GROUP BY client_id
+                ) o ON o.client_id = c.id
                 ORDER BY c.name ASC
             ";
             return $pdo->query($sql)->fetchAll();
         } catch (\Throwable $e) {
             // Compat: instalări vechi fără client_groups / fără deleted_at pe projects.
-            if (!self::isUnknownColumn($e, 'client_group_id') && !self::isUnknownColumn($e, 'deleted_at')) {
+            if (
+                !self::isUnknownColumn($e, 'client_group_id')
+                && !self::isUnknownColumn($e, 'deleted_at')
+                && !self::isMissingTable($e, 'offers')
+                && !self::isMissingTable($e, 'client_groups')
+            ) {
                 throw $e;
             }
             try {
                 $sql2 = "
                     SELECT
                       c.*,
-                      COUNT(p.id) AS project_count,
-                      GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
+                      COALESCE(p.project_count,0) AS project_count,
+                      p.project_list,
+                      COALESCE(o.offer_count,0) AS offer_count,
+                      o.offer_list
                     FROM clients c
-                    LEFT JOIN projects p
-                      ON p.client_id = c.id
-                     AND (p.deleted_at IS NULL OR p.deleted_at = '' OR p.deleted_at = '0000-00-00 00:00:00')
-                    GROUP BY c.id
+                    LEFT JOIN (
+                      SELECT
+                        client_id,
+                        COUNT(id) AS project_count,
+                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
+                      FROM projects
+                      WHERE (deleted_at IS NULL OR deleted_at = '' OR deleted_at = '0000-00-00 00:00:00')
+                      GROUP BY client_id
+                    ) p ON p.client_id = c.id
+                    LEFT JOIN (
+                      SELECT
+                        client_id,
+                        COUNT(id) AS offer_count,
+                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
+                      FROM offers
+                      GROUP BY client_id
+                    ) o ON o.client_id = c.id
                     ORDER BY c.name ASC
                 ";
                 return $pdo->query($sql2)->fetchAll();
             } catch (\Throwable $e2) {
-                if (!self::isUnknownColumn($e2, 'deleted_at')) throw $e2;
+                if (!self::isUnknownColumn($e2, 'deleted_at') && !self::isMissingTable($e2, 'offers')) throw $e2;
                 $sql3 = "
                     SELECT
                       c.*,
-                      COUNT(p.id) AS project_count,
-                      GROUP_CONCAT(CONCAT(p.code, ' · ', p.name) ORDER BY p.created_at DESC SEPARATOR '||') AS project_list
+                      COALESCE(p.project_count,0) AS project_count,
+                      p.project_list,
+                      COALESCE(o.offer_count,0) AS offer_count,
+                      o.offer_list
                     FROM clients c
-                    LEFT JOIN projects p ON p.client_id = c.id
+                    LEFT JOIN (
+                      SELECT
+                        client_id,
+                        COUNT(id) AS project_count,
+                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
+                      FROM projects
+                      GROUP BY client_id
+                    ) p ON p.client_id = c.id
+                    LEFT JOIN (
+                      SELECT
+                        client_id,
+                        COUNT(id) AS offer_count,
+                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
+                      FROM offers
+                      GROUP BY client_id
+                    ) o ON o.client_id = c.id
                     GROUP BY c.id
                     ORDER BY c.name ASC
                 ";
