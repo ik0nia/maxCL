@@ -231,5 +231,51 @@ final class OffcutsController
         }
         Response::redirect($return);
     }
+
+    public static function trashPiece(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $pieceId = (int)($params['pieceId'] ?? 0);
+        $bucket = isset($_GET['bucket']) ? trim((string)$_GET['bucket']) : '';
+        $return = '/hpl/bucati-rest' . ($bucket !== '' ? ('?bucket=' . rawurlencode($bucket)) : '');
+
+        if ($pieceId <= 0) {
+            Session::flash('toast_error', 'Piesă invalidă.');
+            Response::redirect($return);
+        }
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($note === '') {
+            Session::flash('toast_error', 'Completează nota explicativă.');
+            Response::redirect($return);
+        }
+        $piece = HplStockPiece::find($pieceId);
+        if (!$piece) {
+            Session::flash('toast_error', 'Piesă inexistentă.');
+            Response::redirect($return);
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $before = $piece;
+            HplStockPiece::updateFields($pieceId, [
+                'status' => 'SCRAP',
+                'location' => 'Depozit (Stricat)',
+            ]);
+            HplStockPiece::appendNote($pieceId, $note);
+            $pdo->commit();
+            $after = HplStockPiece::find($pieceId) ?: $before;
+            Audit::log('HPL_STOCK_TRASH', 'hpl_stock_pieces', $pieceId, $before, $after, [
+                'message' => 'Piesă scoasă din stoc (Depozit Stricat).',
+                'note' => $note,
+            ]);
+            Session::flash('toast_success', 'Piesa a fost scoasă din stoc.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot scoate piesa: ' . $e->getMessage());
+        }
+        Response::redirect($return);
+    }
 }
 

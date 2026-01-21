@@ -222,6 +222,7 @@ $router->post('/hpl/piese-interne/create', fn() => HplInternalPiecesController::
 // Plăci HPL: Bucăți rest (piese non-standard, stocabile + interne)
 $router->get('/hpl/bucati-rest', fn() => HplOffcutsController::index(), $hplReadMW);
 $router->post('/hpl/bucati-rest/{pieceId}/photo', fn($p) => HplOffcutsController::uploadPhoto($p), $hplReadMW);
+$router->post('/hpl/bucati-rest/{pieceId}/trash', fn($p) => HplOffcutsController::trashPiece($p), $hplReadMW);
 
 // Plăci HPL: Tip culoare (folosește tabela finishes, dar fără texturi)
 $router->get('/hpl/tip-culoare', fn() => FinishesController::index(), $catalogMW);

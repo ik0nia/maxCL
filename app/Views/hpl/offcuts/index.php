@@ -150,6 +150,9 @@ ob_start();
         $photoTitle = $photo ? (string)($photo['original_name'] ?? 'Poză piesă') : '';
         $uploadAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/photo';
         if ($bucket !== '') $uploadAction .= '?bucket=' . rawurlencode($bucket);
+        $trashAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/trash';
+        if ($bucket !== '') $trashAction .= '?bucket=' . rawurlencode($bucket);
+        $pieceLabel = trim((string)($it['board_code'] ?? '') . ' · ' . $h . '×' . $w . ' mm');
       ?>
       <div class="col-12 col-md-6 col-lg-3">
         <div class="card app-card p-3 h-100 js-card-link"
@@ -174,6 +177,15 @@ ob_start();
                    data-lightbox-title="<?= htmlspecialchars($photoTitle !== '' ? $photoTitle : 'Poză piesă') ?>">
                   <i class="bi bi-camera me-1"></i> Poză
                 </a>
+              <?php endif; ?>
+              <?php if ($canUpload): ?>
+                <button class="btn btn-sm btn-outline-danger mt-1 js-trash-piece"
+                        type="button"
+                        data-piece-id="<?= (int)($it['piece_id'] ?? 0) ?>"
+                        data-piece-label="<?= htmlspecialchars($pieceLabel, ENT_QUOTES) ?>"
+                        data-action="<?= htmlspecialchars(Url::to($trashAction)) ?>">
+                  <i class="bi bi-trash3 me-1"></i> Scoate piesa din stoc
+                </button>
               <?php endif; ?>
             </div>
           </div>
@@ -233,6 +245,30 @@ ob_start();
     <?php endforeach; ?>
   </div>
 
+  <!-- Modal: Scoate piesa din stoc -->
+  <div class="modal fade" id="offcutTrashModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius:14px">
+        <div class="modal-header">
+          <h5 class="modal-title">Scoate piesa din stoc</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Închide"></button>
+        </div>
+        <form method="post" id="offcutTrashForm">
+          <div class="modal-body">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+            <div class="text-muted small mb-2" id="offcutTrashLabel"></div>
+            <label class="form-label small">Notă explicativă (obligatoriu)</label>
+            <textarea class="form-control" name="note" rows="3" placeholder="Ex: piesă defectă / lovită / zgâriată" required></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+            <button type="submit" class="btn btn-danger">Confirmă scoaterea</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Scale rectangles to fit canvas, preserving aspect ratio.
     document.addEventListener('DOMContentLoaded', function(){
@@ -262,6 +298,21 @@ ob_start();
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             go(e);
+          }
+        });
+      });
+
+      const modalEl = document.getElementById('offcutTrashModal');
+      const formEl = document.getElementById('offcutTrashForm');
+      const labelEl = document.getElementById('offcutTrashLabel');
+      document.querySelectorAll('.js-trash-piece').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          const action = btn.getAttribute('data-action') || '';
+          const label = btn.getAttribute('data-piece-label') || '';
+          if (formEl && action) formEl.setAttribute('action', action);
+          if (labelEl) labelEl.textContent = label !== '' ? label : '—';
+          if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
           }
         });
       });
