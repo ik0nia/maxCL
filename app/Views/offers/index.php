@@ -34,31 +34,6 @@ ob_start();
 </div>
 
 <div class="card app-card p-3">
-  <form method="get" action="<?= htmlspecialchars(Url::to('/offers')) ?>" class="row g-2 align-items-end mb-3">
-    <div class="col-12 col-md-6">
-      <label class="form-label fw-semibold mb-1">Caută</label>
-      <input class="form-control" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Cod sau nume…">
-    </div>
-    <div class="col-12 col-md-4">
-      <label class="form-label fw-semibold mb-1">Status</label>
-      <select class="form-select" name="status">
-        <option value="">Toate</option>
-        <?php foreach ($statuses as $s): ?>
-          <option value="<?= htmlspecialchars((string)$s['value']) ?>" <?= ((string)$s['value'] === $status) ? 'selected' : '' ?>>
-            <?= htmlspecialchars((string)$s['label']) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="col-12 col-md-2 d-flex gap-2">
-      <button class="btn btn-outline-secondary w-100" type="submit">
-        <i class="bi bi-search me-1"></i> Caută
-      </button>
-      <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
-        <i class="bi bi-x-lg"></i>
-      </a>
-    </div>
-  </form>
   <table class="table table-hover align-middle mb-0" id="offersTable">
     <thead>
       <tr>
