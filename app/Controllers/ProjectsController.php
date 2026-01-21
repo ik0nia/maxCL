@@ -2763,7 +2763,7 @@ final class ProjectsController
             ],
             'errors' => [],
             'statuses' => self::statuses(),
-            'clients' => Client::allWithProjects(), // reuse list (name/type)
+            'clients' => Client::forSelect(),
             'groups' => ClientGroup::forSelect(),
             'labelsAll' => $labelsAll,
             'labelsSelected' => [],
@@ -2807,7 +2807,7 @@ final class ProjectsController
                 'row' => array_merge($_POST, ['code' => $nextCode]),
                 'errors' => $errors,
                 'statuses' => self::statuses(),
-                'clients' => Client::allWithProjects(),
+                'clients' => Client::forSelect(),
                 'groups' => ClientGroup::forSelect(),
                 'labelsAll' => $labelsAll,
                 'labelsSelected' => [],
@@ -3201,7 +3201,7 @@ final class ProjectsController
                     'cncFiles' => $cncFiles,
                     'statuses' => self::statuses(),
                     'allocationModes' => [],
-                    'clients' => Client::allWithProjects(),
+                    'clients' => Client::forSelect(),
                     'groups' => ClientGroup::forSelect(),
                 ]);
                 return;

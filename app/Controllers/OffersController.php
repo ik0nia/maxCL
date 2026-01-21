@@ -122,7 +122,7 @@ final class OffersController
         $statuses = self::statuses();
         $clients = [];
         $groups = [];
-        try { $clients = Client::all(); } catch (\Throwable $e) { $clients = []; }
+        try { $clients = Client::forSelect(); } catch (\Throwable $e) { $clients = []; }
         try { $groups = ClientGroup::all(); } catch (\Throwable $e) { $groups = []; }
         echo View::render('offers/form', [
             'title' => 'Oferta nouă',
@@ -154,7 +154,7 @@ final class OffersController
             $row = $_POST;
             $row['code'] = $code;
             $statuses = self::statuses();
-            try { $clients = Client::all(); } catch (\Throwable $e) { $clients = []; }
+            try { $clients = Client::forSelect(); } catch (\Throwable $e) { $clients = []; }
             try { $groups = ClientGroup::all(); } catch (\Throwable $e) { $groups = []; }
             echo View::render('offers/form', [
                 'title' => 'Oferta nouă',
@@ -328,7 +328,7 @@ final class OffersController
         $clients = [];
         $groups = [];
         $productsAll = [];
-        try { $clients = Client::all(); } catch (\Throwable $e) { $clients = []; }
+        try { $clients = Client::forSelect(); } catch (\Throwable $e) { $clients = []; }
         try { $groups = ClientGroup::all(); } catch (\Throwable $e) { $groups = []; }
         try { $productsAll = Product::all(null, 2000); } catch (\Throwable $e) { $productsAll = []; }
         $statuses = self::statuses();

@@ -71,6 +71,25 @@ final class Client
         }
     }
 
+    /** @return array<int, array{id:int,name:string,type?:string}> */
+    public static function forSelect(): array
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        try {
+            $st = $pdo->prepare('SELECT id, name, type FROM clients ORDER BY name ASC');
+            $st->execute();
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            if (!self::isUnknownColumn($e, 'type')) {
+                throw $e;
+            }
+            $st = $pdo->prepare('SELECT id, name FROM clients ORDER BY name ASC');
+            $st->execute();
+            return $st->fetchAll();
+        }
+    }
+
     public static function find(int $id): ?array
     {
         /** @var PDO $pdo */
