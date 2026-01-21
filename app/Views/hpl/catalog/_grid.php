@@ -1,9 +1,12 @@
 <?php
+use App\Core\Auth;
 use App\Core\Url;
 
 $finishes = $finishes ?? [];
 $stockByFinish = $stockByFinish ?? [];
 $totalByFinish = $totalByFinish ?? [];
+$u = Auth::user();
+$isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
 ?>
 <div class="row g-3">
   <?php foreach ($finishes as $f): ?>
@@ -34,10 +37,15 @@ $totalByFinish = $totalByFinish ?? [];
         </div>
 
         <div class="mt-2 text-center">
-          <a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none">
+          <?php if ($isViewRole): ?>
             <div class="fw-semibold" style="font-size:1.25rem;line-height:1.1;color:#111"><?= htmlspecialchars($code) ?></div>
             <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($name) ?></div>
-          </a>
+          <?php else: ?>
+            <a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none">
+              <div class="fw-semibold" style="font-size:1.25rem;line-height:1.1;color:#111"><?= htmlspecialchars($code) ?></div>
+              <div class="text-muted" style="font-weight:600"><?= htmlspecialchars($name) ?></div>
+            </a>
+          <?php endif; ?>
           <div class="text-muted small mt-1">Total disponibil: <span class="fw-semibold"><?= number_format((float)$tot, 2, '.', '') ?></span> mp</div>
         </div>
 

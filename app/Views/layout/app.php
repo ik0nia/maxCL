@@ -77,79 +77,86 @@ $toastError = Session::flash('toast_error');
     <aside class="app-sidebar" id="sidebar">
       <nav class="app-nav">
         <?php $p = Url::currentPath(); ?>
-        <div class="app-nav-section">Proiecte</div>
-        <a class="app-nav-link <?= str_starts_with($p, '/offers') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
-          <i class="bi bi-clipboard-check me-2"></i> Oferte
-        </a>
-        <a class="app-nav-link <?= str_starts_with($p, '/projects') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
-          <i class="bi bi-kanban me-2"></i> Proiecte
-        </a>
-        <a class="app-nav-link <?= str_starts_with($p, '/products') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/products')) ?>">
-          <i class="bi bi-box2-heart me-2"></i> Produse
-        </a>
-
-        <div class="app-nav-section">Clienți</div>
-        <a class="app-nav-link <?= str_starts_with($p, '/clients') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/clients')) ?>">
-          <i class="bi bi-people me-2"></i> Clienți
-        </a>
-
-        <div class="app-nav-section">Plăci HPL</div>
-        <a class="app-nav-link <?= str_starts_with($p, '/hpl/catalog') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>">
-          <i class="bi bi-grid-3x3-gap me-2"></i> Catalog
-        </a>
-        <a class="app-nav-link <?= str_starts_with($p, '/hpl/tip-culoare') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
-          <i class="bi bi-palette2 me-2"></i> Tip culoare
-        </a>
-        <a class="app-nav-link <?= str_starts_with($p, '/stock') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
-          <i class="bi bi-box-seam me-2"></i> Stoc HPL
-        </a>
-        <?php
-          $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
-        ?>
-        <?php if ($canInternal): ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/hpl/bucati-rest') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
-            <i class="bi bi-bounding-box-circles me-2"></i> Bucăți rest HPL
+        <?php $isViewRole = $user && (string)($user['role'] ?? '') === Auth::ROLE_VIEW; ?>
+        <?php if ($isViewRole): ?>
+          <a class="app-nav-link <?= str_starts_with($p, '/hpl/catalog') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>">
+            <i class="bi bi-grid-3x3-gap me-2"></i> Catalog
           </a>
-          <a class="app-nav-link <?= str_starts_with($p, '/hpl/piese-interne') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
-            <i class="bi bi-scissors me-2"></i> Adaugă plăci nestocabile
+        <?php else: ?>
+          <div class="app-nav-section">Proiecte</div>
+          <a class="app-nav-link <?= str_starts_with($p, '/offers') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/offers')) ?>">
+            <i class="bi bi-clipboard-check me-2"></i> Oferte
           </a>
-        <?php endif; ?>
-
-        <div class="app-nav-section">Magazie</div>
-        <a class="app-nav-link <?= str_starts_with($p, '/magazie/stoc') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>">
-          <i class="bi bi-boxes me-2"></i> Stoc Magazie
-        </a>
-        <a class="app-nav-link <?= str_starts_with($p, '/magazie/receptie') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/receptie')) ?>">
-          <i class="bi bi-truck me-2"></i> Recepție marfă
-        </a>
-
-        <?php if (!$user || (string)($user['role'] ?? '') !== Auth::ROLE_OPERATOR): ?>
-          <div class="app-nav-section">Sistem</div>
-          <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
-            <i class="bi bi-journal-text me-2"></i> Jurnal activitate
+          <a class="app-nav-link <?= str_starts_with($p, '/projects') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
+            <i class="bi bi-kanban me-2"></i> Proiecte
           </a>
-          <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
-            <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
-              <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
+          <a class="app-nav-link <?= str_starts_with($p, '/products') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/products')) ?>">
+            <i class="bi bi-box2-heart me-2"></i> Produse
+          </a>
+
+          <div class="app-nav-section">Clienți</div>
+          <a class="app-nav-link <?= str_starts_with($p, '/clients') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/clients')) ?>">
+            <i class="bi bi-people me-2"></i> Clienți
+          </a>
+
+          <div class="app-nav-section">Plăci HPL</div>
+          <a class="app-nav-link <?= str_starts_with($p, '/hpl/catalog') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/catalog')) ?>">
+            <i class="bi bi-grid-3x3-gap me-2"></i> Catalog
+          </a>
+          <a class="app-nav-link <?= str_starts_with($p, '/hpl/tip-culoare') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/tip-culoare')) ?>">
+            <i class="bi bi-palette2 me-2"></i> Tip culoare
+          </a>
+          <a class="app-nav-link <?= str_starts_with($p, '/stock') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/stock')) ?>">
+            <i class="bi bi-box-seam me-2"></i> Stoc HPL
+          </a>
+          <?php
+            $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+          ?>
+          <?php if ($canInternal): ?>
+            <a class="app-nav-link <?= str_starts_with($p, '/hpl/bucati-rest') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
+              <i class="bi bi-bounding-box-circles me-2"></i> Bucăți rest HPL
+            </a>
+            <a class="app-nav-link <?= str_starts_with($p, '/hpl/piese-interne') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
+              <i class="bi bi-scissors me-2"></i> Adaugă plăci nestocabile
             </a>
           <?php endif; ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
-            <i class="bi bi-person-gear me-2"></i> Utilizatori
+
+          <div class="app-nav-section">Magazie</div>
+          <a class="app-nav-link <?= str_starts_with($p, '/magazie/stoc') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>">
+            <i class="bi bi-boxes me-2"></i> Stoc Magazie
           </a>
-          <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
-            <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
-              <i class="bi bi-cash-coin me-2"></i> Setări costuri
+          <a class="app-nav-link <?= str_starts_with($p, '/magazie/receptie') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/magazie/receptie')) ?>">
+            <i class="bi bi-truck me-2"></i> Recepție marfă
+          </a>
+
+          <?php if (!$user || (string)($user['role'] ?? '') !== Auth::ROLE_OPERATOR): ?>
+            <div class="app-nav-section">Sistem</div>
+            <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
+              <i class="bi bi-journal-text me-2"></i> Jurnal activitate
             </a>
-          <?php endif; ?>
-          <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
-            <a class="app-nav-link <?= str_starts_with($p, '/system/admin-settings') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/admin-settings')) ?>">
-              <i class="bi bi-shield-lock me-2"></i> Setări admin
+            <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
+              <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
+                <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
+              </a>
+            <?php endif; ?>
+            <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
+              <i class="bi bi-person-gear me-2"></i> Utilizatori
             </a>
-          <?php endif; ?>
-          <?php if ($user && strtolower((string)($user['email'] ?? '')) === 'sacodrut@ikonia.ro'): ?>
-            <a class="app-nav-link <?= str_starts_with($p, '/system/db-update') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/db-update')) ?>">
-              <i class="bi bi-database-gear me-2"></i> Update DB
-            </a>
+            <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
+              <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
+                <i class="bi bi-cash-coin me-2"></i> Setări costuri
+              </a>
+            <?php endif; ?>
+            <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
+              <a class="app-nav-link <?= str_starts_with($p, '/system/admin-settings') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/admin-settings')) ?>">
+                <i class="bi bi-shield-lock me-2"></i> Setări admin
+              </a>
+            <?php endif; ?>
+            <?php if ($user && strtolower((string)($user['email'] ?? '')) === 'sacodrut@ikonia.ro'): ?>
+              <a class="app-nav-link <?= str_starts_with($p, '/system/db-update') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/db-update')) ?>">
+                <i class="bi bi-database-gear me-2"></i> Update DB
+              </a>
+            <?php endif; ?>
           <?php endif; ?>
         <?php endif; ?>
       </nav>
