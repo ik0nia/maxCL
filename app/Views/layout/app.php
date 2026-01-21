@@ -52,7 +52,7 @@ $toastError = Session::flash('toast_error');
       </div>
 
       <div class="d-flex align-items-center gap-2">
-        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
+        <?php if ($user && (string)($user['role'] ?? '') !== Auth::ROLE_VIEW): ?>
           <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(Url::to('/manual')) ?>">
             <i class="bi bi-question-circle me-1"></i> Manual aplicatie
           </a>
