@@ -15,7 +15,7 @@ ob_start();
 <div class="app-page-title">
   <div>
     <h1 class="m-0"><?= $isEdit ? 'Editează client' : 'Client nou' ?></h1>
-    <div class="text-muted">Date minime: nume, telefon, email, adresă livrare</div>
+    <div class="text-muted">Date minime: nume și adresă livrare. Telefonul și emailul sunt opționale.</div>
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/clients')) ?>" class="btn btn-outline-secondary">Înapoi</a>
@@ -74,14 +74,14 @@ ob_start();
     </div>
 
     <div class="col-12 col-md-4">
-      <label class="form-label">Telefon *</label>
-      <input class="form-control <?= isset($errors['phone']) ? 'is-invalid' : '' ?>" name="phone" value="<?= htmlspecialchars((string)($v['phone'] ?? '')) ?>" required>
+      <label class="form-label">Telefon (opțional)</label>
+      <input class="form-control <?= isset($errors['phone']) ? 'is-invalid' : '' ?>" name="phone" value="<?= htmlspecialchars((string)($v['phone'] ?? '')) ?>">
       <?php if (isset($errors['phone'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['phone']) ?></div><?php endif; ?>
     </div>
 
     <div class="col-12 col-md-4">
-      <label class="form-label">Email *</label>
-      <input class="form-control <?= isset($errors['email']) ? 'is-invalid' : '' ?>" name="email" value="<?= htmlspecialchars((string)($v['email'] ?? '')) ?>" required>
+      <label class="form-label">Email (opțional)</label>
+      <input class="form-control <?= isset($errors['email']) ? 'is-invalid' : '' ?>" name="email" value="<?= htmlspecialchars((string)($v['email'] ?? '')) ?>">
       <?php if (isset($errors['email'])): ?><div class="invalid-feedback"><?= htmlspecialchars($errors['email']) ?></div><?php endif; ?>
     </div>
 

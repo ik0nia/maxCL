@@ -63,8 +63,6 @@ final class ClientsController
         $check = Validator::required($_POST, [
             'type' => 'Tip client',
             'name' => 'Nume (client/companie)',
-            'phone' => 'Telefon',
-            'email' => 'Email',
             'address' => 'Adresă livrare',
         ]);
         $errors = $check['errors'];
@@ -205,8 +203,6 @@ final class ClientsController
         $check = Validator::required($_POST, [
             'type' => 'Tip client',
             'name' => 'Nume (client/companie)',
-            'phone' => 'Telefon',
-            'email' => 'Email',
             'address' => 'Adresă livrare',
         ]);
         $errors = $check['errors'];
