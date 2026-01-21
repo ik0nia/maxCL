@@ -243,7 +243,7 @@ ob_start();
             </form>
           <?php endif; ?>
 
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="h5 text-success fw-semibold">Consum HPL</div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -290,28 +290,28 @@ ob_start();
               </table>
             </div>
             <?php if ($canWrite): ?>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/hpl/create')) ?>" class="row g-2 mt-2">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/hpl/create')) ?>" class="row g-2 mt-2 align-items-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <div class="col-12 col-md-6">
-                  <select class="form-select js-offer-hpl-board" name="board_id" data-placeholder="Caută placă HPL…" style="width:100%"></select>
+                  <select class="form-select form-select-sm js-offer-hpl-board" name="board_id" data-placeholder="Caută placă HPL…" style="width:100%"></select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="1">
                 </div>
                 <div class="col-6 col-md-2">
-                  <select class="form-select" name="consume_mode">
+                  <select class="form-select form-select-sm" name="consume_mode">
                     <option value="FULL">Full</option>
                     <option value="HALF">Jumătate</option>
                   </select>
                 </div>
                 <div class="col-12 col-md-1 d-flex align-items-end">
-                  <button class="btn btn-outline-secondary w-100" type="submit">+</button>
+                  <button class="btn btn-success btn-sm w-100" type="submit">+</button>
                 </div>
               </form>
             <?php endif; ?>
           </div>
 
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="h5 text-success fw-semibold">Consum Accesorii</div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -353,28 +353,28 @@ ob_start();
               </table>
             </div>
             <?php if ($canWrite): ?>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/accessories/create')) ?>" class="row g-2 mt-2">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/accessories/create')) ?>" class="row g-2 mt-2 align-items-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <div class="col-12 col-md-6">
-                  <select class="form-select js-offer-magazie-item" name="item_id" data-placeholder="Caută accesoriu…" style="width:100%"></select>
+                  <select class="form-select form-select-sm js-offer-magazie-item" name="item_id" data-placeholder="Caută accesoriu…" style="width:100%"></select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control" type="number" step="0.01" min="0" name="qty" value="1">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="1">
                 </div>
                 <div class="col-6 col-md-2 d-flex align-items-center">
-                  <div class="form-check mt-3">
+                  <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" name="include_in_deviz" id="accDeviz<?= $opId ?>" checked>
                     <label class="form-check-label" for="accDeviz<?= $opId ?>">Include</label>
                   </div>
                 </div>
                 <div class="col-12 col-md-1 d-flex align-items-end">
-                  <button class="btn btn-outline-secondary w-100" type="submit">+</button>
+                  <button class="btn btn-success btn-sm w-100" type="submit">+</button>
                 </div>
               </form>
             <?php endif; ?>
           </div>
 
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="h5 text-success fw-semibold">Manoperă</div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -417,22 +417,22 @@ ob_start();
               </table>
             </div>
             <?php if ($canWrite): ?>
-              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/work/create')) ?>" class="row g-2 mt-2">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/work/create')) ?>" class="row g-2 mt-2 align-items-end">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                 <div class="col-12 col-md-3">
-                  <select class="form-select" name="work_type">
+                  <select class="form-select form-select-sm" name="work_type">
                     <option value="CNC">CNC</option>
                     <option value="ATELIER">Atelier</option>
                   </select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control" type="number" step="0.01" min="0" name="hours_estimated" placeholder="Ore">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="hours_estimated" placeholder="Ore">
                 </div>
                 <div class="col-6 col-md-4">
-                  <input class="form-control" name="note" placeholder="Notă (opțional)">
+                  <input class="form-control form-control-sm" name="note" placeholder="Notă (opțional)">
                 </div>
                 <div class="col-12 col-md-2 d-flex align-items-end">
-                  <button class="btn btn-outline-secondary w-100" type="submit">+</button>
+                  <button class="btn btn-success btn-sm w-100" type="submit">+</button>
                 </div>
               </form>
             <?php endif; ?>
