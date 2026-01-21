@@ -26,8 +26,8 @@ ob_start();
   </div>
 </div>
 
-<div class="card app-card p-3 mb-3">
-  <form method="get" action="<?= htmlspecialchars(Url::to('/products')) ?>" class="row g-2 align-items-end">
+<div class="card app-card p-3">
+  <form method="get" action="<?= htmlspecialchars(Url::to('/products')) ?>" class="row g-2 align-items-end mb-3">
     <div style="min-width:320px;flex:1">
       <label class="form-label fw-semibold mb-1">Caută</label>
       <input class="form-control" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Cod sau nume…">
@@ -45,9 +45,6 @@ ob_start();
       </a>
     </div>
   </form>
-</div>
-
-<div class="card app-card p-3">
   <table class="table table-hover align-middle mb-0" id="productsTable">
     <thead>
       <tr>
