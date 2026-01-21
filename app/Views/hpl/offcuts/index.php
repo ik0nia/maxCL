@@ -179,13 +179,20 @@ ob_start();
                 </a>
               <?php endif; ?>
               <?php if ($canUpload): ?>
-                <button class="btn btn-sm btn-outline-danger mt-1 js-trash-piece"
-                        type="button"
-                        data-piece-id="<?= (int)($it['piece_id'] ?? 0) ?>"
-                        data-piece-label="<?= htmlspecialchars($pieceLabel, ENT_QUOTES) ?>"
-                        data-action="<?= htmlspecialchars(Url::to($trashAction)) ?>">
-                  <i class="bi bi-trash3 me-1"></i> Scoate piesa din stoc
-                </button>
+                <form class="d-inline-block mt-1 js-photo-form"
+                      method="post"
+                      enctype="multipart/form-data"
+                      action="<?= htmlspecialchars(Url::to($uploadAction)) ?>">
+                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                  <input type="file"
+                         class="d-none js-photo-input"
+                         name="photo"
+                         accept="image/jpeg,image/png,image/webp"
+                         required>
+                  <button class="btn btn-sm btn-outline-secondary js-photo-btn" type="button">
+                    <?= $photoUrl !== '' ? 'Schimbă poză' : 'Adaugă poză' ?>
+                  </button>
+                </form>
               <?php endif; ?>
             </div>
           </div>
@@ -227,19 +234,19 @@ ob_start();
               <div class="offcut-sub">
                 Filtru: <?= htmlspecialchars(_bucketLabel($bucketKey)) ?>
               </div>
-              <?php if ($canUpload): ?>
-                <form class="mt-2" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars(Url::to($uploadAction)) ?>">
-                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-                  <div class="input-group input-group-sm">
-                    <input type="file" class="form-control" name="photo" accept="image/jpeg,image/png,image/webp" required>
-                    <button class="btn btn-outline-secondary" type="submit">
-                      <?= $photoUrl !== '' ? 'Schimbă poză' : 'Adaugă poză' ?>
-                    </button>
-                  </div>
-                </form>
-              <?php endif; ?>
             </div>
           </div>
+          <?php if ($canUpload): ?>
+            <div class="mt-2 d-flex justify-content-end">
+              <button class="btn btn-sm btn-outline-danger js-trash-piece"
+                      type="button"
+                      data-piece-id="<?= (int)($it['piece_id'] ?? 0) ?>"
+                      data-piece-label="<?= htmlspecialchars($pieceLabel, ENT_QUOTES) ?>"
+                      data-action="<?= htmlspecialchars(Url::to($trashAction)) ?>">
+                <i class="bi bi-trash3 me-1"></i> Scoate piesa din stoc
+              </button>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     <?php endforeach; ?>
@@ -314,6 +321,18 @@ ob_start();
           if (modalEl && window.bootstrap && window.bootstrap.Modal) {
             window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
           }
+        });
+      });
+
+      document.querySelectorAll('.js-photo-form').forEach(function(form){
+        const input = form.querySelector('.js-photo-input');
+        const btn = form.querySelector('.js-photo-btn');
+        if (!input || !btn) return;
+        btn.addEventListener('click', function(){
+          input.click();
+        });
+        input.addEventListener('change', function(){
+          if (input.files && input.files.length > 0) form.submit();
         });
       });
     });
