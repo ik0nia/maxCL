@@ -363,8 +363,8 @@ ob_start();
                 </div>
                 <div class="col-6 col-md-2 d-flex align-items-center">
                   <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox" name="include_in_deviz" id="accDeviz<?= $opId ?>" checked>
-                    <label class="form-check-label" for="accDeviz<?= $opId ?>">Include</label>
+                    <input class="form-check-input" type="checkbox" name="include_in_deviz" id="accDeviz<?= $opId ?>">
+                    <label class="form-check-label" for="accDeviz<?= $opId ?>">Vizibil pe deviz</label>
                   </div>
                 </div>
                 <div class="col-12 col-md-1 d-flex align-items-end">
