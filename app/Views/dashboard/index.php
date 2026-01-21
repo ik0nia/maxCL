@@ -1,4 +1,5 @@
 <?php
+use App\Core\Auth;
 use App\Core\View;
 use App\Core\Url;
 
@@ -17,6 +18,8 @@ $latestOffers = is_array($latestOffers ?? null) ? $latestOffers : [];
 $latestOffersError = $latestOffersError ?? null;
 $lowMagazieItems = is_array($lowMagazieItems ?? null) ? $lowMagazieItems : [];
 $lowMagazieError = $lowMagazieError ?? null;
+$u = Auth::user();
+$isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
 ?>
 <div class="row g-3">
   <div class="col-12">
@@ -25,14 +28,17 @@ $lowMagazieError = $lowMagazieError ?? null;
         <h1 class="m-0">Panou</h1>
         <div class="text-muted">Privire de ansamblu</div>
       </div>
-      <div class="d-flex gap-2">
-        <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-primary"><i class="bi bi-box-seam me-1"></i> Stoc</a>
-      </div>
+      <?php if (!$isViewRole): ?>
+        <div class="d-flex gap-2">
+          <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-primary"><i class="bi bi-box-seam me-1"></i> Stoc</a>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 
-  <div class="col-12">
-    <div class="row g-3">
+  <?php if (!$isViewRole): ?>
+    <div class="col-12">
+      <div class="row g-3">
       <div class="col-12 col-lg-4">
         <div class="card app-card p-3 h-100">
           <div class="d-flex align-items-center justify-content-between gap-2">
@@ -163,8 +169,9 @@ $lowMagazieError = $lowMagazieError ?? null;
           </a>
         </div>
       </div>
+      </div>
     </div>
-  </div>
+  <?php endif; ?>
 
   <div class="col-12">
     <div class="card app-card p-3">
@@ -173,7 +180,9 @@ $lowMagazieError = $lowMagazieError ?? null;
           <div class="h5 m-0">Culori cu cea mai mare cantitate</div>
           <div class="text-muted">Agregat pe Tip culoare (față + verso), indiferent de textură · evidențiere pe grosimi</div>
         </div>
-        <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+        <?php if (!$isViewRole): ?>
+          <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+        <?php endif; ?>
       </div>
 
       <?php if ($stockError): ?>
@@ -191,8 +200,9 @@ $lowMagazieError = $lowMagazieError ?? null;
     </div>
   </div>
 
-  <div class="col-12 col-lg-6">
-    <div class="card app-card p-3">
+  <?php if (!$isViewRole): ?>
+    <div class="col-12 col-lg-6">
+      <div class="card app-card p-3">
       <div class="d-flex align-items-center justify-content-between">
         <div>
           <div class="h5 m-0">Stoc disponibil pe grosimi</div>
@@ -313,7 +323,8 @@ $lowMagazieError = $lowMagazieError ?? null;
         </div>
       <?php endif; ?>
     </div>
-  </div>
+    </div>
+  <?php endif; ?>
 </div>
 <?php
 $content = ob_get_clean();
