@@ -239,7 +239,7 @@ final class OffersController
     public static function canDelete(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
+        return $u && (string)($u['role'] ?? '') === Auth::ROLE_ADMIN;
     }
 
     public static function delete(array $params): void
