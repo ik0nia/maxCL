@@ -269,7 +269,7 @@ $router->get('/api/audit/{id}', fn($p) => AuditController::apiShow($p), $auditMW
 $router->get('/system/costuri', fn() => CostSettingsController::index(), $usersMW);
 $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersMW);
 
-$systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR])];
 $manualMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
 $router->get('/manual', fn() => ManualController::index(), $manualMW);
