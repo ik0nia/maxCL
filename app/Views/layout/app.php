@@ -139,6 +139,8 @@ $toastError = Session::flash('toast_error');
           <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
             <i class="bi bi-cash-coin me-2"></i> Setări costuri
           </a>
+        <?php endif; ?>
+        <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/system/admin-settings') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/admin-settings')) ?>">
             <i class="bi bi-shield-lock me-2"></i> Setări admin
           </a>
