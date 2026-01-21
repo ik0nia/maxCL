@@ -13,6 +13,7 @@ $stLbl = [
   'MONTAJ' => 'Montaj',
   'GATA_DE_LIVRARE' => 'Gata de livrare',
   'AVIZAT' => 'Avizare',
+  'LIVRAT_PARTIAL' => 'Livrat parțial',
   'LIVRAT' => 'Livrat',
 ];
 

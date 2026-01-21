@@ -888,6 +888,24 @@ final class DbMigrations
                 },
             ],
             [
+                'id' => '2026-01-26_01_project_products_status_partial_delivery',
+                'label' => 'ALTER project_products.production_status add LIVRAT_PARTIAL',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::columnExists($pdo, 'project_products', 'production_status')) return;
+                    try {
+                        $pdo->exec("
+                            ALTER TABLE project_products
+                            MODIFY production_status ENUM(
+                              'CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'
+                            ) NOT NULL DEFAULT 'CREAT'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
+            [
                 'id' => '2026-01-19_01_project_magazie_consumptions_deviz_flag',
                 'label' => 'ALTER project_magazie_consumptions ADD include_in_deviz',
                 'fn' => function (PDO $pdo): void {
