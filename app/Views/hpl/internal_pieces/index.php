@@ -90,7 +90,7 @@ ob_start();
         <div class="h5 m-0">Pas 2: Adaugă piesă internă</div>
         <div class="text-muted">Se salvează ca <strong>OFFCUT</strong> și este marcată ca <strong>nestocabilă</strong>.</div>
 
-        <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/hpl/piese-interne/create')) ?>" id="internalPieceForm">
+        <form class="row g-2 mt-2" method="post" action="<?= htmlspecialchars(Url::to('/hpl/piese-interne/create')) ?>" id="internalPieceForm" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
 
           <div class="col-12">
@@ -129,6 +129,12 @@ ob_start();
           <div class="col-12">
             <label class="form-label small">Note</label>
             <input class="form-control js-step2" name="notes" placeholder="opțional" disabled>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label small">Poză piesă (opțional)</label>
+            <input class="form-control js-step2" type="file" name="photo" accept="image/jpeg,image/png,image/webp" disabled>
+            <div class="text-muted small mt-1">JPG/PNG/WEBP · max 100MB.</div>
           </div>
 
           <div class="col-12">
