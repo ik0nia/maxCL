@@ -210,7 +210,7 @@ $router->get('/uploads/files/{name}', function (array $params) {
 
 // ---- Catalog (Admin, Gestionar)
 $catalogMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
-$hplReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$hplReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR, Auth::ROLE_VIEW])];
 
 // Plăci HPL: Catalog (vizualizare stoc pe culori/grosimi)
 $router->get('/hpl/catalog', fn() => HplCatalogController::index(), $hplReadMW);
