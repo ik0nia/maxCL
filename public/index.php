@@ -346,6 +346,7 @@ $clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Au
 $router->get('/clients', fn() => ClientsController::index(), $clientsReadMW);
 $router->get('/clients/create', fn() => ClientsController::createForm(), $clientsWriteMW);
 $router->post('/clients/create', fn() => ClientsController::create(), $clientsWriteMW);
+$router->post('/clients/groups/create', fn() => ClientsController::createGroup(), $clientsWriteMW);
 $router->get('/clients/{id}', fn($p) => ClientsController::show($p), $clientsReadMW);
 $router->get('/clients/{id}/edit', fn($p) => ClientsController::editForm($p), $clientsWriteMW);
 $router->post('/clients/{id}/edit', fn($p) => ClientsController::update($p), $clientsWriteMW);
