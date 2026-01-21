@@ -22,7 +22,7 @@ final class DashboardController
      *   by_thickness:array<int, float>
      * }>
      */
-    private static function buildTopColors(?string $q, int $limit): array
+    private static function aggregateColors(?string $q): array
     {
         $rows = StockStats::availableByAnySideColorAndThickness($q);
 
@@ -48,16 +48,51 @@ final class DashboardController
             $tmp[$cid]['by_thickness'][$t] = ($tmp[$cid]['by_thickness'][$t] ?? 0.0) + (float)$r['m2'];
         }
 
-        $topColors = array_values($tmp);
-        usort($topColors, fn($a, $b) => ($b['total_m2'] <=> $a['total_m2']));
-        $topColors = array_slice($topColors, 0, max(0, $limit));
-
         // sort thickness keys asc
-        foreach ($topColors as &$c) {
+        foreach ($tmp as &$c) {
             ksort($c['by_thickness']);
         }
 
-        return $topColors;
+        return array_values($tmp);
+    }
+
+    /**
+     * @return array<int, array{
+     *   face_color_id:int,
+     *   color_name:string,
+     *   color_code:string,
+     *   thumb_path:string,
+     *   image_path:?string,
+     *   total_m2:float,
+     *   total_qty:int,
+     *   by_thickness:array<int, float>
+     * }>
+     */
+    private static function buildTopColors(?string $q, int $limit): array
+    {
+        $colors = self::aggregateColors($q);
+        usort($colors, fn($a, $b) => ($b['total_m2'] <=> $a['total_m2']));
+        return array_slice($colors, 0, max(0, $limit));
+    }
+
+    /**
+     * @return array<int, array{
+     *   face_color_id:int,
+     *   color_name:string,
+     *   color_code:string,
+     *   thumb_path:string,
+     *   image_path:?string,
+     *   total_m2:float,
+     *   total_qty:int,
+     *   by_thickness:array<int, float>
+     * }>
+     */
+    private static function buildBottomColors(?string $q, int $limit): array
+    {
+        $colors = array_filter(self::aggregateColors($q), fn($c) => (float)($c['total_m2'] ?? 0) > 0);
+        $colors = array_values($colors);
+        usort($colors, fn($a, $b) => ($a['total_m2'] <=> $b['total_m2']));
+        return array_slice($colors, 0, max(0, $limit));
     }
 
     public static function index(): void
@@ -65,6 +100,7 @@ final class DashboardController
         $byThickness = [];
         $topColors = [];
         $stockError = null;
+        $bottomColors = [];
         $readyProductsCount = null;
         $projectsInWorkCount = null;
         $latestOffers = [];
@@ -74,6 +110,7 @@ final class DashboardController
         try {
             $byThickness = StockStats::availableByThickness();
             $topColors = self::buildTopColors(null, 6);
+            $bottomColors = self::buildBottomColors(null, 6);
         } catch (\Throwable $e) {
             $stockError = $e->getMessage();
         }
@@ -135,6 +172,7 @@ final class DashboardController
             'title' => 'Panou',
             'byThickness' => $byThickness,
             'topColors' => $topColors,
+            'bottomColors' => $bottomColors,
             'stockError' => $stockError,
             'readyProductsCount' => $readyProductsCount,
             'projectsInWorkCount' => $projectsInWorkCount,
