@@ -221,6 +221,8 @@ $router->post('/hpl/piese-interne/create', fn() => HplInternalPiecesController::
 
 // Plăci HPL: Bucăți rest (piese non-standard, stocabile + interne)
 $router->get('/hpl/bucati-rest', fn() => HplOffcutsController::index(), $hplReadMW);
+$router->post('/hpl/bucati-rest/{pieceId}/photo', fn($p) => HplOffcutsController::uploadPhoto($p), $hplReadMW);
+$router->post('/hpl/bucati-rest/{pieceId}/trash', fn($p) => HplOffcutsController::trashPiece($p), $hplReadMW);
 
 // Plăci HPL: Tip culoare (folosește tabela finishes, dar fără texturi)
 $router->get('/hpl/tip-culoare', fn() => FinishesController::index(), $catalogMW);
@@ -257,6 +259,7 @@ $router->get('/users/create', fn() => UsersController::createForm(), $usersMW);
 $router->post('/users/create', fn() => UsersController::create(), $usersMW);
 $router->get('/users/{id}/edit', fn($p) => UsersController::editForm($p), $usersMW);
 $router->post('/users/{id}/edit', fn($p) => UsersController::update($p), $usersMW);
+$router->post('/users/{id}/delete', fn($p) => UsersController::delete($p), $usersMW);
 
 $auditMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
 $router->get('/audit', fn() => AuditController::index(), $auditMW);
@@ -288,6 +291,7 @@ $router->get('/offers/{id}', fn($p) => OffersController::show($p), $offersReadMW
 $router->get('/offers/{id}/bon-general', fn($p) => OffersController::bonGeneral($p), $offersReadMW);
 $router->post('/offers/{id}/edit', fn($p) => OffersController::update($p), $offersWriteMW);
 $router->post('/offers/{id}/convert', fn($p) => OffersController::convertToProject($p), $offersWriteMW);
+$router->post('/offers/{id}/delete', fn($p) => OffersController::delete($p), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/offers/{id}/products/add-existing', fn($p) => OffersController::addExistingProduct($p), $offersWriteMW);
 $router->post('/offers/{id}/products/create', fn($p) => OffersController::createProductInOffer($p), $offersWriteMW);
 $router->post('/offers/{id}/products/{opId}/update', fn($p) => OffersController::updateOfferProduct($p), $offersWriteMW);
@@ -344,6 +348,7 @@ $clientsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Au
 $router->get('/clients', fn() => ClientsController::index(), $clientsReadMW);
 $router->get('/clients/create', fn() => ClientsController::createForm(), $clientsWriteMW);
 $router->post('/clients/create', fn() => ClientsController::create(), $clientsWriteMW);
+$router->post('/clients/groups/create', fn() => ClientsController::createGroup(), $clientsWriteMW);
 $router->get('/clients/{id}', fn($p) => ClientsController::show($p), $clientsReadMW);
 $router->get('/clients/{id}/edit', fn($p) => ClientsController::editForm($p), $clientsWriteMW);
 $router->post('/clients/{id}/edit', fn($p) => ClientsController::update($p), $clientsWriteMW);

@@ -13,6 +13,7 @@ $stLbl = [
   'MONTAJ' => 'Montaj',
   'GATA_DE_LIVRARE' => 'Gata de livrare',
   'AVIZAT' => 'Avizare',
+  'LIVRAT_PARTIAL' => 'Livrat parțial',
   'LIVRAT' => 'Livrat',
 ];
 
@@ -54,6 +55,7 @@ ob_start();
         <th>Produs</th>
         <th style="width:140px">Status</th>
         <th style="width:140px">Avizare</th>
+        <th style="width:150px">Data livrare</th>
         <th class="text-end" style="width:130px">Cant.</th>
         <th class="text-end" style="width:130px">Livrat</th>
         <th style="width:220px">Etichete</th>
@@ -71,6 +73,12 @@ ob_start();
           if ($avizDateRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $avizDateRaw)) {
             $parts = explode('-', $avizDateRaw);
             $avizDateTxt = $parts[2] . '.' . $parts[1] . '.' . $parts[0];
+          }
+          $deliveryDateRaw = trim((string)($r['delivery_date'] ?? ''));
+          $deliveryDateTxt = '—';
+          if ($deliveryDateRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $deliveryDateRaw)) {
+            $parts = explode('-', $deliveryDateRaw);
+            $deliveryDateTxt = $parts[2] . '.' . $parts[1] . '.' . $parts[0];
           }
         ?>
         <tr class="js-row-link" data-href="<?= htmlspecialchars($cardUrl) ?>" role="button" tabindex="0">
@@ -111,6 +119,7 @@ ob_start();
           <?php $sv = (string)($r['production_status'] ?? ''); ?>
           <td class="fw-semibold"><?= htmlspecialchars($stLbl[$sv] ?? $sv) ?></td>
           <td><?= htmlspecialchars($avizDateTxt) ?></td>
+          <td><?= htmlspecialchars($deliveryDateTxt) ?></td>
           <td class="text-end"><?= number_format((float)($r['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($r['unit'] ?? '')) ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)($r['delivered_qty'] ?? 0), 2, '.', '') ?></td>
           <td class="text-muted"><?= htmlspecialchars((string)($r['labels'] ?? '')) ?></td>

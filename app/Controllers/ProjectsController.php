@@ -166,7 +166,7 @@ final class ProjectsController
     private static function isFinalProductStatus(string $st): bool
     {
         $st = strtoupper(trim($st));
-        return in_array($st, ['GATA_DE_LIVRARE', 'AVIZAT', 'LIVRAT'], true);
+        return in_array($st, ['GATA_DE_LIVRARE', 'AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true);
     }
 
     /**
@@ -3345,13 +3345,13 @@ final class ProjectsController
     public static function canWrite(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     public static function canDelete(): bool
     {
         $u = Auth::user();
-        return $u && (string)($u['role'] ?? '') === Auth::ROLE_ADMIN;
+        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
     }
 
     public static function delete(array $params): void
@@ -3411,7 +3411,7 @@ final class ProjectsController
     public static function canEditProjectProducts(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        return $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     /** Operator-ul nu mai poate edita după Gata de livrare (inclusiv). */
@@ -3428,13 +3428,13 @@ final class ProjectsController
     public static function canSetProjectProductStatus(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
     }
 
     public static function canSetProjectProductFinalStatus(): bool
     {
         $u = Auth::user();
-        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true);
+        return $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
     }
 
     /** @return array<int, array{value:string,label:string}> */
@@ -3447,6 +3447,7 @@ final class ProjectsController
             ['value' => 'MONTAJ', 'label' => 'Montaj'],
             ['value' => 'GATA_DE_LIVRARE', 'label' => 'Gata de livrare'],
             ['value' => 'AVIZAT', 'label' => 'Avizare'],
+            ['value' => 'LIVRAT_PARTIAL', 'label' => 'Livrat parțial'],
             ['value' => 'LIVRAT', 'label' => 'Livrat'],
         ];
     }
@@ -3457,7 +3458,7 @@ final class ProjectsController
         $all = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
         if (self::canSetProjectProductFinalStatus()) return $all;
         // Operatorii nu pot seta statusurile finale.
-        return array_values(array_filter($all, fn($v) => !in_array($v, ['AVIZAT', 'LIVRAT'], true)));
+        return array_values(array_filter($all, fn($v) => !in_array($v, ['AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true)));
     }
 
     public static function addExistingProduct(array $params): void
@@ -3963,7 +3964,8 @@ final class ProjectsController
         $avizDateLabel = '';
         $deliveryDateIso = null;
         $deliveryDateLabel = '';
-        $useTx = ($next === 'LIVRAT');
+        $deliveryQty = null;
+        $useTx = in_array($next, ['LIVRAT_PARTIAL', 'LIVRAT'], true);
         $pdo = null;
         try {
             // Statusurile piesei nu mai modifică automat locația/statusul HPL-ului.
@@ -4191,7 +4193,7 @@ final class ProjectsController
                 $avizDateLabel = $dt->format('d.m.Y');
             }
 
-            if ($next === 'LIVRAT') {
+            if (in_array($next, ['LIVRAT_PARTIAL', 'LIVRAT'], true)) {
                 $deliveryDateRaw = trim((string)($_POST['delivery_date'] ?? ''));
                 if ($deliveryDateRaw === '') {
                     $msg = 'Nu poți trece la Livrat: completează data livrării.';
@@ -4228,6 +4230,31 @@ final class ProjectsController
                 }
                 $deliveryDateIso = $dt->format('Y-m-d');
                 $deliveryDateLabel = $dt->format('d.m.Y');
+
+                $totalQty = (float)($before['qty'] ?? 0);
+                $currentDelivered = (float)($before['delivered_qty'] ?? 0);
+                $maxQty = max(0.0, $totalQty - $currentDelivered);
+                $deliveryQtyRaw = trim((string)($_POST['delivery_qty'] ?? ''));
+                $deliveryQty = Validator::dec($deliveryQtyRaw);
+                if ($maxQty > 0 && ($deliveryQty === null || $deliveryQty <= 0)) {
+                    $msg = 'Nu poți trece la Livrat: completează cantitatea livrată.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                if ($deliveryQty !== null && $deliveryQty > $maxQty + 1e-9) {
+                    $msg = 'Nu poți livra peste cantitatea rămasă.';
+                    Session::flash('toast_error', $msg);
+                    Session::flash('pp_status_error', json_encode([
+                        'id' => $ppId,
+                        'message' => $msg,
+                    ], JSON_UNESCAPED_UNICODE));
+                    Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+                }
+                if ($deliveryQty === null) $deliveryQty = 0.0;
             }
 
             $docInfo = null;
@@ -4240,20 +4267,27 @@ final class ProjectsController
                 $pdo = \App\Core\DB::pdo();
                 $pdo->beginTransaction();
             }
-            ProjectProduct::updateStatus($ppId, $next);
+
+            $deliveryId = null;
+            $appliedStatus = $next;
+            $totalQty = (float)($before['qty'] ?? 0);
+            $currentDelivered = (float)($before['delivered_qty'] ?? 0);
+            $newDelivered = $currentDelivered;
+            if ($useTx) {
+                $deliveryQty = max(0.0, (float)$deliveryQty);
+                $newDelivered = $currentDelivered + $deliveryQty;
+                if ($totalQty > 0 && $newDelivered > $totalQty) $newDelivered = $totalQty;
+                $appliedStatus = ($totalQty > 0 && $newDelivered >= $totalQty - 1e-9) ? 'LIVRAT' : 'LIVRAT_PARTIAL';
+            }
+
+            ProjectProduct::updateStatus($ppId, $appliedStatus);
             if ($next === 'AVIZAT') {
                 ProjectProduct::updateAvizData($ppId, $avizNumber, $avizDateIso);
             }
-            $deliveryId = null;
-            if ($next === 'LIVRAT') {
-                $totalQty = (float)($before['qty'] ?? 0);
-                $currentDelivered = (float)($before['delivered_qty'] ?? 0);
-                $newDelivered = $currentDelivered;
-                if ($totalQty > $currentDelivered) $newDelivered = $totalQty;
+            if ($useTx) {
                 if (abs($newDelivered - $currentDelivered) > 0.000001) {
                     ProjectProduct::updateDeliveredQty($ppId, $newDelivered);
                 }
-                $deliveryQty = max(0.0, $newDelivered - $currentDelivered);
                 if ($deliveryQty > 0) {
                     $deliveryId = ProjectDelivery::create([
                         'project_id' => $projectId,
@@ -4304,18 +4338,18 @@ final class ProjectsController
                 }
             }
             $after = $before;
-            $after['production_status'] = $next;
+            $after['production_status'] = $appliedStatus;
             Audit::log('PROJECT_PRODUCT_STATUS_CHANGE', 'project_products', $ppId, $before, $after, [
-                'message' => 'Schimbare status produs: ' . $old . ' → ' . $next,
+                'message' => 'Schimbare status produs: ' . $old . ' → ' . $appliedStatus,
                 'project_id' => $projectId,
                 'old_status' => $old,
-                'new_status' => $next,
+                'new_status' => $appliedStatus,
             ]);
             $msg = 'Status produs actualizat.';
             if (is_array($docInfo) && isset($docInfo['deviz_number'], $docInfo['bon_number'])) {
                 $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
             }
-            if ($next === 'LIVRAT') {
+            if ($useTx) {
                 $msg .= ' Livrare înregistrată' . ($deliveryDateLabel !== '' ? (' (' . $deliveryDateLabel . ').') : '.');
             }
             if ($useTx && $pdo && $pdo->inTransaction()) {
@@ -6464,7 +6498,7 @@ final class ProjectsController
         $consumRedirect = '/projects/' . $projectId . '?tab=consum' . ($consumTab !== '' ? ('&consum_tab=' . urlencode($consumTab)) : '');
         $u = Auth::user();
         $role = $u ? (string)($u['role'] ?? '') : '';
-        if (!$u || !in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true)) {
+        if (!$u || !in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true)) {
             Session::flash('toast_error', 'Nu ai drepturi.');
             Response::redirect($consumRedirect);
         }
@@ -6970,6 +7004,11 @@ final class ProjectsController
             if ($qty <= 0) continue;
 
             $pp = $ppById[$ppId];
+            $status = (string)($pp['production_status'] ?? '');
+            if ($status !== 'AVIZAT') {
+                Session::flash('toast_error', 'Poți livra doar produse avizate. (' . (string)($pp['product_name'] ?? '') . ')');
+                Response::redirect('/projects/' . $projectId . '?tab=deliveries');
+            }
             $max = max(0.0, (float)($pp['qty'] ?? 0) - (float)($pp['delivered_qty'] ?? 0));
             if ($qty > $max + 1e-9) {
                 Session::flash('toast_error', 'Nu poți livra peste cantitatea rămasă pentru produsul ' . (string)($pp['product_name'] ?? '') . '.');

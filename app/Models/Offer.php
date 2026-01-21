@@ -174,5 +174,13 @@ final class Offer
             ':pid' => $projectId,
         ]);
     }
+
+    public static function delete(int $id): void
+    {
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('DELETE FROM offers WHERE id = ?');
+        $st->execute([$id]);
+    }
 }
 

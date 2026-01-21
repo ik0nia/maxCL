@@ -1,10 +1,14 @@
 <?php
+use App\Core\Auth;
 use App\Core\Url;
 use App\Core\View;
 
 $bucket = (string)($bucket ?? '');
-$counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0];
+$scrapOnly = !empty($scrapOnly);
+$counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0, 'scrap' => 0];
 $items = $items ?? [];
+$u = Auth::user();
+$canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
 function _normImg2(string $p): string {
   $p = trim($p);
@@ -18,6 +22,7 @@ function _bucketLabel(string $b): string {
     'gt_half' => 'Mai mari de 1/2 din placa standard',
     'half_to_quarter' => 'Între 1/2 și 1/4 din placa standard',
     'lt_quarter' => 'Mai mici de 1/4 din placa standard',
+    'scrap' => 'Stricate',
     default => 'Toate',
   };
 }
@@ -51,24 +56,28 @@ ob_start();
 <div class="card app-card p-3 mb-3">
   <div class="d-flex flex-wrap gap-2 align-items-center">
     <div class="fw-semibold">Filtre:</div>
-    <a class="btn btn-sm <?= $bucket === '' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+    <a class="btn btn-sm <?= !$scrapOnly && $bucket === '' ? 'btn-primary' : 'btn-outline-secondary' ?>"
        href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
       Toate <span class="badge text-bg-light ms-1"><?= (int)($counts['all'] ?? 0) ?></span>
     </a>
-    <a class="btn btn-sm <?= $bucket === 'gt_half' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+    <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'gt_half' ? 'btn-primary' : 'btn-outline-secondary' ?>"
        href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=gt_half')) ?>">
       &gt; 1/2 <span class="badge text-bg-light ms-1"><?= (int)($counts['gt_half'] ?? 0) ?></span>
     </a>
-    <a class="btn btn-sm <?= $bucket === 'half_to_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+    <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'half_to_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
        href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=half_to_quarter')) ?>">
       1/2 – 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['half_to_quarter'] ?? 0) ?></span>
     </a>
-    <a class="btn btn-sm <?= $bucket === 'lt_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+    <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'lt_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
        href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=lt_quarter')) ?>">
       &lt; 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['lt_quarter'] ?? 0) ?></span>
     </a>
+    <a class="btn btn-sm <?= $scrapOnly ? 'btn-danger' : 'btn-outline-danger' ?>"
+       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?scrap=1')) ?>">
+      Stricate <span class="badge text-bg-light ms-1"><?= (int)($counts['scrap'] ?? 0) ?></span>
+    </a>
     <div class="ms-auto text-muted small">
-      <?= htmlspecialchars(_bucketLabel($bucket)) ?> · Afișez <strong><?= count($items) ?></strong>
+      <?= htmlspecialchars($scrapOnly ? _bucketLabel('scrap') : _bucketLabel($bucket)) ?> · Afișez <strong><?= count($items) ?></strong>
     </div>
   </div>
 </div>
@@ -126,6 +135,7 @@ ob_start();
         $isInternal = ($isAcc === 0);
         $status = (string)($it['status'] ?? '');
         $location = (string)($it['location'] ?? '');
+        $isScrap = ($status === 'SCRAP' || $location === 'Depozit (Stricat)');
         $pieceType = (string)($it['piece_type'] ?? '');
         $m2 = (float)($it['area_total_m2'] ?? 0);
 
@@ -142,6 +152,21 @@ ob_start();
         $ratio = $it['_area_ratio'] ?? null;
         $ratioPct = (is_numeric($ratio) ? ((float)$ratio * 100.0) : null);
         $bucketKey = (string)($it['_bucket'] ?? '');
+        $photo = is_array($it['_photo'] ?? null) ? $it['_photo'] : null;
+        $photoUrl = $photo ? (string)($photo['url'] ?? '') : '';
+        $photoTitle = $photo ? (string)($photo['original_name'] ?? 'Poză piesă') : '';
+        $trashInfo = is_array($it['_trash'] ?? null) ? $it['_trash'] : null;
+        $uploadAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/photo';
+        $trashAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/trash';
+        $qs = [];
+        if ($bucket !== '') $qs[] = 'bucket=' . rawurlencode($bucket);
+        if ($scrapOnly) $qs[] = 'scrap=1';
+        if ($qs) {
+          $qstr = '?' . implode('&', $qs);
+          $uploadAction .= $qstr;
+          $trashAction .= $qstr;
+        }
+        $pieceLabel = trim((string)($it['board_code'] ?? '') . ' · ' . $h . '×' . $w . ' mm');
       ?>
       <div class="col-12 col-md-6 col-lg-3">
         <div class="card app-card p-3 h-100 js-card-link"
@@ -155,8 +180,34 @@ ob_start();
               <span class="badge text-bg-light"><?= htmlspecialchars(_statusLabel($status)) ?></span>
               <span class="badge text-bg-light"><?= htmlspecialchars($location) ?></span>
             </div>
-            <div class="text-muted small text-end" title="Suprafață piesă raportată la placa standard">
-              <?= htmlspecialchars(_ratioLabel($ratioPct !== null ? (float)$ratioPct : null)) ?>
+            <div class="text-end">
+              <div class="text-muted small" title="Suprafață piesă raportată la placa standard">
+                <?= htmlspecialchars(_ratioLabel($ratioPct !== null ? (float)$ratioPct : null)) ?>
+              </div>
+              <?php if ($photoUrl !== ''): ?>
+                <a class="btn btn-sm btn-outline-secondary mt-1"
+                   href="<?= htmlspecialchars($photoUrl) ?>"
+                   data-lightbox-src="<?= htmlspecialchars($photoUrl) ?>"
+                   data-lightbox-title="<?= htmlspecialchars($photoTitle !== '' ? $photoTitle : 'Poză piesă') ?>">
+                  <i class="bi bi-camera me-1"></i> Poză
+                </a>
+              <?php endif; ?>
+              <?php if ($canUpload): ?>
+                <form class="d-inline-block mt-1 js-photo-form"
+                      method="post"
+                      enctype="multipart/form-data"
+                      action="<?= htmlspecialchars(Url::to($uploadAction)) ?>">
+                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                  <input type="file"
+                         class="d-none js-photo-input"
+                         name="photo"
+                         accept="image/jpeg,image/png,image/webp"
+                         required>
+                  <button class="btn btn-sm btn-outline-secondary js-photo-btn" type="button">
+                    <?= $photoUrl !== '' ? 'Schimbă poză' : 'Adaugă poză' ?>
+                  </button>
+                </form>
+              <?php endif; ?>
             </div>
           </div>
 
@@ -195,13 +246,71 @@ ob_start();
                 <strong><?= $qty ?></strong> buc · <?= htmlspecialchars($pieceType) ?> · <?= number_format($m2, 2, '.', '') ?> mp
               </div>
               <div class="offcut-sub">
-                Filtru: <?= htmlspecialchars(_bucketLabel($bucketKey)) ?>
+                Filtru: <?= htmlspecialchars($scrapOnly ? _bucketLabel('scrap') : _bucketLabel($bucketKey)) ?>
               </div>
             </div>
           </div>
+          <?php if ($canUpload && !$isScrap): ?>
+            <div class="mt-2 d-flex justify-content-end">
+              <button class="btn btn-sm btn-outline-danger js-trash-piece"
+                      type="button"
+                      data-piece-id="<?= (int)($it['piece_id'] ?? 0) ?>"
+                      data-piece-label="<?= htmlspecialchars($pieceLabel, ENT_QUOTES) ?>"
+                      data-action="<?= htmlspecialchars(Url::to($trashAction)) ?>">
+                <i class="bi bi-trash3 me-1"></i> Scoate piesa din stoc
+              </button>
+            </div>
+          <?php endif; ?>
+          <?php if ($isScrap && $trashInfo): ?>
+            <?php
+              $trashUser = trim((string)($trashInfo['user_name'] ?? ''));
+              if ($trashUser === '') $trashUser = 'User #' . (int)($trashInfo['user_id'] ?? 0);
+              $trashNote = trim((string)($trashInfo['note'] ?? ''));
+              $trashDt = trim((string)($trashInfo['created_at'] ?? ''));
+              $trashDtLabel = '';
+              if ($trashDt !== '') {
+                try {
+                  $dt = new \DateTime($trashDt);
+                  $trashDtLabel = $dt->format('d.m.Y H:i');
+                } catch (\Throwable $e) {}
+              }
+            ?>
+            <div class="mt-2 p-2 rounded" style="background:#FFF6F6;border:1px solid #F3C6C6">
+              <div class="small text-danger fw-semibold">
+                Marcat ca stricat de <?= htmlspecialchars($trashUser) ?><?= $trashDtLabel !== '' ? (' · ' . htmlspecialchars($trashDtLabel)) : '' ?>
+              </div>
+              <?php if ($trashNote !== ''): ?>
+                <div class="small text-muted mt-1"><?= nl2br(htmlspecialchars($trashNote)) ?></div>
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     <?php endforeach; ?>
+  </div>
+
+  <!-- Modal: Scoate piesa din stoc -->
+  <div class="modal fade" id="offcutTrashModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius:14px">
+        <div class="modal-header">
+          <h5 class="modal-title">Scoate piesa din stoc</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Închide"></button>
+        </div>
+        <form method="post" id="offcutTrashForm">
+          <div class="modal-body">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+            <div class="text-muted small mb-2" id="offcutTrashLabel"></div>
+            <label class="form-label small">Notă explicativă (obligatoriu)</label>
+            <textarea class="form-control" name="note" rows="3" placeholder="Ex: piesă defectă / lovită / zgâriată" required></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>
+            <button type="submit" class="btn btn-danger">Confirmă scoaterea</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -234,6 +343,33 @@ ob_start();
             e.preventDefault();
             go(e);
           }
+        });
+      });
+
+      const modalEl = document.getElementById('offcutTrashModal');
+      const formEl = document.getElementById('offcutTrashForm');
+      const labelEl = document.getElementById('offcutTrashLabel');
+      document.querySelectorAll('.js-trash-piece').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          const action = btn.getAttribute('data-action') || '';
+          const label = btn.getAttribute('data-piece-label') || '';
+          if (formEl && action) formEl.setAttribute('action', action);
+          if (labelEl) labelEl.textContent = label !== '' ? label : '—';
+          if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+          }
+        });
+      });
+
+      document.querySelectorAll('.js-photo-form').forEach(function(form){
+        const input = form.querySelector('.js-photo-input');
+        const btn = form.querySelector('.js-photo-btn');
+        if (!input || !btn) return;
+        btn.addEventListener('click', function(){
+          input.click();
+        });
+        input.addEventListener('change', function(){
+          if (input.files && input.files.length > 0) form.submit();
         });
       });
     });

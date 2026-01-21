@@ -185,7 +185,7 @@ final class OffersController
                 'message' => 'A creat oferta: ' . $code . ' · ' . $name,
             ]);
             Session::flash('toast_success', 'Oferta a fost creată.');
-            Response::redirect('/offers/' . $id);
+            Response::redirect('/offers/' . $id . '?tab=products');
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot crea oferta: ' . $e->getMessage());
             Response::redirect('/offers/create');
@@ -234,6 +234,41 @@ final class OffersController
             Session::flash('toast_error', 'Nu pot actualiza: ' . $e->getMessage());
         }
         Response::redirect('/offers/' . $offerId);
+    }
+
+    public static function canDelete(): bool
+    {
+        $u = Auth::user();
+        return $u && (string)($u['role'] ?? '') === Auth::ROLE_ADMIN;
+    }
+
+    public static function delete(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $offerId = (int)($params['id'] ?? 0);
+        if ($offerId <= 0) {
+            Session::flash('toast_error', 'Ofertă invalidă.');
+            Response::redirect('/offers');
+        }
+        $offer = Offer::find($offerId);
+        if (!$offer) {
+            Session::flash('toast_error', 'Oferta nu există.');
+            Response::redirect('/offers');
+        }
+        if (!self::canDelete()) {
+            Session::flash('toast_error', 'Nu ai drepturi să ștergi oferta.');
+            Response::redirect('/offers/' . $offerId);
+        }
+        try {
+            Offer::delete($offerId);
+            Audit::log('OFFER_DELETE', 'offers', $offerId, $offer, null, [
+                'message' => 'A șters oferta: ' . (string)($offer['code'] ?? '') . ' · ' . (string)($offer['name'] ?? ''),
+            ]);
+            Session::flash('toast_success', 'Oferta a fost ștearsă.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot șterge oferta: ' . $e->getMessage());
+        }
+        Response::redirect('/offers');
     }
 
     public static function show(array $params): void
@@ -327,10 +362,8 @@ final class OffersController
 
         $clients = [];
         $groups = [];
-        $productsAll = [];
         try { $clients = Client::forSelect(); } catch (\Throwable $e) { $clients = []; }
         try { $groups = ClientGroup::all(); } catch (\Throwable $e) { $groups = []; }
-        try { $productsAll = Product::all(null, 2000); } catch (\Throwable $e) { $productsAll = []; }
         $statuses = self::statuses();
         echo View::render('offers/show', [
             'title' => 'Oferta ' . (string)($offer['code'] ?? ''),
@@ -345,7 +378,6 @@ final class OffersController
             'statuses' => $statuses,
             'clients' => $clients,
             'groups' => $groups,
-            'productsAll' => $productsAll,
         ]);
     }
 
@@ -412,7 +444,6 @@ final class OffersController
         $desc = trim((string)($_POST['description'] ?? ''));
         $code = trim((string)($_POST['code'] ?? ''));
         $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
-        $desc = trim((string)($_POST['description'] ?? ''));
         $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? '1'))) ?? 1.0;
         if ($qty <= 0) $errors['qty'] = 'Cantitate invalidă.';
@@ -425,6 +456,8 @@ final class OffersController
         }
 
         try {
+            $pdo = DB::pdo();
+            $pdo->beginTransaction();
             $pid = Product::create([
                 'code' => $code !== '' ? $code : null,
                 'name' => $name,
@@ -434,19 +467,21 @@ final class OffersController
                 'notes' => $desc !== '' ? $desc : null,
                 'cnc_settings_json' => null,
             ]);
-            Audit::log('PRODUCT_CREATE', 'products', $pid, null, null, [
-                'message' => 'A creat produs: ' . $name,
-                'offer_id' => $offerId,
-            ]);
 
-            OfferProduct::addToOffer([
+            $opId = OfferProduct::addToOffer([
                 'offer_id' => $offerId,
                 'product_id' => $pid,
                 'qty' => $qty,
                 'unit' => 'buc',
             ]);
 
-            Audit::log('OFFER_PRODUCT_ATTACH', 'offer_products', 0, null, null, [
+            $pdo->commit();
+
+            Audit::log('PRODUCT_CREATE', 'products', $pid, null, null, [
+                'message' => 'A creat produs: ' . $name,
+                'offer_id' => $offerId,
+            ]);
+            Audit::log('OFFER_PRODUCT_ATTACH', 'offer_products', $opId, null, null, [
                 'message' => 'A atașat produs nou la ofertă: ' . $name,
                 'offer_id' => $offerId,
                 'product_id' => $pid,
@@ -454,10 +489,14 @@ final class OffersController
                 'unit' => 'buc',
             ]);
             Session::flash('toast_success', 'Produs creat și adăugat în ofertă.');
+            Response::redirect('/offers/' . $offerId . '?tab=products#op-' . $opId);
         } catch (\Throwable $e) {
+            try {
+                if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            } catch (\Throwable $e2) {}
             Session::flash('toast_error', 'Nu pot crea produsul: ' . $e->getMessage());
+            Response::redirect('/offers/' . $offerId . '?tab=products');
         }
-        Response::redirect('/offers/' . $offerId . '?tab=products');
     }
 
     public static function updateOfferProduct(array $params): void
@@ -477,6 +516,7 @@ final class OffersController
         }
         $qty = Validator::dec(trim((string)($_POST['qty'] ?? ''))) ?? null;
         $unit = trim((string)($_POST['unit'] ?? (string)($op['unit'] ?? 'buc')));
+        $desc = trim((string)($_POST['description'] ?? ''));
         $salePriceRaw = trim((string)($_POST['sale_price'] ?? ''));
         $salePrice = $salePriceRaw !== '' ? (Validator::dec($salePriceRaw) ?? null) : null;
         if ($qty === null || $qty <= 0) {

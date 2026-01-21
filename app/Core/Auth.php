@@ -8,6 +8,7 @@ use PDO;
 final class Auth
 {
     public const ROLE_ADMIN = 'ADMIN';
+    public const ROLE_MANAGER = 'MANAGER';
     public const ROLE_GESTIONAR = 'GESTIONAR';
     public const ROLE_OPERATOR = 'OPERATOR';
     public const ROLE_VIEW = 'VIZUALIZARE';
@@ -63,7 +64,16 @@ final class Auth
                 Session::flash('toast_error', 'Te rugăm să te autentifici.');
                 Response::redirect('/login');
             }
-            if (!in_array((string)$u['role'], $roles, true)) {
+            $rolesAllowed = $roles;
+            if (in_array(self::ROLE_ADMIN, $rolesAllowed, true)) {
+                $rolesAllowed[] = self::ROLE_MANAGER;
+            }
+            if (in_array(self::ROLE_MANAGER, $rolesAllowed, true)) {
+                $rolesAllowed[] = self::ROLE_ADMIN;
+            }
+            $rolesAllowed = array_values(array_unique($rolesAllowed));
+
+            if (!in_array((string)$u['role'], $rolesAllowed, true)) {
                 $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
                 $path = (string)parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
                 $isApi = str_starts_with($path, '/api/') || str_contains($accept, 'application/json');

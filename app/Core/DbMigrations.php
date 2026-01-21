@@ -888,6 +888,24 @@ final class DbMigrations
                 },
             ],
             [
+                'id' => '2026-01-26_01_project_products_status_partial_delivery',
+                'label' => 'ALTER project_products.production_status add LIVRAT_PARTIAL',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    if (!self::columnExists($pdo, 'project_products', 'production_status')) return;
+                    try {
+                        $pdo->exec("
+                            ALTER TABLE project_products
+                            MODIFY production_status ENUM(
+                              'CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'
+                            ) NOT NULL DEFAULT 'CREAT'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                },
+            ],
+            [
                 'id' => '2026-01-19_01_project_magazie_consumptions_deviz_flag',
                 'label' => 'ALTER project_magazie_consumptions ADD include_in_deviz',
                 'fn' => function (PDO $pdo): void {
@@ -1306,6 +1324,23 @@ final class DbMigrations
                     }
                     try { $pdo->exec("ALTER TABLE projects ADD KEY idx_projects_source_offer (source_offer_id)"); } catch (\Throwable $e) {}
                     try { if (self::tableExists($pdo, 'offers')) $pdo->exec("ALTER TABLE projects ADD CONSTRAINT fk_projects_source_offer FOREIGN KEY (source_offer_id) REFERENCES offers(id)"); } catch (\Throwable $e) {}
+                },
+            ],
+            [
+                'id' => '2026-01-26_02_users_role_manager',
+                'label' => 'ALTER users.role add MANAGER',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'users')) return;
+                    if (!self::columnExists($pdo, 'users', 'role')) return;
+                    try {
+                        $pdo->exec("
+                            ALTER TABLE users
+                            MODIFY role ENUM('ADMIN','MANAGER','GESTIONAR','OPERATOR','VIZUALIZARE')
+                            NOT NULL DEFAULT 'VIZUALIZARE'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
                 },
             ],
         ];

@@ -48,7 +48,7 @@ final class ConsumptionsResetController
 
         $u = Auth::user();
         $role = $u ? (string)($u['role'] ?? '') : '';
-        if ($role !== Auth::ROLE_ADMIN) {
+        if (!in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true)) {
             Response::json(['ok' => false, 'error' => 'Acces interzis.'], 403);
         }
 

@@ -103,7 +103,7 @@ $toastError = Session::flash('toast_error');
           <i class="bi bi-box-seam me-2"></i> Stoc
         </a>
         <?php
-          $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+          $canInternal = $user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
         ?>
         <?php if ($canInternal): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/hpl/bucati-rest') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
@@ -126,7 +126,7 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
           <i class="bi bi-journal-text me-2"></i> Jurnal activitate
         </a>
-        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR], true)): ?>
+        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
             <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
           </a>
@@ -134,7 +134,7 @@ $toastError = Session::flash('toast_error');
         <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
           <i class="bi bi-person-gear me-2"></i> Utilizatori
         </a>
-        <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
+        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true)): ?>
           <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
             <i class="bi bi-cash-coin me-2"></i> Setări costuri
           </a>

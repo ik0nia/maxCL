@@ -1,6 +1,11 @@
 <?php
+use App\Core\Auth;
+use App\Core\Csrf;
 use App\Core\Url;
 use App\Core\View;
+
+$u = Auth::user();
+$canDelete = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER], true);
 
 ob_start();
 ?>
@@ -25,7 +30,7 @@ ob_start();
         <th>Rol</th>
         <th>Status</th>
         <th>Ultimul login</th>
-        <th class="text-end" style="width:160px">Acțiuni</th>
+        <th class="text-end" style="width:200px">Acțiuni</th>
       </tr>
     </thead>
     <tbody>
@@ -46,6 +51,15 @@ ob_start();
             <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/users/' . (int)$r['id'] . '/edit')) ?>">
               <i class="bi bi-pencil me-1"></i> Editează
             </a>
+            <?php if ($canDelete): ?>
+              <form method="post" action="<?= htmlspecialchars(Url::to('/users/' . (int)$r['id'] . '/delete')) ?>" class="d-inline"
+                    onsubmit="return confirm('Sigur vrei să ștergi acest utilizator?');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-outline-danger btn-sm" type="submit">
+                  <i class="bi bi-trash me-1"></i> Șterge
+                </button>
+              </form>
+            <?php endif; ?>
           </td>
         </tr>
       <?php endforeach; ?>
