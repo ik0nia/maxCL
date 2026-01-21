@@ -15,25 +15,18 @@ final class SearchIndex
         $pdo = DB::pdo();
         self::ensureTable($pdo);
 
-        $pdo->beginTransaction();
-        try {
-            $pdo->exec('DELETE FROM search_index');
+        $pdo->exec('DELETE FROM search_index');
+        $now = date('Y-m-d H:i:s');
 
-            $counts = [
-                'offer' => self::indexOffers($pdo),
-                'project' => self::indexProjects($pdo),
-                'product' => self::indexProducts($pdo),
-                'label' => self::indexLabels($pdo),
-                'finish' => self::indexFinishes($pdo),
-                'hpl_board' => self::indexHplBoards($pdo),
-                'magazie_item' => self::indexMagazieItems($pdo),
-            ];
-
-            $pdo->commit();
-        } catch (\Throwable $e) {
-            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
-            throw $e;
-        }
+        $counts = [
+            'offer' => self::indexOffers($pdo, $now),
+            'project' => self::indexProjects($pdo, $now),
+            'product' => self::indexProducts($pdo, $now),
+            'label' => self::indexLabels($pdo, $now),
+            'finish' => self::indexFinishes($pdo, $now),
+            'hpl_board' => self::indexHplBoards($pdo, $now),
+            'magazie_item' => self::indexMagazieItems($pdo, $now),
+        ];
 
         $total = 0;
         foreach ($counts as $c) $total += (int)$c;
@@ -82,14 +75,21 @@ final class SearchIndex
         ]);
     }
 
-    private static function indexOffers(PDO $pdo): int
+    private static function indexOffers(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'offers')) return 0;
-        $rows = $pdo->query("
-            SELECT id, code, name, description, notes, technical_notes, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, code, name, description, notes, technical_notes
             FROM offers
-            ORDER BY updated_at DESC
-        ")->fetchAll();
+            ORDER BY id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT id, code, name
+                FROM offers
+                ORDER BY id DESC
+            ");
+        }
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -105,21 +105,28 @@ final class SearchIndex
                 'sub' => self::snippet($desc),
                 'href' => \App\Core\Url::to('/offers/' . $id),
                 'search_text' => $searchText,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
         return $count;
     }
 
-    private static function indexProjects(PDO $pdo): int
+    private static function indexProjects(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'projects')) return 0;
-        $rows = $pdo->query("
-            SELECT id, code, name, description, notes, technical_notes, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, code, name, description, notes, technical_notes
             FROM projects
-            ORDER BY updated_at DESC
-        ")->fetchAll();
+            ORDER BY id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT id, code, name
+                FROM projects
+                ORDER BY id DESC
+            ");
+        }
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -135,21 +142,28 @@ final class SearchIndex
                 'sub' => self::snippet($desc),
                 'href' => \App\Core\Url::to('/projects/' . $id),
                 'search_text' => $searchText,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
         return $count;
     }
 
-    private static function indexProducts(PDO $pdo): int
+    private static function indexProducts(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'products')) return 0;
-        $rows = $pdo->query("
-            SELECT id, code, name, notes, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, code, name, notes
             FROM products
-            ORDER BY updated_at DESC
-        ")->fetchAll();
+            ORDER BY id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT id, code, name
+                FROM products
+                ORDER BY id DESC
+            ");
+        }
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -166,21 +180,21 @@ final class SearchIndex
                 'sub' => self::snippet($desc),
                 'href' => \App\Core\Url::to('/products') . '?q=' . rawurlencode($q),
                 'search_text' => $searchText,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
         return $count;
     }
 
-    private static function indexLabels(PDO $pdo): int
+    private static function indexLabels(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'labels')) return 0;
-        $rows = $pdo->query("
-            SELECT id, name, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, name
             FROM labels
             ORDER BY name ASC
-        ")->fetchAll();
+        ");
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $name = trim((string)($r['name'] ?? ''));
@@ -192,21 +206,28 @@ final class SearchIndex
                 'sub' => 'Filtrează produsele după etichetă',
                 'href' => \App\Core\Url::to('/products') . '?label=' . rawurlencode($name),
                 'search_text' => $name,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
         return $count;
     }
 
-    private static function indexFinishes(PDO $pdo): int
+    private static function indexFinishes(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'finishes')) return 0;
-        $rows = $pdo->query("
-            SELECT id, code, color_name, color_code, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, code, color_name, color_code
             FROM finishes
-            ORDER BY updated_at DESC
-        ")->fetchAll();
+            ORDER BY id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT id, code, color_name
+                FROM finishes
+                ORDER BY id DESC
+            ");
+        }
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -223,21 +244,28 @@ final class SearchIndex
                 'sub' => $sub,
                 'href' => \App\Core\Url::to('/hpl/catalog'),
                 'search_text' => $searchText,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
         return $count;
     }
 
-    private static function indexHplBoards(PDO $pdo): int
+    private static function indexHplBoards(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'hpl_boards')) return 0;
-        $rows = $pdo->query("
-            SELECT id, code, name, brand, thickness_mm, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, code, name, brand, thickness_mm
             FROM hpl_boards
-            ORDER BY updated_at DESC
-        ")->fetchAll();
+            ORDER BY id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT id, code, name
+                FROM hpl_boards
+                ORDER BY id DESC
+            ");
+        }
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -257,21 +285,28 @@ final class SearchIndex
                 'sub' => $subParts ? implode(' · ', $subParts) : '',
                 'href' => \App\Core\Url::to('/stock/boards/' . $id),
                 'search_text' => $searchText,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
         return $count;
     }
 
-    private static function indexMagazieItems(PDO $pdo): int
+    private static function indexMagazieItems(PDO $pdo, string $now): int
     {
-        if (!self::tableExists($pdo, 'magazie_items')) return 0;
-        $rows = $pdo->query("
-            SELECT id, winmentor_code, name, updated_at
+        $rows = self::fetchAllSafe($pdo, "
+            SELECT id, winmentor_code, name
             FROM magazie_items
-            ORDER BY updated_at DESC
-        ")->fetchAll();
+            ORDER BY id DESC
+        ");
+        if (!$rows) {
+            $rows = self::fetchAllSafe($pdo, "
+                SELECT id, name
+                FROM magazie_items
+                ORDER BY id DESC
+            ");
+        }
+        if (!$rows) return 0;
         $count = 0;
         foreach ($rows as $r) {
             $id = (int)($r['id'] ?? 0);
@@ -286,7 +321,7 @@ final class SearchIndex
                 'sub' => '',
                 'href' => \App\Core\Url::to('/magazie/stoc/' . $id),
                 'search_text' => $searchText,
-                'updated_at' => (string)($r['updated_at'] ?? date('Y-m-d H:i:s')),
+                'updated_at' => $now,
             ]);
             $count++;
         }
@@ -330,14 +365,14 @@ final class SearchIndex
         return $clean;
     }
 
-    private static function tableExists(PDO $pdo, string $table): bool
+    /** @return array<int, array<string,mixed>> */
+    private static function fetchAllSafe(PDO $pdo, string $sql): array
     {
         try {
-            $st = $pdo->prepare("SHOW TABLES LIKE ?");
-            $st->execute([$table]);
-            return (bool)$st->fetch();
+            $st = $pdo->query($sql);
+            return $st ? $st->fetchAll() : [];
         } catch (\Throwable $e) {
-            return false;
+            return [];
         }
     }
 }
