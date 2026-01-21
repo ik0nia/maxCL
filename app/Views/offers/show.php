@@ -19,6 +19,7 @@ $openNewProduct = empty($offerProducts);
 
 $u = Auth::user();
 $canWrite = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$isAdmin = $u && (string)($u['role'] ?? '') === Auth::ROLE_ADMIN;
 $offerId = (int)($offer['id'] ?? 0);
 $convertedProjectId = (int)($offer['converted_project_id'] ?? 0);
 
@@ -44,6 +45,15 @@ ob_start();
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
         <button class="btn btn-success" type="submit">
           <i class="bi bi-box-arrow-up-right me-1"></i> Transformă în proiect
+        </button>
+      </form>
+    <?php endif; ?>
+    <?php if ($isAdmin): ?>
+      <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/delete')) ?>" class="m-0"
+            onsubmit="return confirm('Ștergi oferta? Se vor șterge produsele și consumurile asociate.');">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+        <button class="btn btn-outline-danger" type="submit" <?= $convertedProjectId > 0 ? 'disabled' : '' ?>>
+          <i class="bi bi-trash me-1"></i> Șterge oferta
         </button>
       </form>
     <?php endif; ?>

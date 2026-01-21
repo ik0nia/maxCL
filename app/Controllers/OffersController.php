@@ -236,6 +236,56 @@ final class OffersController
         Response::redirect('/offers/' . $offerId);
     }
 
+    public static function delete(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $offerId = (int)($params['id'] ?? 0);
+        if ($offerId <= 0) {
+            Session::flash('toast_error', 'Parametri invalizi.');
+            Response::redirect('/offers');
+        }
+        $offer = Offer::find($offerId);
+        if (!$offer) {
+            Session::flash('toast_error', 'Oferta nu există.');
+            Response::redirect('/offers');
+        }
+        $user = Auth::user();
+        if (!$user || (string)($user['role'] ?? '') !== Auth::ROLE_ADMIN) {
+            Session::flash('toast_error', 'Nu ai dreptul să ștergi oferta.');
+            Response::redirect('/offers/' . $offerId);
+        }
+        $convertedProjectId = (int)($offer['converted_project_id'] ?? 0);
+        if ($convertedProjectId > 0) {
+            Session::flash('toast_error', 'Oferta este deja convertită. Ștergerea nu este permisă.');
+            Response::redirect('/offers/' . $offerId);
+        }
+
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('DELETE FROM offer_product_hpl WHERE offer_id = ?');
+            $st->execute([$offerId]);
+            $st = $pdo->prepare('DELETE FROM offer_product_accessories WHERE offer_id = ?');
+            $st->execute([$offerId]);
+            $st = $pdo->prepare('DELETE FROM offer_work_logs WHERE offer_id = ?');
+            $st->execute([$offerId]);
+            $st = $pdo->prepare('DELETE FROM offer_products WHERE offer_id = ?');
+            $st->execute([$offerId]);
+            Offer::delete($offerId);
+            $pdo->commit();
+
+            Audit::log('OFFER_DELETE', 'offers', $offerId, $offer, null, [
+                'message' => 'A șters oferta: ' . (string)($offer['code'] ?? '') . ' · ' . (string)($offer['name'] ?? ''),
+            ]);
+            Session::flash('toast_success', 'Oferta a fost ștearsă.');
+            Response::redirect('/offers');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot șterge oferta: ' . $e->getMessage());
+            Response::redirect('/offers/' . $offerId);
+        }
+    }
+
     public static function show(array $params): void
     {
         $id = (int)($params['id'] ?? 0);
