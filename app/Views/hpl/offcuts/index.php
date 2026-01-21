@@ -250,7 +250,7 @@ ob_start();
               </div>
             </div>
           </div>
-          <?php if ($canUpload): ?>
+          <?php if ($canUpload && !$isScrap): ?>
             <div class="mt-2 d-flex justify-content-end">
               <button class="btn btn-sm btn-outline-danger js-trash-piece"
                       type="button"
