@@ -100,7 +100,7 @@ final class DashboardController
             $st = $pdo->prepare("
                 SELECT COUNT(*) AS c
                 FROM projects
-                WHERE status NOT IN ('DRAFT','ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
+                WHERE status NOT IN ('ANULAT','LIVRAT_COMPLET','FINALIZAT','ARHIVAT')
             ");
             $st->execute();
             $projectsInWorkCount = (int)($st->fetchColumn() ?? 0);
