@@ -68,6 +68,179 @@ ob_start();
     </div>
 
     <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Meniu principal (stanga) - cuprins</h2>
+      <p class="mb-2">Elementele apar in functie de rolul tau.</p>
+      <ul class="mb-0">
+        <li><a href="#basic-panou">Panou</a></li>
+        <li><a href="#basic-proiecte">Proiecte</a></li>
+        <li><a href="#basic-oferte">Oferte</a></li>
+        <li><a href="#basic-produse">Produse</a></li>
+        <li><a href="#basic-clienti">Clienti</a></li>
+        <li><a href="#basic-hpl-catalog">HPL · Catalog</a></li>
+        <li><a href="#basic-hpl-tip-culoare">HPL · Tip culoare</a></li>
+        <li><a href="#basic-hpl-stoc">HPL · Stoc</a></li>
+        <li><a href="#basic-hpl-bucati-rest">HPL · Bucati rest</a></li>
+        <li><a href="#basic-hpl-piese-interne">HPL · Adaugare placi mici (nestocabile)</a></li>
+        <li><a href="#basic-magazie-stoc">Magazie · Stoc Magazie</a></li>
+        <li><a href="#basic-magazie-receptie">Magazie · Receptie marfa</a></li>
+        <li><a href="#basic-audit">Sistem · Jurnal activitate</a></li>
+        <li><a href="#basic-consumuri-materiale">Sistem · Consumuri materiale</a></li>
+        <li><a href="#basic-utilizatori">Sistem · Utilizatori</a></li>
+        <li><a href="#basic-setari-costuri">Sistem · Setari costuri</a></li>
+        <li><a href="#basic-setari-admin">Sistem · Setari admin</a></li>
+        <li><a href="#basic-update-db">Sistem · Update DB</a></li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 id="basic-panou" class="h5">Panou</h2>
+      <p class="mb-2">
+        Este pagina de start. Ofera o privire rapida asupra stocului HPL si a culorilor dominante.
+      </p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista cu culori/top cantitate, cautare rapida si link catre Stoc.</li>
+        <li><strong>Foloseste-o pentru:</strong> orientare rapida si acces rapid la stoc.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Proiecte, Oferte, Produse</h2>
+
+      <h3 id="basic-proiecte" class="h6 mt-3">Proiecte</h3>
+      <p class="mb-2">Aici gestionezi lucrarile efective (executia ofertelor).</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista proiectelor, acces la detalii, tab-uri cu produse, consumuri, livrari, fisiere, ore si discutii.</li>
+        <li><strong>Operatiuni tipice:</strong> creare proiect, schimbare status, adaugare produse, alocare/consum materiale.</li>
+      </ul>
+
+      <h3 id="basic-oferte" class="h6 mt-3">Oferte</h3>
+      <p class="mb-2">Configurezi oferta pentru client inainte sa inceapa executia.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista oferte, formular creare, pagina de oferta cu produse, HPL, accesorii si manopera.</li>
+        <li><strong>Operatiuni tipice:</strong> creare/actualizare oferta, adaugare produse, conversie in proiect.</li>
+      </ul>
+
+      <h3 id="basic-produse" class="h6 mt-3">Produse</h3>
+      <p class="mb-2">Lista produselor definite in sistem, folosite in oferte si proiecte.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> tabel cu produse si detalii de baza.</li>
+        <li><strong>Foloseste-o pentru:</strong> verificare rapida a produselor disponibile.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 id="basic-clienti" class="h5">Clienti</h2>
+      <p class="mb-2">Gestionezi clientii si adresele lor.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista clienti, pagina detalii client si adrese.</li>
+        <li><strong>Operatiuni tipice:</strong> creare client, editare, adaugare adrese, stergere (doar ADMIN).</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">HPL</h2>
+
+      <h3 id="basic-hpl-catalog" class="h6 mt-3">Catalog</h3>
+      <p class="mb-2">Vedere de ansamblu pe placi HPL, grupate pe culori/grosimi.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> grid cu placi si stoc, plus cautare/filtre.</li>
+        <li><strong>Foloseste-o pentru:</strong> consultare rapida a disponibilului.</li>
+      </ul>
+
+      <h3 id="basic-hpl-tip-culoare" class="h6 mt-3">Tip culoare</h3>
+      <p class="mb-2">Administrezi culorile si texturile asociate HPL.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista culori, imagini, texturi si formulare de adaugare/editare.</li>
+        <li><strong>Operatiuni tipice:</strong> creare/editare tip culoare, gestionare texturi inline.</li>
+      </ul>
+
+      <h3 id="basic-hpl-stoc" class="h6 mt-3">Stoc</h3>
+      <p class="mb-2">Gestionezi placile HPL si piesele rezultate.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista placilor, formular de adaugare/editare, detalii placa cu piese.</li>
+        <li><strong>Operatiuni tipice:</strong> adaugare placa, adaugare piese, mutare piese, stergere piese/placi.</li>
+      </ul>
+
+      <h3 id="basic-hpl-bucati-rest" class="h6 mt-3">Bucati rest</h3>
+      <p class="mb-2">Vedere rapida a resturilor (offcut) si a pieselor disponibile.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista bucati rest si statusul lor.</li>
+        <li><strong>Foloseste-o pentru:</strong> identificarea rapida a pieselor reutilizabile.</li>
+      </ul>
+
+      <h3 id="basic-hpl-piese-interne" class="h6 mt-3">Adaugare placi mici (nestocabile)</h3>
+      <p class="mb-2">Introduci piese interne care nu intra in totalurile de stoc.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> formular cu dimensiuni si cantitati.</li>
+        <li><strong>Foloseste-o pentru:</strong> evidenta placilor mici folosite intern.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Magazie</h2>
+
+      <h3 id="basic-magazie-stoc" class="h6 mt-3">Stoc Magazie</h3>
+      <p class="mb-2">Lista accesoriilor din magazie si consumul acestora.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> stoc curent, pagina de detalii si consum pe proiect.</li>
+        <li><strong>Operatiuni tipice:</strong> consum, vizualizare istoric, stergere (doar ADMIN).</li>
+      </ul>
+
+      <h3 id="basic-magazie-receptie" class="h6 mt-3">Receptie marfa</h3>
+      <p class="mb-2">Introduci intrari noi in magazie.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> formular de receptie marfa.</li>
+        <li><strong>Foloseste-o pentru:</strong> cresterea stocului de accesorii.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
+      <h2 class="h5">Sistem</h2>
+
+      <h3 id="basic-audit" class="h6 mt-3">Jurnal activitate</h3>
+      <p class="mb-2">Audit complet pentru actiuni importante.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista log-uri, filtre pe user/actiune/perioada si detalii.</li>
+        <li><strong>Foloseste-o pentru:</strong> verificarea istoricului actiunilor.</li>
+      </ul>
+
+      <h3 id="basic-consumuri-materiale" class="h6 mt-3">Consumuri materiale</h3>
+      <p class="mb-2">Centralizare consumuri HPL si accesorii, filtrabila pe perioada.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> tab-uri HPL/Accesorii, filtre pe date si mod (consumat/rezervat/toate).</li>
+        <li><strong>Foloseste-o pentru:</strong> raportare si verificare consumuri.</li>
+      </ul>
+
+      <h3 id="basic-utilizatori" class="h6 mt-3">Utilizatori</h3>
+      <p class="mb-2">Administrare conturi (doar ADMIN).</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> lista utilizatori, creare si editare.</li>
+        <li><strong>Foloseste-o pentru:</strong> control acces si roluri.</li>
+      </ul>
+
+      <h3 id="basic-setari-costuri" class="h6 mt-3">Setari costuri</h3>
+      <p class="mb-2">Valori globale pentru costurile de manopera si CNC.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> formular cu cost pe ora (atelier) si cost CNC.</li>
+        <li><strong>Foloseste-o pentru:</strong> calculul corect al costurilor in proiecte.</li>
+      </ul>
+
+      <h3 id="basic-setari-admin" class="h6 mt-3">Setari admin</h3>
+      <p class="mb-2">Datele firmei si snapshot-uri ale bazei de date.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> formular date firma + logo, sectiune snapshot (creare/restaurare).</li>
+        <li><strong>Foloseste-o pentru:</strong> administrare avansata.</li>
+      </ul>
+
+      <h3 id="basic-update-db" class="h6 mt-3">Update DB</h3>
+      <p class="mb-2">Rulezi migrari atunci cand apar modificari de schema.</p>
+      <ul class="mb-0">
+        <li><strong>Contine:</strong> plan de verificare si buton de rulare update.</li>
+        <li><strong>Foloseste-o pentru:</strong> actualizari dupa update-uri din Git.</li>
+      </ul>
+    </div>
+
+    <div class="card app-card p-3 mb-3">
       <h2 class="h5">Operatiuni uzuale (ce faci in formulare)</h2>
       <ul class="mb-0">
         <li><strong>Clienti</strong>: adaugi client nou, editezi date, gestionezi adresele si poti sterge (doar ADMIN).</li>
