@@ -123,32 +123,34 @@ $toastError = Session::flash('toast_error');
           <i class="bi bi-truck me-2"></i> Recepție marfă
         </a>
 
-        <div class="app-nav-section">Sistem</div>
-        <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
-          <i class="bi bi-journal-text me-2"></i> Jurnal activitate
-        </a>
-        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
-            <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
+        <?php if (!$user || (string)($user['role'] ?? '') !== Auth::ROLE_OPERATOR): ?>
+          <div class="app-nav-section">Sistem</div>
+          <a class="app-nav-link <?= str_starts_with($p, '/audit') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
+            <i class="bi bi-journal-text me-2"></i> Jurnal activitate
           </a>
-        <?php endif; ?>
-        <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
-          <i class="bi bi-person-gear me-2"></i> Utilizatori
-        </a>
-        <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
-            <i class="bi bi-cash-coin me-2"></i> Setări costuri
+          <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
+            <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
+              <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
+            </a>
+          <?php endif; ?>
+          <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
+            <i class="bi bi-person-gear me-2"></i> Utilizatori
           </a>
-        <?php endif; ?>
-        <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/system/admin-settings') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/admin-settings')) ?>">
-            <i class="bi bi-shield-lock me-2"></i> Setări admin
-          </a>
-        <?php endif; ?>
-        <?php if ($user && strtolower((string)($user['email'] ?? '')) === 'sacodrut@ikonia.ro'): ?>
-          <a class="app-nav-link <?= str_starts_with($p, '/system/db-update') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/db-update')) ?>">
-            <i class="bi bi-database-gear me-2"></i> Update DB
-          </a>
+          <?php if ($user && in_array((string)($user['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)): ?>
+            <a class="app-nav-link <?= str_starts_with($p, '/system/costuri') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/costuri')) ?>">
+              <i class="bi bi-cash-coin me-2"></i> Setări costuri
+            </a>
+          <?php endif; ?>
+          <?php if ($user && (string)($user['role'] ?? '') === Auth::ROLE_ADMIN): ?>
+            <a class="app-nav-link <?= str_starts_with($p, '/system/admin-settings') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/admin-settings')) ?>">
+              <i class="bi bi-shield-lock me-2"></i> Setări admin
+            </a>
+          <?php endif; ?>
+          <?php if ($user && strtolower((string)($user['email'] ?? '')) === 'sacodrut@ikonia.ro'): ?>
+            <a class="app-nav-link <?= str_starts_with($p, '/system/db-update') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/db-update')) ?>">
+              <i class="bi bi-database-gear me-2"></i> Update DB
+            </a>
+          <?php endif; ?>
         <?php endif; ?>
       </nav>
     </aside>
