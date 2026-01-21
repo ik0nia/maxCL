@@ -36,6 +36,7 @@ use App\Controllers\System\CostSettingsController;
 use App\Controllers\System\ConsumptionsResetController;
 use App\Controllers\System\AdminSettingsController;
 use App\Controllers\System\DbUpdateController;
+use App\Controllers\System\ManualController;
 use App\Controllers\System\MaterialConsumptionsController;
 
 require __DIR__ . '/../vendor_stub.php';
@@ -266,7 +267,9 @@ $router->get('/system/costuri', fn() => CostSettingsController::index(), $usersM
 $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersMW);
 
 $systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
+$manualMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR])];
 $router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
+$router->get('/manual', fn() => ManualController::index(), $manualMW);
 $router->get('/system/consumuri/reset', fn() => ConsumptionsResetController::run(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->get('/system/admin-settings', fn() => AdminSettingsController::index(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/company/update', fn() => AdminSettingsController::updateCompany(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
