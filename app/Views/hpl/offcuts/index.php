@@ -1,10 +1,13 @@
 <?php
+use App\Core\Auth;
 use App\Core\Url;
 use App\Core\View;
 
 $bucket = (string)($bucket ?? '');
 $counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0];
 $items = $items ?? [];
+$u = Auth::user();
+$canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
 function _normImg2(string $p): string {
   $p = trim($p);
@@ -145,6 +148,8 @@ ob_start();
         $photo = is_array($it['_photo'] ?? null) ? $it['_photo'] : null;
         $photoUrl = $photo ? (string)($photo['url'] ?? '') : '';
         $photoTitle = $photo ? (string)($photo['original_name'] ?? 'Poză piesă') : '';
+        $uploadAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/photo';
+        if ($bucket !== '') $uploadAction .= '?bucket=' . rawurlencode($bucket);
       ?>
       <div class="col-12 col-md-6 col-lg-3">
         <div class="card app-card p-3 h-100 js-card-link"
@@ -210,6 +215,17 @@ ob_start();
               <div class="offcut-sub">
                 Filtru: <?= htmlspecialchars(_bucketLabel($bucketKey)) ?>
               </div>
+              <?php if ($canUpload): ?>
+                <form class="mt-2" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars(Url::to($uploadAction)) ?>">
+                  <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                  <div class="input-group input-group-sm">
+                    <input type="file" class="form-control" name="photo" accept="image/jpeg,image/png,image/webp" required>
+                    <button class="btn btn-outline-secondary" type="submit">
+                      <?= $photoUrl !== '' ? 'Schimbă poză' : 'Adaugă poză' ?>
+                    </button>
+                  </div>
+                </form>
+              <?php endif; ?>
             </div>
           </div>
         </div>

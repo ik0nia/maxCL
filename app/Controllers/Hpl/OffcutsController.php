@@ -3,11 +3,18 @@ declare(strict_types=1);
 
 namespace App\Controllers\Hpl;
 
+use App\Core\Audit;
+use App\Core\Auth;
 use App\Core\DB;
+use App\Core\Csrf;
 use App\Core\Response;
+use App\Core\Session;
+use App\Core\Upload;
 use App\Core\Url;
 use App\Core\View;
+use App\Models\EntityFile;
 use App\Models\HplOffcuts;
+use App\Models\HplStockPiece;
 
 final class OffcutsController
 {
@@ -110,6 +117,119 @@ final class OffcutsController
             'counts' => $counts,
             'items' => $items,
         ]);
+    }
+
+    public static function uploadPhoto(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $pieceId = (int)($params['pieceId'] ?? 0);
+        $bucket = isset($_GET['bucket']) ? trim((string)$_GET['bucket']) : '';
+        $return = '/hpl/bucati-rest' . ($bucket !== '' ? ('?bucket=' . rawurlencode($bucket)) : '');
+
+        if ($pieceId <= 0) {
+            Session::flash('toast_error', 'Piesă invalidă.');
+            Response::redirect($return);
+        }
+        $piece = HplStockPiece::find($pieceId);
+        if (!$piece) {
+            Session::flash('toast_error', 'Piesă inexistentă.');
+            Response::redirect($return);
+        }
+        if (empty($_FILES['photo']['name'] ?? '')) {
+            Session::flash('toast_error', 'Alege o poză.');
+            Response::redirect($return);
+        }
+        $photo = $_FILES['photo'];
+        if (!isset($photo['error']) || (int)$photo['error'] !== UPLOAD_ERR_OK) {
+            Session::flash('toast_error', 'Upload imagine eșuat.');
+            Response::redirect($return);
+        }
+        $tmp = (string)($photo['tmp_name'] ?? '');
+        if ($tmp === '' || !is_file($tmp)) {
+            Session::flash('toast_error', 'Fișier invalid.');
+            Response::redirect($return);
+        }
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = (string)$finfo->file($tmp);
+        $allowed = [
+            'image/jpeg' => true,
+            'image/png' => true,
+            'image/webp' => true,
+        ];
+        if (!isset($allowed[$mime])) {
+            Session::flash('toast_error', 'Format invalid. Acceptat: JPG/PNG/WEBP.');
+            Response::redirect($return);
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        $uploadedFs = null;
+        $oldFiles = [];
+        try {
+            // ștergem pozele vechi (dacă există) pentru a înlocui
+            $st = $pdo->prepare("
+                SELECT id, stored_name
+                FROM entity_files
+                WHERE entity_type = 'hpl_stock_pieces'
+                  AND entity_id = ?
+                  AND (category = 'internal_piece_photo' OR mime LIKE 'image/%')
+                ORDER BY id DESC
+            ");
+            $st->execute([$pieceId]);
+            $oldFiles = $st->fetchAll();
+            if ($oldFiles) {
+                $ids = [];
+                foreach ($oldFiles as $of) {
+                    $fid = (int)($of['id'] ?? 0);
+                    if ($fid > 0) $ids[] = $fid;
+                }
+                if ($ids) {
+                    $ph = implode(',', array_fill(0, count($ids), '?'));
+                    $pdo->prepare("DELETE FROM entity_files WHERE id IN ($ph)")->execute($ids);
+                }
+            }
+
+            $up = Upload::saveEntityFile($photo);
+            $uploadedFs = $up['fs_path'] ?? null;
+            $fid = EntityFile::create([
+                'entity_type' => 'hpl_stock_pieces',
+                'entity_id' => $pieceId,
+                'category' => 'internal_piece_photo',
+                'original_name' => $up['original_name'],
+                'stored_name' => $up['stored_name'],
+                'mime' => $up['mime'],
+                'size_bytes' => $up['size_bytes'],
+                'uploaded_by' => Auth::id(),
+            ]);
+            Audit::log('FILE_UPLOAD', 'entity_files', $fid, null, null, [
+                'message' => 'Upload foto piesă HPL: ' . $up['original_name'],
+                'entity_type' => 'hpl_stock_pieces',
+                'entity_id' => $pieceId,
+                'stored_name' => $up['stored_name'],
+            ]);
+            $pdo->commit();
+
+            // curățăm fișierele vechi de pe disc
+            if ($oldFiles) {
+                $dir = dirname(__DIR__, 2) . '/storage/uploads/files/';
+                foreach ($oldFiles as $of) {
+                    $stored = (string)($of['stored_name'] ?? '');
+                    if ($stored !== '') {
+                        $fs = $dir . $stored;
+                        if (is_file($fs)) @unlink($fs);
+                    }
+                }
+            }
+            Session::flash('toast_success', 'Poză salvată.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            if (is_string($uploadedFs) && $uploadedFs !== '' && is_file($uploadedFs)) {
+                @unlink($uploadedFs);
+            }
+            Session::flash('toast_error', 'Nu pot salva poza: ' . $e->getMessage());
+        }
+        Response::redirect($return);
     }
 }
 
