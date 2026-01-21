@@ -40,7 +40,7 @@ final class Client
                   SELECT
                     client_id,
                     COUNT(id) AS project_count,
-                    GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
+                    GROUP_CONCAT(CONCAT(id, '::', code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
                   FROM projects
                   WHERE (deleted_at IS NULL OR deleted_at = '' OR deleted_at = '0000-00-00 00:00:00')
                   GROUP BY client_id
@@ -49,7 +49,7 @@ final class Client
                   SELECT
                     client_id,
                     COUNT(id) AS offer_count,
-                    GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
+                    GROUP_CONCAT(CONCAT(id, '::', code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
                   FROM offers
                   GROUP BY client_id
                 ) o ON o.client_id = c.id
@@ -79,7 +79,7 @@ final class Client
                       SELECT
                         client_id,
                         COUNT(id) AS project_count,
-                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
+                      GROUP_CONCAT(CONCAT(id, '::', code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
                       FROM projects
                       WHERE (deleted_at IS NULL OR deleted_at = '' OR deleted_at = '0000-00-00 00:00:00')
                       GROUP BY client_id
@@ -88,7 +88,7 @@ final class Client
                       SELECT
                         client_id,
                         COUNT(id) AS offer_count,
-                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
+                      GROUP_CONCAT(CONCAT(id, '::', code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
                       FROM offers
                       GROUP BY client_id
                     ) o ON o.client_id = c.id
@@ -109,7 +109,7 @@ final class Client
                       SELECT
                         client_id,
                         COUNT(id) AS project_count,
-                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
+                      GROUP_CONCAT(CONCAT(id, '::', code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS project_list
                       FROM projects
                       GROUP BY client_id
                     ) p ON p.client_id = c.id
@@ -117,7 +117,7 @@ final class Client
                       SELECT
                         client_id,
                         COUNT(id) AS offer_count,
-                        GROUP_CONCAT(CONCAT(code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
+                      GROUP_CONCAT(CONCAT(id, '::', code, ' · ', name) ORDER BY created_at DESC SEPARATOR '||') AS offer_list
                       FROM offers
                       GROUP BY client_id
                     ) o ON o.client_id = c.id

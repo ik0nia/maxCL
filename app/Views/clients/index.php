@@ -34,8 +34,6 @@ ob_start();
             <th style="width:150px">Tip</th>
             <th>Nume</th>
             <th>Telefon</th>
-            <th>Email</th>
-            <th>Adresă livrare</th>
             <th>Proiecte</th>
             <th>Oferte</th>
             <th class="text-end" style="width:240px">Acțiuni</th>
@@ -66,8 +64,6 @@ ob_start();
                 <?php endif; ?>
               </td>
               <td><?= htmlspecialchars((string)($r['phone'] ?? '')) ?></td>
-              <td><?= htmlspecialchars((string)($r['email'] ?? '')) ?></td>
-              <td class="text-muted"><?= nl2br(htmlspecialchars((string)($r['address'] ?? ''))) ?></td>
               <td>
                 <?php if ($pCount <= 0): ?>
                   <span class="text-muted">—</span>
@@ -75,7 +71,21 @@ ob_start();
                   <div class="small text-muted mb-1"><?= $pCount ?> proiect(e)</div>
                   <div class="d-flex flex-wrap gap-1">
                     <?php foreach (array_slice($projects, 0, 4) as $p): ?>
-                      <span class="badge app-badge"><?= htmlspecialchars($p) ?></span>
+                      <?php
+                        $pid = 0;
+                        $plabel = $p;
+                        if (strpos($p, '::') !== false) {
+                          [$pidRaw, $plabel] = explode('::', $p, 2);
+                          $pid = is_numeric($pidRaw) ? (int)$pidRaw : 0;
+                        }
+                      ?>
+                      <?php if ($pid > 0): ?>
+                        <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/projects/' . $pid)) ?>">
+                          <?= htmlspecialchars($plabel) ?>
+                        </a>
+                      <?php else: ?>
+                        <span class="badge app-badge"><?= htmlspecialchars($plabel) ?></span>
+                      <?php endif; ?>
                     <?php endforeach; ?>
                     <?php if (count($projects) > 4): ?>
                       <span class="text-muted small">+<?= (int)(count($projects) - 4) ?></span>
@@ -90,7 +100,21 @@ ob_start();
               <div class="small text-muted mb-1"><?= $oCount ?> ofertă(e)</div>
               <div class="d-flex flex-wrap gap-1">
                 <?php foreach (array_slice($offers, 0, 4) as $o): ?>
-                  <span class="badge app-badge"><?= htmlspecialchars($o) ?></span>
+                  <?php
+                    $oid = 0;
+                    $olabel = $o;
+                    if (strpos($o, '::') !== false) {
+                      [$oidRaw, $olabel] = explode('::', $o, 2);
+                      $oid = is_numeric($oidRaw) ? (int)$oidRaw : 0;
+                    }
+                  ?>
+                  <?php if ($oid > 0): ?>
+                    <a class="badge app-badge text-decoration-none" href="<?= htmlspecialchars(Url::to('/offers/' . $oid)) ?>">
+                      <?= htmlspecialchars($olabel) ?>
+                    </a>
+                  <?php else: ?>
+                    <span class="badge app-badge"><?= htmlspecialchars($olabel) ?></span>
+                  <?php endif; ?>
                 <?php endforeach; ?>
                 <?php if (count($offers) > 4): ?>
                   <span class="text-muted small">+<?= (int)(count($offers) - 4) ?></span>
