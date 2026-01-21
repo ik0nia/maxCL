@@ -31,7 +31,7 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
       <?php if (!$isViewRole): ?>
         <div class="d-flex gap-2">
           <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-primary"><i class="bi bi-box-seam me-1"></i> Stoc HPL</a>
-          <a href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>" class="btn btn-outline-secondary"><i class="bi bi-boxes me-1"></i> Stoc Magazie</a>
+          <a href="<?= htmlspecialchars(Url::to('/magazie/stoc')) ?>" class="btn btn-success"><i class="bi bi-boxes me-1"></i> Stoc Magazie</a>
         </div>
       <?php endif; ?>
     </div>
