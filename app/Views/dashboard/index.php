@@ -8,7 +8,11 @@ $topColors = $topColors ?? [];
 $stockError = $stockError ?? null;
 $bottomColors = $bottomColors ?? [];
 $readyProductsCount = array_key_exists('readyProductsCount', get_defined_vars()) ? $readyProductsCount : null;
+$readyProducts = is_array($readyProducts ?? null) ? $readyProducts : [];
+$readyProductsError = $readyProductsError ?? null;
 $projectsInWorkCount = array_key_exists('projectsInWorkCount', get_defined_vars()) ? $projectsInWorkCount : null;
+$projectsInWork = is_array($projectsInWork ?? null) ? $projectsInWork : [];
+$projectsInWorkError = $projectsInWorkError ?? null;
 $latestOffers = is_array($latestOffers ?? null) ? $latestOffers : [];
 $latestOffersError = $latestOffersError ?? null;
 $lowMagazieItems = is_array($lowMagazieItems ?? null) ? $lowMagazieItems : [];
@@ -31,7 +35,10 @@ $lowMagazieError = $lowMagazieError ?? null;
     <div class="row g-3">
       <div class="col-12 col-lg-4">
         <div class="card app-card p-3 h-100">
-          <div class="h5 m-0">Produse gata de livrare</div>
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="h5 m-0">Produse gata de livrare</div>
+            <span class="badge app-badge">Top 5</span>
+          </div>
           <div class="text-muted">Neavizate</div>
           <?php if ($readyProductsCount === null): ?>
             <div class="text-muted mt-3">Date indisponibile.</div>
@@ -42,21 +49,77 @@ $lowMagazieError = $lowMagazieError ?? null;
               Vezi produse
             </a>
           <?php endif; ?>
+          <?php if ($readyProductsError): ?>
+            <div class="text-muted mt-3">Lista indisponibilă.</div>
+          <?php elseif (!$readyProducts): ?>
+            <div class="text-muted mt-3">Nu există produse încă.</div>
+          <?php else: ?>
+            <ul class="list-group list-group-flush mt-2">
+              <?php foreach ($readyProducts as $r): ?>
+                <?php
+                  $ppId = (int)($r['project_product_id'] ?? 0);
+                  $projId = (int)($r['project_id'] ?? 0);
+                  $projCode = trim((string)($r['project_code'] ?? ''));
+                  $projName = trim((string)($r['project_name'] ?? ''));
+                  $prodName = trim((string)($r['product_name'] ?? ''));
+                  $prodCode = trim((string)($r['product_code'] ?? ''));
+                  $label = $prodName !== '' ? $prodName : ($prodCode !== '' ? $prodCode : ('Produs #' . $ppId));
+                  $pLabel = $projName !== '' ? $projName : ($projCode !== '' ? $projCode : ('Proiect #' . $projId));
+                  $href = Url::to('/projects/' . $projId . '?tab=products#pp-' . $ppId);
+                ?>
+                <li class="list-group-item px-0">
+                  <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars($href) ?>">
+                    <?= htmlspecialchars($label) ?>
+                  </a>
+                  <div class="text-muted small"><?= htmlspecialchars($pLabel) ?></div>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php endif; ?>
         </div>
       </div>
 
       <div class="col-12 col-lg-4">
         <div class="card app-card p-3 h-100">
-          <div class="h5 m-0">Proiecte în lucru</div>
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="h5 m-0">Proiecte în lucru</div>
+            <span class="badge app-badge">Top 5</span>
+          </div>
           <div class="text-muted">Statusuri active</div>
           <?php if ($projectsInWorkCount === null): ?>
             <div class="text-muted mt-3">Date indisponibile.</div>
           <?php else: ?>
             <div class="display-6 fw-semibold mt-2"><?= (int)$projectsInWorkCount ?></div>
-            <div class="text-muted small">Excludem draft/anulat/livrat complet/arhivat</div>
+            <div class="text-muted small">Excludem anulat/livrat complet/arhivat</div>
             <a class="btn btn-outline-secondary btn-sm mt-2" href="<?= htmlspecialchars(Url::to('/projects')) ?>">
               Vezi proiecte
             </a>
+          <?php endif; ?>
+          <?php if ($projectsInWorkError): ?>
+            <div class="text-muted mt-3">Lista indisponibilă.</div>
+          <?php elseif (!$projectsInWork): ?>
+            <div class="text-muted mt-3">Nu există proiecte încă.</div>
+          <?php else: ?>
+            <ul class="list-group list-group-flush mt-2">
+              <?php foreach ($projectsInWork as $p): ?>
+                <?php
+                  $pid = (int)($p['id'] ?? 0);
+                  $pcode = trim((string)($p['code'] ?? ''));
+                  $pname = trim((string)($p['name'] ?? ''));
+                  $pstatus = (string)($p['status'] ?? '');
+                  $label = $pname !== '' ? $pname : ($pcode !== '' ? $pcode : ('Proiect #' . $pid));
+                  $sub = $pcode !== '' ? $pcode : ('#' . $pid);
+                ?>
+                <li class="list-group-item px-0">
+                  <a class="text-decoration-none fw-semibold" href="<?= htmlspecialchars(Url::to('/projects/' . $pid)) ?>">
+                    <?= htmlspecialchars($label) ?>
+                  </a>
+                  <div class="text-muted small">
+                    <?= htmlspecialchars($sub) ?><?php if ($pstatus !== ''): ?> · <?= htmlspecialchars($pstatus) ?><?php endif; ?>
+                  </div>
+                </li>
+              <?php endforeach; ?>
+            </ul>
           <?php endif; ?>
         </div>
       </div>
@@ -175,26 +238,6 @@ $lowMagazieError = $lowMagazieError ?? null;
       <?php endif; ?>
     </div>
 
-    <div class="card app-card p-3 mt-3">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="h5 m-0">Culori cu cea mai mică cantitate</div>
-          <div class="text-muted">Fără stoc 0 · cele mai apropiate de zero</div>
-        </div>
-        <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
-      </div>
-
-      <?php if ($stockError): ?>
-        <div class="alert alert-warning border mt-3 mb-0" style="border-radius:14px">
-          <div class="fw-semibold">Statistici indisponibile.</div>
-          <div class="text-muted">Rulează <a href="<?= htmlspecialchars(Url::to('/setup')) ?>">Setup</a> dacă tabelele de stoc nu sunt instalate încă.</div>
-        </div>
-      <?php else: ?>
-        <div class="mt-2">
-          <?= View::render('dashboard/_top_colors_grid', ['topColors' => $bottomColors]) ?>
-        </div>
-      <?php endif; ?>
-    </div>
   </div>
 
   <div class="col-12 col-lg-6">
@@ -244,6 +287,29 @@ $lowMagazieError = $lowMagazieError ?? null;
               <?php endforeach; ?>
             </tbody>
           </table>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card app-card p-3">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="h5 m-0">Culori cu cea mai mică cantitate</div>
+          <div class="text-muted">Fără stoc 0 · cele mai apropiate de zero</div>
+        </div>
+        <a href="<?= htmlspecialchars(Url::to('/stock')) ?>" class="btn btn-outline-secondary btn-sm">Vezi Stoc</a>
+      </div>
+
+      <?php if ($stockError): ?>
+        <div class="alert alert-warning border mt-3 mb-0" style="border-radius:14px">
+          <div class="fw-semibold">Statistici indisponibile.</div>
+          <div class="text-muted">Rulează <a href="<?= htmlspecialchars(Url::to('/setup')) ?>">Setup</a> dacă tabelele de stoc nu sunt instalate încă.</div>
+        </div>
+      <?php else: ?>
+        <div class="mt-2">
+          <?= View::render('dashboard/_top_colors_grid', ['topColors' => $bottomColors]) ?>
         </div>
       <?php endif; ?>
     </div>
