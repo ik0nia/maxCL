@@ -31,8 +31,8 @@ ob_start();
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/offers')) ?>" class="btn btn-outline-secondary">Înapoi</a>
-    <a class="btn btn-outline-secondary" target="_blank" href="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/bon-general')) ?>">
-      <i class="bi bi-file-earmark-text me-1"></i> Bon ofertă
+    <a class="btn btn-primary" target="_blank" href="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/bon-general')) ?>">
+      <i class="bi bi-file-earmark-text me-1"></i> Print ofertă
     </a>
     <?php if ($convertedProjectId > 0): ?>
       <a class="btn btn-success" href="<?= htmlspecialchars(Url::to('/projects/' . $convertedProjectId)) ?>">
@@ -241,11 +241,6 @@ ob_start();
                 <button class="btn btn-outline-secondary btn-sm" type="submit">Actualizează</button>
               </div>
             </form>
-            <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/delete')) ?>" class="mt-2"
-                  onsubmit="return confirm('Ștergi produsul din ofertă?');">
-              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
-              <button class="btn btn-danger btn-sm" type="submit">Șterge</button>
-            </form>
           <?php endif; ?>
 
           <div class="mt-3">
@@ -449,6 +444,15 @@ ob_start();
               <div class="text-muted">Preț cu discount: <?= number_format((float)($tot['sale_total'] ?? 0), 2, '.', '') ?> lei</div>
             </div>
           </div>
+          <?php if ($canWrite): ?>
+            <div class="mt-2 d-flex justify-content-end">
+              <form method="post" action="<?= htmlspecialchars(Url::to('/offers/' . $offerId . '/products/' . $opId . '/delete')) ?>"
+                    onsubmit="return confirm('Ștergi produsul din ofertă?');">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                <button class="btn btn-danger btn-sm" type="submit">Șterge produs</button>
+              </form>
+            </div>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
