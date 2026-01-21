@@ -15,7 +15,7 @@ if ($companyName === '') $companyName = 'HPL Manager';
 <html lang="ro">
 <head>
   <meta charset="utf-8">
-  <title>Bon ofertă <?= htmlspecialchars((string)($offer['code'] ?? '')) ?></title>
+  <title>Ofertă <?= htmlspecialchars((string)($offer['code'] ?? '')) ?></title>
   <style>
     body { font-family: Inter, Arial, sans-serif; font-size: 13px; color: #111; }
     .doc-wrap { max-width: 980px; margin: 20px auto; }
@@ -32,6 +32,7 @@ if ($companyName === '') $companyName = 'HPL Manager';
     .totals { margin-top: 16px; display: flex; justify-content: flex-end; }
     .totals .box { min-width: 320px; border: 1px solid #ddd; padding: 12px; }
     .totals .row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .strike { text-decoration: line-through; color: #666; }
     .muted { color: #666; }
   </style>
 </head>
@@ -39,7 +40,7 @@ if ($companyName === '') $companyName = 'HPL Manager';
   <div class="doc-wrap">
     <div class="doc-header">
       <div>
-        <h1 class="doc-title">Bon ofertă</h1>
+        <h1 class="doc-title">Ofertă</h1>
         <div class="meta">
           <div>Oferta: <strong><?= htmlspecialchars((string)($offer['code'] ?? '')) ?></strong></div>
           <div>Denumire: <?= htmlspecialchars((string)($offer['name'] ?? '')) ?></div>
@@ -66,11 +67,19 @@ if ($companyName === '') $companyName = 'HPL Manager';
           <th class="text-end">Cantitate</th>
           <th class="text-end">Preț ofertă</th>
           <th class="text-end">Total ofertă</th>
-          <th class="text-end">Preț de listă</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($rows as $r): ?>
+          <?php
+            $qty = (float)($r['qty'] ?? 0);
+            $listTotal = (float)($r['cost_total'] ?? 0);
+            $offerTotal = (float)($r['sale_total'] ?? 0);
+            $listUnit = $qty > 0 ? ($listTotal / $qty) : 0.0;
+            $offerUnit = (float)($r['sale_price'] ?? 0);
+            $discTotal = $listTotal - $offerTotal;
+            $discPct = ($listTotal > 0) ? (($discTotal / $listTotal) * 100.0) : 0.0;
+          ?>
           <tr>
             <td>
               <strong><?= htmlspecialchars((string)($r['product_name'] ?? '')) ?></strong>
@@ -79,27 +88,49 @@ if ($companyName === '') $companyName = 'HPL Manager';
               <?php endif; ?>
             </td>
             <td class="text-end"><?= $fmtQty($r['qty'] ?? 0) ?> <?= htmlspecialchars((string)($r['unit'] ?? 'buc')) ?></td>
-            <td class="text-end"><?= $fmtMoney($r['sale_price'] ?? 0) ?></td>
-            <td class="text-end"><?= $fmtMoney($r['sale_total'] ?? 0) ?></td>
-            <td class="text-end"><?= $fmtMoney($r['cost_total'] ?? 0) ?></td>
+            <td class="text-end">
+              <?php if ($listUnit > 0): ?>
+                <div class="strike"><?= $fmtMoney($listUnit) ?></div>
+              <?php endif; ?>
+              <div><?= $fmtMoney($offerUnit) ?></div>
+            </td>
+            <td class="text-end">
+              <?php if ($listTotal > 0): ?>
+                <div class="strike"><?= $fmtMoney($listTotal) ?></div>
+              <?php endif; ?>
+              <div><?= $fmtMoney($offerTotal) ?></div>
+              <?php if ($discTotal > 0.01): ?>
+                <div class="muted small">Discount: -<?= $fmtMoney($discTotal) ?> (<?= number_format($discPct, 1, '.', '') ?>%)</div>
+              <?php endif; ?>
+            </td>
           </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-          <tr><td colspan="5" class="muted">Nu există produse.</td></tr>
+          <tr><td colspan="4" class="muted">Nu există produse.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
 
     <div class="totals">
       <div class="box">
+        <?php
+          $discTotalAll = (float)$totalCost - (float)$totalSale;
+          $discPctAll = ($totalCost > 0) ? (($discTotalAll / (float)$totalCost) * 100.0) : 0.0;
+        ?>
+        <div class="row">
+          <div><strong>Preț de listă</strong></div>
+          <div><strong><span class="strike"><?= $fmtMoney($totalCost) ?> lei</span></strong></div>
+        </div>
+        <div class="row">
+          <div>Preț ofertă</div>
+          <div><?= $fmtMoney($totalSale) ?> lei</div>
+        </div>
+        <?php if ($discTotalAll > 0.01): ?>
           <div class="row">
-            <div><strong>Preț de listă</strong></div>
-            <div><strong><?= $fmtMoney($totalCost) ?> lei</strong></div>
+            <div>Discount</div>
+            <div>-<?= $fmtMoney($discTotalAll) ?> lei (<?= number_format($discPctAll, 1, '.', '') ?>%)</div>
           </div>
-          <div class="row">
-            <div>Preț ofertă</div>
-            <div><?= $fmtMoney($totalSale) ?> lei</div>
-          </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
