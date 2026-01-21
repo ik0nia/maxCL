@@ -458,6 +458,11 @@ ob_start();
     </div>
   </div>
 
+  <style>
+    .s2-thumb{width:28px;height:28px;object-fit:cover;border-radius:8px;border:1px solid #D9E3E6;margin-right:8px}
+    .s2-thumb2{width:28px;height:28px;object-fit:cover;border-radius:8px;border:1px solid #D9E3E6;margin-right:8px;margin-left:-6px}
+    .s2-row{display:flex;align-items:center}
+  </style>
   <script>
     document.addEventListener('DOMContentLoaded', function(){
       if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
@@ -485,6 +490,39 @@ ob_start();
         });
       });
 
+      const basePath = "<?= htmlspecialchars(Url::basePath()) ?>";
+      function normThumb(path){
+        if (!path) return '';
+        const s = String(path);
+        if (/^https?:\/\//i.test(s)) return s;
+        if (basePath && s.startsWith(basePath + '/')) return s;
+        if (s.startsWith('/')) return (basePath || '') + s;
+        return (basePath || '') + '/' + s;
+      }
+      function fmtBoard(opt){
+        if (!opt || opt.loading) return (opt && opt.text) ? opt.text : '';
+        const thumb = normThumb(opt.thumb || '');
+        const thumbBack = normThumb(opt.thumb_back || '');
+        const fc = opt.face_color_code || '';
+        const bc = opt.back_color_code || '';
+        let colors = fc ? String(fc) : '';
+        if (bc && bc !== fc) colors = colors ? (colors + '/' + String(bc)) : String(bc);
+        const label = String(opt.text || '');
+        if (!thumb && !thumbBack && !colors) return label;
+        const esc = (s) => String(s || '').replace(/</g,'&lt;');
+        const $row = $('<span class="s2-row"></span>');
+        if (thumb) $row.append($('<img class="s2-thumb" alt="" />').attr('src', thumb));
+        if (thumbBack && thumbBack !== thumb) $row.append($('<img class="s2-thumb2" alt="" />').attr('src', thumbBack));
+        const $txt = $('<span></span>');
+        if (colors) {
+          $txt.html('<strong>' + esc(colors) + '</strong>' + (label ? (' · ' + esc(label)) : ''));
+        } else {
+          $txt.text(label);
+        }
+        $row.append($txt);
+        return $row;
+      }
+
       $('.js-offer-hpl-board').each(function(){
         const $el = $(this);
         if ($el.data('select2')) return;
@@ -493,6 +531,9 @@ ob_start();
           placeholder: $el.data('placeholder') || 'Caută placă HPL…',
           allowClear: true,
           minimumInputLength: 1,
+          templateResult: fmtBoard,
+          templateSelection: fmtBoard,
+          escapeMarkup: m => m,
           ajax: {
             url: "<?= htmlspecialchars(Url::to('/api/hpl/boards/search')) ?>",
             dataType: 'json',
@@ -504,10 +545,6 @@ ob_start();
               return { results: items };
             },
             cache: true
-          },
-          templateResult: function(item){
-            if (!item || !item.text) return item.text || '';
-            return item.text;
           }
         });
       });
