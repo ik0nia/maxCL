@@ -74,7 +74,7 @@ ob_start();
       $projTitle = trim((string)($project['name'] ?? ''));
       if ($projTitle === '') $projTitle = trim((string)($project['code'] ?? ''));
     ?>
-    <h1 class="m-0 text-success display-4 fw-bold">PROIECT: #<?= (int)($project['id'] ?? 0) ?> - <?= htmlspecialchars($projTitle) ?></h1>
+    <h1 class="m-0 text-success display-1 fw-bold">PROIECT: #<?= (int)($project['id'] ?? 0) ?> - <?= htmlspecialchars($projTitle) ?></h1>
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/projects')) ?>" class="btn btn-outline-secondary">Înapoi</a>
