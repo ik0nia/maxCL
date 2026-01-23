@@ -6285,6 +6285,33 @@ final class ProjectsController
             $h = (int)($p['height_mm'] ?? 0);
             $loc = (string)($p['location'] ?? '');
             $isAcc = (int)($p['is_accounting'] ?? 1);
+            $consumeMode = strtoupper((string)($c['consume_mode'] ?? 'FULL'));
+            $halfMin = 0;
+            $halfRemainder = null;
+            if ($consumeMode === 'HALF') {
+                $fullH = 0;
+                try {
+                    $board = $boardId > 0 ? HplBoard::find($boardId) : null;
+                    $fullH = (int)($board['std_height_mm'] ?? 0);
+                } catch (\Throwable $e) {
+                    $fullH = 0;
+                }
+                if ($fullH <= 0 && $h > 0) $fullH = $h * 2;
+                $halfMin = $fullH > 0 ? (int)floor($fullH / 2) : ($h > 0 ? $h : 0);
+                if ($halfMin <= 0) {
+                    throw new \RuntimeException('Nu pot calcula jumatatea placii standard.');
+                }
+                $rawRemainder = trim((string)($_POST['half_remainder_mm'] ?? ''));
+                if ($rawRemainder === '') {
+                    $halfRemainder = $halfMin;
+                } else {
+                    $maxH = $fullH > 0 ? $fullH : PHP_INT_MAX;
+                    $halfRemainder = Validator::int($rawRemainder, $halfMin, $maxH);
+                    if ($halfRemainder === null) {
+                        throw new \RuntimeException('Lungimea restului trebuie sa fie cel putin jumatate din lungimea placii standard.');
+                    }
+                }
+            }
 
             $consumedPieceId = $pieceId;
             // Cerință: la "Debitat" trecem materialul în Producție și apoi îl consumăm,
@@ -6317,6 +6344,35 @@ final class ProjectsController
 
             ProjectProductHplConsumption::markConsumed((int)$cid);
             ProjectProductHplConsumption::setConsumedPiece((int)$cid, (int)$consumedPieceId);
+
+            if ($consumeMode === 'HALF' && $halfRemainder !== null) {
+                $rem = null;
+                try {
+                    $rem = HplStockPiece::findIdentical(
+                        $boardId,
+                        'OFFCUT',
+                        'RESERVED',
+                        $w,
+                        $halfMin,
+                        $loc,
+                        $isAcc,
+                        $projectId,
+                        $pieceId
+                    );
+                } catch (\Throwable $e) {
+                    $rem = null;
+                }
+                if ($rem && (int)($rem['height_mm'] ?? 0) !== (int)$halfRemainder) {
+                    $pdo->prepare("UPDATE hpl_stock_pieces SET height_mm = ? WHERE id = ?")
+                        ->execute([(int)$halfRemainder, (int)($rem['id'] ?? 0)]);
+                    try {
+                        HplStockPiece::appendNote(
+                            (int)($rem['id'] ?? 0),
+                            'Rest ajustat la ' . (int)$halfRemainder . ' mm · Debitat · ' . $projNote . ' · ' . $prodNote
+                        );
+                    } catch (\Throwable $e) {}
+                }
+            }
 
             Audit::log('PROJECT_PRODUCT_HPL_CONSUME', 'project_product_hpl_consumptions', $cid, null, null, [
                 'message' => 'HPL debitat pe produs.',

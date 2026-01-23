@@ -1152,8 +1152,14 @@ ob_start();
                                   <td class="text-end">
                                     <?php if (($canEditProducts && ProjectsController::canOperatorEditProjectProduct($pp)) && $st2 === 'RESERVED' && $hrId > 0): ?>
                                       <div class="d-flex justify-content-end gap-1">
-                                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>" class="m-0">
+                                        <form method="post"
+                                              action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/cut')) ?>"
+                                              class="m-0 js-hpl-cut-form"
+                                              data-consume-mode="<?= htmlspecialchars($cm2) ?>"
+                                              data-std-h="<?= (int)$stdH ?>"
+                                              data-piece-h="<?= (int)$ph2 ?>">
                                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                                          <input type="hidden" name="half_remainder_mm" value="" class="js-half-remainder">
                                           <button class="btn btn-outline-success btn-sm" type="submit">Debitat</button>
                                         </form>
                                         <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/hpl/' . $hrId . '/unallocate')) ?>" class="m-0"
@@ -1173,6 +1179,47 @@ ob_start();
                         </div>
                       <?php endif; ?>
                     </div>
+
+                    <script>
+                      document.addEventListener('DOMContentLoaded', function(){
+                        document.querySelectorAll('form.js-hpl-cut-form').forEach(function(form){
+                          form.addEventListener('submit', function(e){
+                            const mode = String(form.dataset.consumeMode || '').toUpperCase();
+                            if (mode !== 'HALF') return;
+                            const stdH = parseInt(form.dataset.stdH || '0', 10);
+                            const pieceH = parseInt(form.dataset.pieceH || '0', 10);
+                            let fullH = stdH > 0 ? stdH : (pieceH > 0 ? pieceH * 2 : 0);
+                            let halfH = fullH > 0 ? Math.floor(fullH / 2) : (pieceH > 0 ? pieceH : 0);
+                            if (halfH <= 0) return;
+                            let msg = 'Lungime rest care reintra in stoc (mm). Minim: ' + halfH;
+                            if (fullH > 0) msg += ', Maxim: ' + fullH;
+                            const val = window.prompt(msg, String(halfH));
+                            if (val === null) {
+                              e.preventDefault();
+                              return;
+                            }
+                            const num = parseInt(String(val).trim(), 10);
+                            if (!Number.isFinite(num)) {
+                              alert('Introdu o lungime valida.');
+                              e.preventDefault();
+                              return;
+                            }
+                            if (num < halfH) {
+                              alert('Lungimea nu poate fi mai mica decat jumatate din lungimea placii standard.');
+                              e.preventDefault();
+                              return;
+                            }
+                            if (fullH > 0 && num > fullH) {
+                              alert('Lungimea nu poate depasi lungimea placii standard.');
+                              e.preventDefault();
+                              return;
+                            }
+                            const hidden = form.querySelector('input.js-half-remainder');
+                            if (hidden) hidden.value = String(num);
+                          });
+                        });
+                      });
+                    </script>
 
                     <div class="mt-2">
                       <div class="h5 m-0 text-success fw-semibold">Manopere</div>
