@@ -236,6 +236,7 @@ ob_start();
                <?= $widthRangeReady ? '' : 'disabled' ?>>
       </div>
     </div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="rangeResetBtn">Reset intervale</button>
     <button class="btn btn-sm btn-primary" type="submit">Aplică</button>
   </form>
 </div>
@@ -619,6 +620,26 @@ ob_start();
         document.querySelector('.js-width-min-label'),
         document.querySelector('.js-width-max-label')
       );
+
+      function resetRange(wrapperId) {
+        const wrapper = document.getElementById(wrapperId);
+        if (!wrapper) return;
+        const minEl = wrapper.querySelector('.range-min');
+        const maxEl = wrapper.querySelector('.range-max');
+        if (!minEl || !maxEl) return;
+        if (minEl.min !== '') minEl.value = minEl.min;
+        if (maxEl.max !== '') maxEl.value = maxEl.max;
+        minEl.dispatchEvent(new Event('input', { bubbles: true }));
+        maxEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      const resetBtn = document.getElementById('rangeResetBtn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', function(){
+          resetRange('lengthRangeWrap');
+          resetRange('widthRangeWrap');
+        });
+      }
 
       // Click pe card -> intră în pagina de stoc a materialului (plăcii).
       document.querySelectorAll('.js-card-link[data-href]').forEach(function(card){
