@@ -69,7 +69,6 @@ ob_start();
                     <option value="g">g</option>
                     <option value="mg">mg</option>
                     <option value="mililitru">mililitru</option>
-                    <option value="l">l</option>
                     <option value="litru">litru</option>
                     <option value="m">m</option>
                     <option value="metri liniari">metri liniari</option>
