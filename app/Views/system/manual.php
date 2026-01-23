@@ -404,6 +404,7 @@ ob_start();
           <li>Pret / unit (pe fiecare linie)</li>
           <li>Nota (optional, pentru receptie)</li>
         </ul>
+        <div class="text-muted small mt-1">Unitatea este selectata dintr-o lista (ex: buc, kg, litru, ml, m2, metri liniari, bax etc.).</div>
       </div>
     </div>
 
@@ -567,6 +568,8 @@ ob_start();
         <li>In <strong>Receptie marfa</strong> adaugi intrari de produse in magazie.</li>
         <li>In <strong>Stoc Magazie</strong> vezi disponibilul si poti consuma pe proiect.</li>
         <li>Consumurile sunt urmarite si la nivel de produs din proiect.</li>
+        <li>Unitatea de masura este afisata peste tot unde folosesti accesorii.</li>
+        <li>Cantitatile la accesorii pot fi introduse cu 2 zecimale.</li>
       </ul>
     </div>
 
@@ -632,6 +635,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.6</strong> – Unitati accesorii afisate peste tot + consum accesorii cu 2 zecimale + unitati la receptie.</li>
         <li><strong>v1.0.5</strong> – Filtre noi la Bucati rest (toggle stoc contabil + tip culoare cu thumbnail).</li>
         <li><strong>v1.0.4</strong> – Debitare 1/2: popup pentru lungimea reala a restului reintrat in stoc.</li>
         <li><strong>v1.0.3</strong> – Unitati de masura pentru accesoriile din magazie.</li>
@@ -1131,7 +1135,7 @@ ob_start();
       <tr><td>Cod WinMentor</td><td>winmentor_code[]</td><td>text</td><td>Obligatoriu, max 64</td><td>magazie_items.winmentor_code</td><td>Agregare pe cod.</td></tr>
       <tr><td>Denumire</td><td>name[]</td><td>text</td><td>Obligatoriu, max 190</td><td>magazie_items.name</td><td>—</td></tr>
       <tr><td>Cantitate</td><td>qty[]</td><td>number</td><td>decimal &gt; 0</td><td>magazie_items.stock_qty</td><td>—</td></tr>
-      <tr><td>Unitate masura</td><td>unit[]</td><td>text</td><td>max 16</td><td>magazie_items.unit</td><td>Implicit buc, editabil per linie.</td></tr>
+      <tr><td>Unitate masura</td><td>unit[]</td><td>select</td><td>max 16</td><td>magazie_items.unit</td><td>Lista predefinita (ex: buc, kg, litru, ml, m2, metri liniari, bax).</td></tr>
       <tr><td>Pret/unit</td><td>unit_price[]</td><td>text</td><td>decimal &gt;= 0</td><td>magazie_items.unit_price</td><td>Valoare utilizata la miscari.</td></tr>
       <tr><td>Nota</td><td>note</td><td>text</td><td>max 255</td><td>magazie_movements.note</td><td>Se aplica tuturor liniilor.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
@@ -1313,7 +1317,7 @@ ob_start();
     </thead>
     <tbody>
       <tr><td>Accesoriu</td><td>item_id</td><td>select</td><td>int &gt;= 1</td><td>offer_product_accessories.item_id</td><td>Select2 cu /api/magazie/items/search.</td></tr>
-      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0</td><td>offer_product_accessories.qty</td><td>—</td></tr>
+      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0 (2 zecimale)</td><td>offer_product_accessories.qty</td><td>Unitatea se preia din accesoriu si apare pe deviz/bon.</td></tr>
       <tr><td>Vizibil pe deviz</td><td>include_in_deviz</td><td>checkbox</td><td>Optional</td><td>offer_product_accessories.include_in_deviz</td><td>1 = apare pe deviz.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
@@ -1505,7 +1509,7 @@ ob_start();
     </thead>
     <tbody>
       <tr><td>Accesoriu</td><td>item_id</td><td>select</td><td>int &gt;= 1</td><td>project_magazie_consumptions.item_id</td><td>Mode = RESERVED.</td></tr>
-      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0</td><td>project_magazie_consumptions.qty</td><td>—</td></tr>
+      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0 (2 zecimale)</td><td>project_magazie_consumptions.qty</td><td>Unitatea se preia din accesoriu.</td></tr>
       <tr><td>Apare pe deviz</td><td>include_in_deviz_flag</td><td>checkbox</td><td>Optional</td><td>project_magazie_consumptions.include_in_deviz</td><td>include_in_deviz=0 hidden + flag.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
@@ -1518,7 +1522,7 @@ ob_start();
       <tr><th>Eticheta UI</th><th>name</th><th>Tip</th><th>Validari</th><th>DB / Structura</th><th>Observatii</th></tr>
     </thead>
     <tbody>
-      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0</td><td>project_magazie_consumptions.qty</td><td>Numai pentru RESERVED.</td></tr>
+      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0 (2 zecimale)</td><td>project_magazie_consumptions.qty</td><td>Numai pentru RESERVED.</td></tr>
       <tr><td>Apare pe deviz</td><td>include_in_deviz_flag</td><td>checkbox</td><td>Optional</td><td>project_magazie_consumptions.include_in_deviz</td><td>include_in_deviz=0 hidden + flag.</td></tr>
       <tr><td>Sursa</td><td>src</td><td>hidden</td><td>DIRECT / PROIECT</td><td>n/a</td><td>Controleaza logica de unallocate.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
@@ -1532,7 +1536,7 @@ ob_start();
       <tr><th>Eticheta UI</th><th>name</th><th>Tip</th><th>Validari</th><th>DB / Structura</th><th>Observatii</th></tr>
     </thead>
     <tbody>
-      <tr><td>Cantitate</td><td>qty</td><td>hidden</td><td>decimal &gt; 0</td><td>project_magazie_consumptions.qty</td><td>Folosita la de-alocare.</td></tr>
+      <tr><td>Cantitate</td><td>qty</td><td>hidden</td><td>decimal &gt; 0 (2 zecimale)</td><td>project_magazie_consumptions.qty</td><td>Folosita la de-alocare.</td></tr>
       <tr><td>Sursa</td><td>src</td><td>hidden</td><td>DIRECT / PROIECT</td><td>n/a</td><td>Controleaza logica de unallocate.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
@@ -1584,7 +1588,7 @@ ob_start();
     </thead>
     <tbody>
       <tr><td>Accesoriu</td><td>item_id</td><td>select</td><td>int &gt;= 1</td><td>project_magazie_consumptions.item_id</td><td>Select2 cu /api/magazie/items/search.</td></tr>
-      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0</td><td>project_magazie_consumptions.qty</td><td>—</td></tr>
+      <tr><td>Cantitate</td><td>qty</td><td>number</td><td>decimal &gt; 0 (2 zecimale)</td><td>project_magazie_consumptions.qty</td><td>Unitatea se preia din accesoriu.</td></tr>
       <tr><td>Mod</td><td>mode</td><td>hidden</td><td>RESERVED</td><td>project_magazie_consumptions.mode</td><td>In tab accesorii se forteaza RESERVED.</td></tr>
       <tr><td>Produs (optional)</td><td>project_product_id</td><td>select</td><td>int (optional)</td><td>project_magazie_consumptions.project_product_id</td><td>Leaga consumul la produs.</td></tr>
       <tr><td>Apare pe deviz</td><td>include_in_deviz_flag</td><td>checkbox</td><td>Optional</td><td>project_magazie_consumptions.include_in_deviz</td><td>include_in_deviz=0 hidden + flag.</td></tr>
@@ -1600,7 +1604,7 @@ ob_start();
       <tr><th>Eticheta UI</th><th>name</th><th>Tip</th><th>Validari</th><th>DB / Structura</th><th>Observatii</th></tr>
     </thead>
     <tbody>
-      <tr><td>Cant</td><td>qty</td><td>number</td><td>decimal &gt; 0</td><td>project_magazie_consumptions.qty</td><td>—</td></tr>
+      <tr><td>Cant</td><td>qty</td><td>number</td><td>decimal &gt; 0 (2 zecimale)</td><td>project_magazie_consumptions.qty</td><td>Unitatea se preia din accesoriu.</td></tr>
       <tr><td>Unit</td><td>unit</td><td>text</td><td>Optional</td><td>project_magazie_consumptions.unit</td><td>—</td></tr>
       <tr><td>Mod</td><td>mode</td><td>select</td><td>RESERVED/CONSUMED</td><td>project_magazie_consumptions.mode</td><td>—</td></tr>
       <tr><td>Apare pe deviz</td><td>include_in_deviz_flag</td><td>checkbox</td><td>Optional</td><td>project_magazie_consumptions.include_in_deviz</td><td>include_in_deviz=0 hidden + flag.</td></tr>
