@@ -292,6 +292,7 @@ ob_start();
         <li><strong>Operatiuni tipice:</strong> adaugare placa, adaugare piese, mutare piese, stergere piese/placi.</li>
         <li><strong>Stoc WinMentor:</strong> FULL + OFFCUT × 0.5 (coloana dedicata).</li>
         <li><strong>Export:</strong> CSV/XLS din lista Stoc HPL.</li>
+        <li><strong>Stoc Actual Mentor (Admin):</strong> sincronizare din WinMentor + coloana dedicata.</li>
       </ul>
       <div class="mt-2">
         <div class="fw-semibold">Formular: Placa noua / Editare</div>
@@ -637,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.14</strong> – Stoc HPL: sync WinMentor + coloana Stoc Actual Mentor (doar Admin).</li>
         <li><strong>v1.0.13</strong> – Proiecte: eliminare prioritate + coloana Zile rămase (blocată la livrat complet).</li>
         <li><strong>v1.0.12</strong> – Header proiect afisat mare, verde, cu ID si titlu.</li>
         <li><strong>v1.0.11</strong> – Deschiderea proiectului merge direct pe tabul Produse.</li>
@@ -966,6 +968,7 @@ ob_start();
     <li>Reguli: <code>piece_type</code> = FULL/OFFCUT, <code>status</code> = AVAILABLE/RESERVED/CONSUMED/SCRAP.</li>
     <li>Distinctie contabil: <code>hpl_stock_pieces.is_accounting</code> (1 = stoc contabil; 0 = piese interne).</li>
     <li>Export: CSV/XLS cu coloane Cod WinMentor, Denumire, Grosime, Dimensiune, Stoc pt WinMentor, Stoc (mp).</li>
+    <li>Admin: buton „Actualizeaza Stocuri din Mentor” + coloana „Stoc Actual Mentor”.</li>
   </ul>
 
   <h4 class="h6 mt-3">Formular: Placa HPL (creare / editare)</h4>
