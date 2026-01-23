@@ -391,8 +391,9 @@ ob_start();
         <ul class="mb-0">
           <li>Cod WinMentor (pe fiecare linie)</li>
           <li>Denumire (pe fiecare linie)</li>
-          <li>Bucati (pe fiecare linie)</li>
-          <li>Pret / buc (pe fiecare linie)</li>
+          <li>Cantitate (pe fiecare linie)</li>
+          <li>Unitate de masura (pe fiecare linie)</li>
+          <li>Pret / unit (pe fiecare linie)</li>
           <li>Nota (optional, pentru receptie)</li>
         </ul>
       </div>
@@ -622,6 +623,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.3</strong> – Unitati de masura pentru accesoriile din magazie.</li>
         <li><strong>v1.0.2</strong> – Documentatie completa pentru cautarea globala (topnav) si indexare.</li>
         <li><strong>v1.0.1</strong> – Telefonul si emailul clientului sunt optionale la crearea ofertelor si proiectelor.</li>
       </ul>
@@ -1115,8 +1117,9 @@ ob_start();
     <tbody>
       <tr><td>Cod WinMentor</td><td>winmentor_code[]</td><td>text</td><td>Obligatoriu, max 64</td><td>magazie_items.winmentor_code</td><td>Agregare pe cod.</td></tr>
       <tr><td>Denumire</td><td>name[]</td><td>text</td><td>Obligatoriu, max 190</td><td>magazie_items.name</td><td>—</td></tr>
-      <tr><td>Bucăți</td><td>qty[]</td><td>number</td><td>decimal &gt; 0</td><td>magazie_items.stock_qty</td><td>Unitate implicita = buc.</td></tr>
-      <tr><td>Pret/buc</td><td>unit_price[]</td><td>text</td><td>decimal &gt;= 0</td><td>magazie_items.unit_price</td><td>Valoare utilizata la miscari.</td></tr>
+      <tr><td>Cantitate</td><td>qty[]</td><td>number</td><td>decimal &gt; 0</td><td>magazie_items.stock_qty</td><td>—</td></tr>
+      <tr><td>Unitate masura</td><td>unit[]</td><td>text</td><td>max 16</td><td>magazie_items.unit</td><td>Implicit buc, editabil per linie.</td></tr>
+      <tr><td>Pret/unit</td><td>unit_price[]</td><td>text</td><td>decimal &gt;= 0</td><td>magazie_items.unit_price</td><td>Valoare utilizata la miscari.</td></tr>
       <tr><td>Nota</td><td>note</td><td>text</td><td>max 255</td><td>magazie_movements.note</td><td>Se aplica tuturor liniilor.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
