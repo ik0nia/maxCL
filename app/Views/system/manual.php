@@ -635,6 +635,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.7</strong> – Log-uri HPL imbunatatite (placa/culori/dimensiuni + user/ora consum).</li>
         <li><strong>v1.0.6</strong> – Unitati accesorii afisate peste tot + consum accesorii cu 2 zecimale + unitati la receptie.</li>
         <li><strong>v1.0.5</strong> – Filtre noi la Bucati rest (toggle stoc contabil + tip culoare cu thumbnail).</li>
         <li><strong>v1.0.4</strong> – Debitare 1/2: popup pentru lungimea reala a restului reintrat in stoc.</li>
@@ -1031,6 +1032,7 @@ ob_start();
     <li>Ruta: <code>GET /hpl/bucati-rest</code> (filtre bucket/scrap).</li>
     <li>Filtre noi: <code>accounting=1</code> (toggle stoc contabil) si <code>color_id</code> (tip culoare, fata sau verso).</li>
     <li>Afiseaza piese OFFCUT (contabile + interne).</li>
+    <li>Log-urile de consum includ placa, culorile, dimensiunea, utilizatorul si data/ora.</li>
     <li>Audit: <code>HPL_STOCK_TRASH</code>, <code>FILE_UPLOAD</code>.</li>
   </ul>
 
