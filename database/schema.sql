@@ -266,6 +266,7 @@ CREATE TABLE IF NOT EXISTS projects (
   description TEXT NULL,
   start_date DATE NULL,
   due_date DATE NULL,
+  days_remaining_locked INT NULL,
   completed_at DATETIME NULL,
   cancelled_at DATETIME NULL,
   notes TEXT NULL,

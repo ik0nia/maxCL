@@ -933,7 +933,6 @@ final class OffersController
                 'description' => $offer['description'] ?? null,
                 'category' => $offer['category'] ?? null,
                 'status' => 'DRAFT',
-                'priority' => 0,
                 'start_date' => null,
                 'due_date' => $offer['due_date'] ?? null,
                 'notes' => $offer['notes'] ?? null,

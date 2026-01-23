@@ -12,6 +12,18 @@ $q = trim((string)($q ?? ''));
 $status = trim((string)($status ?? ''));
 $statuses = $statuses ?? [];
 
+function _daysRemaining(?string $dueDate, ?string $refDate = null): ?int {
+  $dueDate = trim((string)($dueDate ?? ''));
+  if ($dueDate === '') return null;
+  try {
+    $due = new DateTime($dueDate);
+    $ref = new DateTime($refDate ?: date('Y-m-d'));
+  } catch (Throwable $e) {
+    return null;
+  }
+  return (int)$ref->diff($due)->format('%r%a');
+}
+
 ob_start();
 ?>
 <div class="app-page-title">
@@ -37,8 +49,8 @@ ob_start();
         <th>Nume</th>
         <th style="width:160px">Client/Grup</th>
         <th style="width:160px">Status</th>
-        <th class="text-end" style="width:110px">Prioritate</th>
         <th style="width:140px">Deadline</th>
+        <th class="text-end" style="width:130px">Zile rămase</th>
         <th class="text-end" style="width:120px">Acțiuni</th>
       </tr>
     </thead>
@@ -91,8 +103,36 @@ ob_start();
             <?php endif; ?>
           </td>
           <td class="fw-semibold"><?= htmlspecialchars((string)($r['status'] ?? '')) ?></td>
-          <td class="text-end"><?= (int)($r['priority'] ?? 0) ?></td>
-          <td><?= htmlspecialchars((string)($r['due_date'] ?? '')) ?></td>
+          <?php
+            $dueRaw = (string)($r['due_date'] ?? '');
+            $daysLocked = isset($r['days_remaining_locked']) ? (int)$r['days_remaining_locked'] : null;
+            $statusVal = (string)($r['status'] ?? '');
+            $daysLeft = null;
+            if ($dueRaw !== '') {
+              if ($statusVal === 'LIVRAT_COMPLET') {
+                if ($daysLocked !== null) {
+                  $daysLeft = $daysLocked;
+                } else {
+                  $ref = trim((string)($r['completed_at'] ?? ''));
+                  if ($ref !== '') $ref = substr($ref, 0, 10);
+                  $daysLeft = _daysRemaining($dueRaw, $ref !== '' ? $ref : null);
+                }
+              } else {
+                $daysLeft = _daysRemaining($dueRaw);
+              }
+            }
+            $daysClass = '';
+            $daysBold = '';
+            if ($daysLeft !== null) {
+              if ($daysLeft < 0) $daysClass = 'text-danger';
+              else $daysClass = 'text-success';
+              if ($daysLeft >= 0 && $daysLeft <= 3) $daysBold = 'fw-bold';
+            }
+          ?>
+          <td><?= htmlspecialchars($dueRaw !== '' ? $dueRaw : '—') ?></td>
+          <td class="text-end <?= $daysClass ?> <?= $daysBold ?>">
+            <?= $daysLeft !== null ? (int)$daysLeft : '—' ?>
+          </td>
           <td class="text-end">
             <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/projects/' . (int)$r['id'])) ?>">
               <i class="bi bi-eye me-1"></i> Vezi

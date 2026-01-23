@@ -416,6 +416,20 @@ final class DbMigrations
                     if (!self::columnExists($pdo, 'projects', 'priority')) {
                         $pdo->exec("ALTER TABLE projects ADD COLUMN priority INT NOT NULL DEFAULT 0");
                     }
+                    if (!self::columnExists($pdo, 'projects', 'days_remaining_locked')) {
+                        $pdo->exec("ALTER TABLE projects ADD COLUMN days_remaining_locked INT NULL AFTER due_date");
+                        try {
+                            $pdo->exec("
+                                UPDATE projects
+                                SET days_remaining_locked = DATEDIFF(due_date, COALESCE(completed_at, CURDATE()))
+                                WHERE status = 'LIVRAT_COMPLET'
+                                  AND due_date IS NOT NULL
+                                  AND days_remaining_locked IS NULL
+                            ");
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
                     if (!self::columnExists($pdo, 'projects', 'completed_at')) {
                         $pdo->exec("ALTER TABLE projects ADD COLUMN completed_at DATETIME NULL");
                     }

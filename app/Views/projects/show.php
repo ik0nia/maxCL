@@ -118,10 +118,6 @@ ob_start();
             </div>
 
             <div class="col-12 col-md-3">
-              <label class="form-label fw-semibold">Prioritate</label>
-              <input class="form-control" type="number" name="priority" value="<?= htmlspecialchars((string)($project['priority'] ?? '0')) ?>">
-            </div>
-            <div class="col-12 col-md-3">
               <label class="form-label fw-semibold">Categorie</label>
               <input class="form-control" name="category" value="<?= htmlspecialchars((string)($project['category'] ?? '')) ?>">
             </div>

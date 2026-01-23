@@ -180,9 +180,9 @@ final class Project
         $pdo = DB::pdo();
         $st = $pdo->prepare('
             INSERT INTO projects
-              (code, name, description, category, status, priority, start_date, due_date, notes, technical_notes, tags, client_id, client_group_id, allocation_mode, allocations_locked, created_by)
+              (code, name, description, category, status, priority, start_date, due_date, days_remaining_locked, notes, technical_notes, tags, client_id, client_group_id, allocation_mode, allocations_locked, created_by)
             VALUES
-              (:code, :name, :description, :category, :status, :priority, :start_date, :due_date, :notes, :technical_notes, :tags, :client_id, :client_group_id, :allocation_mode, :allocations_locked, :created_by)
+              (:code, :name, :description, :category, :status, :priority, :start_date, :due_date, :days_remaining_locked, :notes, :technical_notes, :tags, :client_id, :client_group_id, :allocation_mode, :allocations_locked, :created_by)
         ');
         $st->execute([
             ':code' => trim((string)($data['code'] ?? '')),
@@ -193,6 +193,7 @@ final class Project
             ':priority' => (int)($data['priority'] ?? 0),
             ':start_date' => $data['start_date'] ?? null,
             ':due_date' => $data['due_date'] ?? null,
+            ':days_remaining_locked' => $data['days_remaining_locked'] ?? null,
             ':notes' => $data['notes'] ?? null,
             ':technical_notes' => $data['technical_notes'] ?? null,
             ':tags' => $data['tags'] ?? null,
@@ -222,6 +223,7 @@ final class Project
               priority=:priority,
               start_date=:start_date,
               due_date=:due_date,
+              days_remaining_locked=:days_remaining_locked,
               completed_at=:completed_at,
               cancelled_at=:cancelled_at,
               notes=:notes,
@@ -243,6 +245,7 @@ final class Project
             ':priority' => (int)($data['priority'] ?? 0),
             ':start_date' => $data['start_date'] ?? null,
             ':due_date' => $data['due_date'] ?? null,
+            ':days_remaining_locked' => $data['days_remaining_locked'] ?? null,
             ':completed_at' => $data['completed_at'] ?? null,
             ':cancelled_at' => $data['cancelled_at'] ?? null,
             ':notes' => $data['notes'] ?? null,

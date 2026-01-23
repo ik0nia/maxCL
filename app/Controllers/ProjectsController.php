@@ -111,6 +111,21 @@ final class ProjectsController
         return $t !== false ? (int)$t : null;
     }
 
+    private static function calcDaysRemaining(?string $dueDate, ?string $refDate = null): ?int
+    {
+        $dueDate = trim((string)($dueDate ?? ''));
+        if ($dueDate === '') return null;
+        $ref = $refDate !== null ? trim($refDate) : '';
+        if ($ref === '') $ref = date('Y-m-d');
+        try {
+            $due = new \DateTime($dueDate);
+            $base = new \DateTime($ref);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        return (int)$base->diff($due)->format('%r%a');
+    }
+
     private static function boolFromPost(string $key, int $default = 1): int
     {
         if (!array_key_exists($key, $_POST)) return $default ? 1 : 0;
@@ -2813,7 +2828,6 @@ final class ProjectsController
             'row' => [
                 'code' => $nextCode,
                 'status' => 'DRAFT',
-                'priority' => 0,
             ],
             'errors' => [],
             'statuses' => self::statuses(),
@@ -2844,7 +2858,6 @@ final class ProjectsController
             $errors['client_group_id'] = 'Alege fie client, fie grup.';
         }
 
-        $priority = Validator::int(trim((string)($_POST['priority'] ?? '0')), -100000, 100000) ?? 0;
         $status = trim((string)($_POST['status'] ?? 'DRAFT'));
         $allowedStatuses = array_map(fn($s) => (string)$s['value'], self::statuses());
         if ($status !== '' && !in_array($status, $allowedStatuses, true)) $errors['status'] = 'Status invalid.';
@@ -2869,13 +2882,18 @@ final class ProjectsController
             return;
         }
 
+        $daysLocked = null;
+        if ($status === 'LIVRAT_COMPLET') {
+            $daysLocked = self::calcDaysRemaining($_POST['due_date'] ?? null, date('Y-m-d'));
+        }
+
         $data = [
             'name' => trim((string)$_POST['name']),
             'description' => trim((string)($_POST['description'] ?? '')) ?: null,
             'category' => trim((string)($_POST['category'] ?? '')) ?: null,
             'status' => $status ?: 'DRAFT',
-            'priority' => $priority,
             'due_date' => trim((string)($_POST['due_date'] ?? '')) ?: null,
+            'days_remaining_locked' => $daysLocked,
             'notes' => trim((string)($_POST['notes'] ?? '')) ?: null,
             'technical_notes' => trim((string)($_POST['technical_notes'] ?? '')) ?: null,
             'tags' => null,
@@ -3303,7 +3321,6 @@ final class ProjectsController
             $errors['client_group_id'] = 'Alege fie client, fie grup.';
         }
 
-        $priority = Validator::int(trim((string)($_POST['priority'] ?? '0')), -100000, 100000) ?? 0;
         $status = trim((string)($_POST['status'] ?? (string)($before['status'] ?? 'DRAFT')));
         $allowedStatuses = array_map(fn($s) => (string)$s['value'], self::statuses());
         if ($status !== '' && !in_array($status, $allowedStatuses, true)) $errors['status'] = 'Status invalid.';
@@ -3313,6 +3330,16 @@ final class ProjectsController
             Response::redirect('/projects/' . $id . '?tab=general');
         }
 
+        $prevStatus = (string)($before['status'] ?? '');
+        $daysLocked = $before['days_remaining_locked'] ?? null;
+        $completedAt = $before['completed_at'] ?? null;
+        if ($status === 'LIVRAT_COMPLET' && $prevStatus !== 'LIVRAT_COMPLET') {
+            $daysLocked = self::calcDaysRemaining($_POST['due_date'] ?? null, date('Y-m-d'));
+            $completedAt = date('Y-m-d H:i:s');
+        } elseif ($status !== 'LIVRAT_COMPLET') {
+            $daysLocked = null;
+        }
+
         $after = [
             // cod auto - nu se editează manual
             'code' => (string)($before['code'] ?? ''),
@@ -3320,9 +3347,10 @@ final class ProjectsController
             'description' => trim((string)($_POST['description'] ?? '')) ?: null,
             'category' => trim((string)($_POST['category'] ?? '')) ?: null,
             'status' => $status ?: 'DRAFT',
-            'priority' => $priority,
+            'priority' => (int)($before['priority'] ?? 0),
             'due_date' => trim((string)($_POST['due_date'] ?? '')) ?: null,
-            'completed_at' => $before['completed_at'] ?? null,
+            'days_remaining_locked' => $daysLocked,
+            'completed_at' => $completedAt,
             'cancelled_at' => $before['cancelled_at'] ?? null,
             'notes' => trim((string)($_POST['notes'] ?? '')) ?: null,
             'technical_notes' => trim((string)($_POST['technical_notes'] ?? '')) ?: null,
@@ -3376,6 +3404,10 @@ final class ProjectsController
         // timestamp-uri best-effort
         if ($newStatus === 'LIVRAT_COMPLET') {
             $after['completed_at'] = date('Y-m-d H:i:s');
+            $after['days_remaining_locked'] = self::calcDaysRemaining($after['due_date'] ?? null, date('Y-m-d'));
+        }
+        if ($newStatus !== 'LIVRAT_COMPLET') {
+            $after['days_remaining_locked'] = null;
         }
         if ($newStatus === 'ANULAT') {
             $after['cancelled_at'] = date('Y-m-d H:i:s');
@@ -4379,8 +4411,10 @@ final class ProjectsController
                     if ($allDelivered && $ppsNow) {
                         $afterProj['status'] = 'LIVRAT_COMPLET';
                         $afterProj['completed_at'] = date('Y-m-d H:i:s');
+                        $afterProj['days_remaining_locked'] = self::calcDaysRemaining($afterProj['due_date'] ?? null, date('Y-m-d'));
                     } elseif ($anyDelivered) {
                         $afterProj['status'] = 'LIVRAT_PARTIAL';
+                        $afterProj['days_remaining_locked'] = null;
                     }
                     if ((string)($beforeProj['status'] ?? '') !== (string)($afterProj['status'] ?? '')) {
                         Project::update($projectId, $afterProj);
@@ -7233,8 +7267,10 @@ final class ProjectsController
             if ($allDelivered && $ppsNow) {
                 $afterProj['status'] = 'LIVRAT_COMPLET';
                 $afterProj['completed_at'] = date('Y-m-d H:i:s');
+                $afterProj['days_remaining_locked'] = self::calcDaysRemaining($afterProj['due_date'] ?? null, date('Y-m-d'));
             } elseif ($anyDelivered) {
                 $afterProj['status'] = 'LIVRAT_PARTIAL';
+                $afterProj['days_remaining_locked'] = null;
             }
             if ((string)($beforeProj['status'] ?? '') !== (string)($afterProj['status'] ?? '')) {
                 Project::update($projectId, $afterProj);
