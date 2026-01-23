@@ -190,22 +190,25 @@ ob_start();
         <span>min: <strong class="js-length-min-label"><?= htmlspecialchars($lengthMinLabel) ?></strong></span>
         <span>max: <strong class="js-length-max-label"><?= htmlspecialchars($lengthMaxLabel) ?></strong></span>
       </div>
-      <input type="range"
-             class="form-range"
-             name="length_min"
-             id="lengthMinRange"
-             value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
-             min="<?= (int)$lengthRangeMinVal ?>"
-             max="<?= (int)$lengthRangeMaxVal ?>"
-             <?= $lengthRangeReady ? '' : 'disabled' ?>>
-      <input type="range"
-             class="form-range mt-1"
-             name="length_max"
-             id="lengthMaxRange"
-             value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
-             min="<?= (int)$lengthRangeMinVal ?>"
-             max="<?= (int)$lengthRangeMaxVal ?>"
-             <?= $lengthRangeReady ? '' : 'disabled' ?>>
+      <div class="range-dual" id="lengthRangeWrap">
+        <div class="range-track js-length-track"></div>
+        <input type="range"
+               class="range-input range-min"
+               name="length_min"
+               id="lengthMinRange"
+               value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
+               min="<?= (int)$lengthRangeMinVal ?>"
+               max="<?= (int)$lengthRangeMaxVal ?>"
+               <?= $lengthRangeReady ? '' : 'disabled' ?>>
+        <input type="range"
+               class="range-input range-max"
+               name="length_max"
+               id="lengthMaxRange"
+               value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
+               min="<?= (int)$lengthRangeMinVal ?>"
+               max="<?= (int)$lengthRangeMaxVal ?>"
+               <?= $lengthRangeReady ? '' : 'disabled' ?>>
+      </div>
     </div>
     <div>
       <label class="form-label small mb-1">Latime (mm)</label>
@@ -213,22 +216,25 @@ ob_start();
         <span>min: <strong class="js-width-min-label"><?= htmlspecialchars($widthMinLabel) ?></strong></span>
         <span>max: <strong class="js-width-max-label"><?= htmlspecialchars($widthMaxLabel) ?></strong></span>
       </div>
-      <input type="range"
-             class="form-range"
-             name="width_min"
-             id="widthMinRange"
-             value="<?= htmlspecialchars((string)$widthMinVal) ?>"
-             min="<?= (int)$widthRangeMinVal ?>"
-             max="<?= (int)$widthRangeMaxVal ?>"
-             <?= $widthRangeReady ? '' : 'disabled' ?>>
-      <input type="range"
-             class="form-range mt-1"
-             name="width_max"
-             id="widthMaxRange"
-             value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
-             min="<?= (int)$widthRangeMinVal ?>"
-             max="<?= (int)$widthRangeMaxVal ?>"
-             <?= $widthRangeReady ? '' : 'disabled' ?>>
+      <div class="range-dual" id="widthRangeWrap">
+        <div class="range-track js-width-track"></div>
+        <input type="range"
+               class="range-input range-min"
+               name="width_min"
+               id="widthMinRange"
+               value="<?= htmlspecialchars((string)$widthMinVal) ?>"
+               min="<?= (int)$widthRangeMinVal ?>"
+               max="<?= (int)$widthRangeMaxVal ?>"
+               <?= $widthRangeReady ? '' : 'disabled' ?>>
+        <input type="range"
+               class="range-input range-max"
+               name="width_max"
+               id="widthMaxRange"
+               value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
+               min="<?= (int)$widthRangeMinVal ?>"
+               max="<?= (int)$widthRangeMaxVal ?>"
+               <?= $widthRangeReady ? '' : 'disabled' ?>>
+      </div>
     </div>
     <button class="btn btn-sm btn-primary" type="submit">Aplică</button>
   </form>
@@ -272,6 +278,63 @@ ob_start();
   .offcut-sub{font-size:.82rem;color:#5F6B72;font-weight:600;line-height:1.2}
   .offcut-badges{display:flex;gap:6px;flex-wrap:wrap}
   .js-card-link{cursor:pointer}
+  .range-dual{
+    position: relative;
+    height: 24px;
+    min-width: 220px;
+  }
+  .range-dual .range-track{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 6px;
+    transform: translateY(-50%);
+    background: #E5E7EB;
+    border-radius: 999px;
+  }
+  .range-dual .range-input{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    width: 100%;
+    margin: 0;
+    transform: translateY(-50%);
+    background: transparent;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .range-dual .range-input.range-min,
+  .range-dual .range-input.range-max{
+    pointer-events: auto;
+  }
+  .range-dual .range-input::-webkit-slider-runnable-track{
+    height: 6px;
+    background: transparent;
+  }
+  .range-dual .range-input::-moz-range-track{
+    height: 6px;
+    background: transparent;
+  }
+  .range-dual .range-input::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #6FA94A;
+    border: 1px solid #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  .range-dual .range-input::-moz-range-thumb{
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #6FA94A;
+    border: 1px solid #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  }
 </style>
 
 <?php if (!$items): ?>
@@ -487,40 +550,72 @@ ob_start();
         el.style.height = hp + '%';
       });
 
-      function bindRangePair(minEl, maxEl, minLabelEl, maxLabelEl) {
+      function bindRangePair(wrapper, minLabelEl, maxLabelEl) {
+        if (!wrapper) return;
+        const minEl = wrapper.querySelector('.range-min');
+        const maxEl = wrapper.querySelector('.range-max');
+        const trackEl = wrapper.querySelector('.range-track');
         if (!minEl || !maxEl) return;
         function readVal(el) {
           const v = parseInt(el.value || '0', 10);
           return isFinite(v) ? v : 0;
         }
-        function syncLabels() {
-          if (minLabelEl) minLabelEl.textContent = String(readVal(minEl));
-          if (maxLabelEl) maxLabelEl.textContent = String(readVal(maxEl));
+        function readRange() {
+          const min = parseInt(minEl.min || '0', 10);
+          const max = parseInt(minEl.max || '0', 10);
+          return { min: isFinite(min) ? min : 0, max: isFinite(max) ? max : 0 };
+        }
+        function setTrack(minVal, maxVal) {
+          if (!trackEl) return;
+          const range = readRange();
+          const span = range.max - range.min;
+          if (span <= 0) {
+            trackEl.style.background = '#E5E7EB';
+            return;
+          }
+          const minPct = ((minVal - range.min) / span) * 100;
+          const maxPct = ((maxVal - range.min) / span) * 100;
+          const start = Math.max(0, Math.min(100, minPct));
+          const end = Math.max(0, Math.min(100, maxPct));
+          trackEl.style.background =
+            'linear-gradient(to right, #E5E7EB ' + start + '%, #6FA94A ' + start + '%, #6FA94A ' + end + '%, #E5E7EB ' + end + '%)';
+        }
+        function sync() {
+          const minVal = readVal(minEl);
+          const maxVal = readVal(maxEl);
+          if (minLabelEl) minLabelEl.textContent = String(minVal);
+          if (maxLabelEl) maxLabelEl.textContent = String(maxVal);
+          setTrack(minVal, maxVal);
+          if (minVal >= maxVal) {
+            minEl.style.zIndex = '3';
+            maxEl.style.zIndex = '2';
+          } else {
+            minEl.style.zIndex = '2';
+            maxEl.style.zIndex = '3';
+          }
         }
         minEl.addEventListener('input', function() {
           const minVal = readVal(minEl);
           const maxVal = readVal(maxEl);
           if (minVal > maxVal) maxEl.value = String(minVal);
-          syncLabels();
+          sync();
         });
         maxEl.addEventListener('input', function() {
           const minVal = readVal(minEl);
           const maxVal = readVal(maxEl);
           if (maxVal < minVal) minEl.value = String(maxVal);
-          syncLabels();
+          sync();
         });
-        syncLabels();
+        sync();
       }
 
       bindRangePair(
-        document.getElementById('lengthMinRange'),
-        document.getElementById('lengthMaxRange'),
+        document.getElementById('lengthRangeWrap'),
         document.querySelector('.js-length-min-label'),
         document.querySelector('.js-length-max-label')
       );
       bindRangePair(
-        document.getElementById('widthMinRange'),
-        document.getElementById('widthMaxRange'),
+        document.getElementById('widthRangeWrap'),
         document.querySelector('.js-width-min-label'),
         document.querySelector('.js-width-max-label')
       );
