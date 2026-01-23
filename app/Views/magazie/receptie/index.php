@@ -68,7 +68,6 @@ ob_start();
                     <option value="kg">kg</option>
                     <option value="g">g</option>
                     <option value="mg">mg</option>
-                    <option value="ml">ml</option>
                     <option value="mililitru">mililitru</option>
                     <option value="l">l</option>
                     <option value="litru">litru</option>
