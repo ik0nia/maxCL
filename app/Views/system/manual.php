@@ -345,6 +345,7 @@ ob_start();
           <li>Bucket (dimensiune fata de placa standard) si Stricate.</li>
           <li>Toggle pentru stocuri contabile (implicit ascunse).</li>
           <li>Filtru tip culoare (thumbnail + cod) – filtreaza atat fata cat si verso.</li>
+          <li>Lungime / latime (min / max) in mm.</li>
         </ul>
       </div>
 
@@ -637,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.9</strong> – Filtre lungime/latime la Bucati rest + ascundere buton scoatere pentru stocabile.</li>
         <li><strong>v1.0.8</strong> – Stoc WinMentor + export CSV/XLS din Stoc HPL.</li>
         <li><strong>v1.0.7</strong> – Log-uri HPL imbunatatite (placa/culori/dimensiuni + user/ora consum).</li>
         <li><strong>v1.0.6</strong> – Unitati accesorii afisate peste tot + consum accesorii cu 2 zecimale + unitati la receptie.</li>
@@ -1034,7 +1036,7 @@ ob_start();
   <h3 class="h6 mt-4" id="hpl-offcuts">5.5 Bucati rest</h3>
   <ul>
     <li>Ruta: <code>GET /hpl/bucati-rest</code> (filtre bucket/scrap).</li>
-    <li>Filtre noi: <code>accounting=1</code> (toggle stoc contabil) si <code>color_id</code> (tip culoare, fata sau verso).</li>
+    <li>Filtre: <code>accounting=1</code>, <code>color_id</code>, <code>length_min</code>/<code>length_max</code>, <code>width_min</code>/<code>width_max</code> (mm).</li>
     <li>Afiseaza piese OFFCUT (contabile + interne).</li>
     <li>Log-urile de consum includ placa, culorile, dimensiunea, utilizatorul si data/ora.</li>
     <li>Audit: <code>HPL_STOCK_TRASH</code>, <code>FILE_UPLOAD</code>.</li>
