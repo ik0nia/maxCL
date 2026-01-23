@@ -351,6 +351,7 @@ ob_start();
     // Column indices (DataTables) – calculate from header (admin-only columns exist)
     const headerCells = Array.from(document.querySelectorAll('#boardsTable thead th'));
     const IDX_WM = headerCells.findIndex(th => th.classList.contains('js-wmcode-col'));
+    const IDX_MENTOR = headerCells.findIndex(th => th.classList.contains('js-mentor-col'));
     const PRICE_IDXS = headerCells.reduce((acc, th, idx) => {
       if (th.classList.contains('js-price-col')) acc.push(idx);
       return acc;
@@ -364,6 +365,7 @@ ob_start();
       // Prefer DataTables visibility so columns reflow nicely.
       if (dt && dt.column) {
         try { if (IDX_WM >= 0) dt.column(IDX_WM).visible(showWm, false); } catch (e) {}
+        try { if (IDX_MENTOR >= 0) dt.column(IDX_MENTOR).visible(showWm, false); } catch (e) {}
         try {
           // price columns exist only for Admin/Gestionar (canSeePrices=true)
           PRICE_IDXS.forEach(idx => { if (idx >= 0) dt.column(idx).visible(showPrices, false); });
@@ -371,6 +373,7 @@ ob_start();
       } else {
         // Fallback without DataTables
         document.querySelectorAll('.js-wmcode-col').forEach(el => el.classList.toggle('d-none', !showWm));
+        document.querySelectorAll('.js-mentor-col').forEach(el => el.classList.toggle('d-none', !showWm));
         document.querySelectorAll('.js-price-col').forEach(el => el.classList.toggle('d-none', !showPrices));
       }
 
