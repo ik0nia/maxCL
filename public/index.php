@@ -366,11 +366,11 @@ $router->post('/clients/{id}/delete', fn($p) => ClientsController::delete($p), [
 $stockReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $stockWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $stockMoveMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
-$stockAdminMW = [Auth::requireRole([Auth::ROLE_ADMIN])];
+$stockMentorMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR])];
 
 $router->get('/stock', fn() => StockController::index(), $stockReadMW);
 $router->get('/stock/export', fn() => StockController::export(), $stockReadMW);
-$router->post('/stock/mentor-sync', fn() => StockController::syncMentorStock(), $stockAdminMW);
+$router->post('/stock/mentor-sync', fn() => StockController::syncMentorStock(), $stockMentorMW);
 $router->get('/stock/boards/create', fn() => StockController::createBoardForm(), $stockWriteMW);
 $router->post('/stock/boards/create', fn() => StockController::createBoard(), $stockWriteMW);
 $router->get('/stock/boards/{id}', fn($p) => StockController::boardDetails($p), $stockReadMW);

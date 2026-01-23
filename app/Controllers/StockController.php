@@ -251,8 +251,9 @@ final class StockController
     {
         Csrf::verify($_POST['_csrf'] ?? null);
         $u = Auth::user();
-        if (!$u || (string)($u['role'] ?? '') !== Auth::ROLE_ADMIN) {
-            Session::flash('toast_error', 'Nu ai acces la actualizarea Mentor.');
+        $role = $u ? (string)($u['role'] ?? '') : '';
+        if (!in_array($role, [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true)) {
+            Session::flash('toast_error', 'Nu ai acces la actualizarea WinMentor.');
             Response::redirect('/stock');
         }
 

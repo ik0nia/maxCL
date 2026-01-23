@@ -7,7 +7,7 @@ use App\Core\View;
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
 $canSeePrices = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
-$isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
+$canMentor = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
 $rows = $rows ?? [];
 $filterColor = $filterColor ?? null;
 $filterColorQuery = (string)($filterColorQuery ?? '');
@@ -50,12 +50,12 @@ ob_start();
     <div class="text-muted">Catalog plăci + total buc/mp (disponibil)</div>
   </div>
   <div class="d-flex gap-2">
-    <?php if ($isAdmin): ?>
+    <?php if ($canMentor): ?>
       <form method="post" action="<?= htmlspecialchars(Url::to('/stock/mentor-sync')) ?>" class="d-inline">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
         <button class="btn btn-outline-success" type="submit"
                 onclick="return confirm('Actualizezi stocurile din WinMentor?');">
-          <i class="bi bi-cloud-download me-1"></i> Actualizează Stocuri din Mentor
+          <i class="bi bi-cloud-download me-1"></i> Actualizează Stocuri din WinMentor
         </button>
       </form>
     <?php endif; ?>
@@ -145,7 +145,7 @@ ob_start();
         <th class="text-end">Stoc FULL (buc)</th>
         <th class="text-end">Stoc OFFCUT (buc)</th>
         <th class="text-end">Stoc pt WinMentor</th>
-        <?php if ($isAdmin): ?>
+        <?php if ($canMentor): ?>
           <th class="text-end js-mentor-col">Stoc Actual Mentor</th>
         <?php endif; ?>
         <th class="text-end">Stoc (mp)</th>
@@ -221,14 +221,19 @@ ob_start();
           <td class="text-end fw-semibold"><?= (int)$fullQty ?></td>
           <td class="text-end fw-semibold"><?= (int)$offcutQty ?></td>
           <td class="text-end fw-semibold"><?= htmlspecialchars($wmStockTxt) ?></td>
-          <?php if ($isAdmin): ?>
+          <?php if ($canMentor): ?>
             <?php
               $mentorStock = $r['mentor_stock'] ?? null;
               $mentorTxt = ($mentorStock !== null && $mentorStock !== '' && is_numeric($mentorStock))
                 ? number_format((float)$mentorStock, 2, '.', '')
                 : '—';
+              $mentorClass = '';
+              if ($mentorStock !== null && $mentorStock !== '' && is_numeric($mentorStock)) {
+                $mVal = (float)$mentorStock;
+                if (abs($mVal - (float)$wmStock) > 0.0001) $mentorClass = 'text-danger';
+              }
             ?>
-            <td class="text-end fw-semibold js-mentor-col"><?= htmlspecialchars($mentorTxt) ?></td>
+            <td class="text-end fw-semibold js-mentor-col <?= $mentorClass ?>"><?= htmlspecialchars($mentorTxt) ?></td>
           <?php endif; ?>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
