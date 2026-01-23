@@ -291,6 +291,8 @@ ob_start();
       <ul class="mb-0">
         <li><strong>Contine:</strong> lista placilor, formular de adaugare/editare, detalii placa cu piese.</li>
         <li><strong>Operatiuni tipice:</strong> adaugare placa, adaugare piese, mutare piese, stergere piese/placi.</li>
+        <li><strong>Stoc WinMentor:</strong> FULL + OFFCUT × 0.5 (coloana dedicata).</li>
+        <li><strong>Export:</strong> CSV/XLS din lista Stoc HPL.</li>
       </ul>
       <div class="mt-2">
         <div class="fw-semibold">Formular: Placa noua / Editare</div>
@@ -635,6 +637,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.8</strong> – Stoc WinMentor + export CSV/XLS din Stoc HPL.</li>
         <li><strong>v1.0.7</strong> – Log-uri HPL imbunatatite (placa/culori/dimensiuni + user/ora consum).</li>
         <li><strong>v1.0.6</strong> – Unitati accesorii afisate peste tot + consum accesorii cu 2 zecimale + unitati la receptie.</li>
         <li><strong>v1.0.5</strong> – Filtre noi la Bucati rest (toggle stoc contabil + tip culoare cu thumbnail).</li>
@@ -953,10 +956,11 @@ ob_start();
 
   <h3 class="h6 mt-4" id="hpl-stoc">5.4 Stoc HPL (placi + piese)</h3>
   <ul>
-    <li>Rute: <code>/stock</code>, <code>/stock/boards/create</code>, <code>/stock/boards/{id}</code>, <code>/stock/boards/{id}/edit</code>.</li>
+    <li>Rute: <code>/stock</code>, <code>/stock/export</code>, <code>/stock/boards/create</code>, <code>/stock/boards/{id}</code>, <code>/stock/boards/{id}/edit</code>.</li>
     <li>DB: <code>hpl_boards</code> (placi), <code>hpl_stock_pieces</code> (piese).</li>
     <li>Reguli: <code>piece_type</code> = FULL/OFFCUT, <code>status</code> = AVAILABLE/RESERVED/CONSUMED/SCRAP.</li>
     <li>Distinctie contabil: <code>hpl_stock_pieces.is_accounting</code> (1 = stoc contabil; 0 = piese interne).</li>
+    <li>Export: CSV/XLS cu coloane Cod WinMentor, Denumire, Grosime, Dimensiune, Stoc pt WinMentor, Stoc (mp).</li>
   </ul>
 
   <h4 class="h6 mt-3">Formular: Placa HPL (creare / editare)</h4>
