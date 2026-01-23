@@ -13,6 +13,13 @@ $filterColorQuery = (string)($filterColorQuery ?? '');
 $filterThicknessMm = $filterThicknessMm ?? null;
 $thicknessOptions = $thicknessOptions ?? [];
 
+$exportParams = [];
+if ($filterColorQuery !== '') $exportParams['color'] = $filterColorQuery;
+if ($filterThicknessMm !== null && (int)$filterThicknessMm > 0) $exportParams['thickness_mm'] = (int)$filterThicknessMm;
+$exportQuery = $exportParams ? ('&' . http_build_query($exportParams)) : '';
+$exportCsvUrl = Url::to('/stock/export?format=csv' . $exportQuery);
+$exportXlsUrl = Url::to('/stock/export?format=xls' . $exportQuery);
+
 // Valoare stoc (lei) — vizibilă doar la cerere (toggle), pentru Admin/Gestionar
 $totalValueLei = 0.0;
 if ($canSeePrices) {
@@ -42,6 +49,14 @@ ob_start();
     <div class="text-muted">Catalog plăci + total buc/mp (disponibil)</div>
   </div>
   <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <a href="<?= htmlspecialchars($exportCsvUrl) ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-filetype-csv me-1"></i> Export CSV
+      </a>
+      <a href="<?= htmlspecialchars($exportXlsUrl) ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export XLS
+      </a>
+    </div>
     <?php if ($canWrite): ?>
       <div class="d-flex align-items-center gap-3 flex-wrap">
         <div class="form-check form-switch m-0 app-title-switch">
@@ -119,6 +134,7 @@ ob_start();
         <th>Dim. standard</th>
         <th class="text-end">Stoc FULL (buc)</th>
         <th class="text-end">Stoc OFFCUT (buc)</th>
+        <th class="text-end">Stoc pt WinMentor</th>
         <th class="text-end">Stoc (mp)</th>
         <?php if ($canSeePrices): ?>
           <th class="text-end js-price-col">Preț/mp</th>
@@ -183,8 +199,15 @@ ob_start();
           <td><?= htmlspecialchars((string)$r['name']) ?></td>
           <td><?= (int)$r['thickness_mm'] ?> mm</td>
           <td><?= (int)$r['std_height_mm'] ?> × <?= (int)$r['std_width_mm'] ?> mm</td>
-          <td class="text-end fw-semibold"><?= (int)($r['stock_qty_full_available'] ?? 0) ?></td>
-          <td class="text-end fw-semibold"><?= (int)($r['stock_qty_offcut_available'] ?? 0) ?></td>
+          <?php
+            $fullQty = (float)($r['stock_qty_full_available'] ?? 0);
+            $offcutQty = (float)($r['stock_qty_offcut_available'] ?? 0);
+            $wmStock = $fullQty + ($offcutQty * 0.5);
+            $wmStockTxt = number_format((float)$wmStock, 2, '.', '');
+          ?>
+          <td class="text-end fw-semibold"><?= (int)$fullQty ?></td>
+          <td class="text-end fw-semibold"><?= (int)$offcutQty ?></td>
+          <td class="text-end fw-semibold"><?= htmlspecialchars($wmStockTxt) ?></td>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
             <?php

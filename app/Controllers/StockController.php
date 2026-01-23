@@ -175,6 +175,78 @@ final class StockController
         }
     }
 
+    public static function export(): void
+    {
+        $format = strtolower((string)($_GET['format'] ?? 'csv'));
+        if ($format !== 'xls') $format = 'csv';
+
+        // Filtru culoare: acceptă atât cod (ex: 617) cât și id intern (compat)
+        $colorId = null;
+        $color = null;
+        $colorRaw = isset($_GET['color']) ? trim((string)$_GET['color']) : '';
+        if ($colorRaw !== '') {
+            $color = Finish::findByCode($colorRaw);
+            if (!$color) {
+                $maybeId = Validator::int($colorRaw, 1);
+                if ($maybeId) $color = Finish::find($maybeId);
+            }
+        } elseif (isset($_GET['color_id']) && (string)$_GET['color_id'] !== '') {
+            $maybeId = Validator::int((string)$_GET['color_id'], 1);
+            if ($maybeId) $color = Finish::find($maybeId);
+        }
+        if ($color) $colorId = (int)$color['id'];
+
+        $thicknessMm = null;
+        if (isset($_GET['thickness_mm']) && (string)$_GET['thickness_mm'] !== '') {
+            $thicknessMm = Validator::int((string)$_GET['thickness_mm'], 1);
+        }
+
+        $rows = HplBoard::allWithTotals($colorId ?: null, $thicknessMm ?: null);
+
+        $date = date('Y-m-d');
+        $ext = $format === 'xls' ? 'xls' : 'csv';
+        $filename = 'stoc-hpl-' . $date . '.' . $ext;
+        if ($format === 'xls') {
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        } else {
+            header('Content-Type: text/csv; charset=utf-8');
+        }
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        echo "\xEF\xBB\xBF";
+
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            Response::redirect('/stock');
+        }
+        $delimiter = $format === 'xls' ? "\t" : ",";
+        fputcsv($out, ['Cod WinMentor', 'Denumire', 'Grosime', 'Dimensiune', 'Stoc pt WinMentor', 'Stoc (mp)'], $delimiter);
+        foreach ($rows as $r) {
+            $code = (string)($r['code'] ?? '');
+            $name = (string)($r['name'] ?? '');
+            $th = (int)($r['thickness_mm'] ?? 0);
+            $stdW = (int)($r['std_width_mm'] ?? 0);
+            $stdH = (int)($r['std_height_mm'] ?? 0);
+            $dim = ($stdH > 0 && $stdW > 0) ? ($stdH . '×' . $stdW . ' mm') : '';
+            $fullQty = (float)($r['stock_qty_full_available'] ?? 0);
+            $offcutQty = (float)($r['stock_qty_offcut_available'] ?? 0);
+            $wmStock = $fullQty + ($offcutQty * 0.5);
+            $stockM2 = (float)($r['stock_m2_available'] ?? 0);
+
+            fputcsv($out, [
+                $code,
+                $name,
+                $th > 0 ? ($th . ' mm') : '',
+                $dim,
+                number_format($wmStock, 2, '.', ''),
+                number_format($stockM2, 2, '.', ''),
+            ], $delimiter);
+        }
+        fclose($out);
+        exit;
+    }
+
     public static function createBoardForm(): void
     {
         try {
