@@ -2921,7 +2921,7 @@ final class ProjectsController
     {
         $id = (int)($params['id'] ?? 0);
         $tab = isset($_GET['tab']) ? trim((string)($_GET['tab'] ?? '')) : '';
-        if ($tab === '') $tab = 'general';
+        if ($tab === '') $tab = 'products';
 
         for ($attempt = 0; $attempt < 2; $attempt++) {
             try {

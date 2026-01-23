@@ -13,7 +13,7 @@ $canMoveHpl = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth
 $canDelete = ProjectsController::canDelete();
 
 $project = $project ?? [];
-$tab = (string)($tab ?? 'general');
+$tab = (string)($tab ?? 'products');
 $projectProducts = $projectProducts ?? [];
 $magazieConsum = $magazieConsum ?? [];
 $hplConsum = $hplConsum ?? [];
@@ -64,7 +64,7 @@ $tabs = [
   'discutii' => 'Discuții',
   'history' => 'Istoric / Log-uri',
 ];
-if (!isset($tabs[$tab])) $tab = 'general';
+if (!isset($tabs[$tab])) $tab = 'products';
 
 ob_start();
 ?>
