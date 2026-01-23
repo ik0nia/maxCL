@@ -141,7 +141,6 @@ ob_start();
           <li>Cod (automat, readonly)</li>
           <li>Nume</li>
           <li>Status</li>
-          <li>Prioritate</li>
           <li>Categorie</li>
           <li>Deadline</li>
           <li>Descriere</li>
@@ -638,6 +637,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.13</strong> – Proiecte: eliminare prioritate + coloana Zile rămase (blocată la livrat complet).</li>
         <li><strong>v1.0.12</strong> – Header proiect afisat mare, verde, cu ID si titlu.</li>
         <li><strong>v1.0.11</strong> – Deschiderea proiectului merge direct pe tabul Produse.</li>
         <li><strong>v1.0.10</strong> – Filtre range (min/max) pentru lungime si latime cu etichete dedicate.</li>
@@ -1366,6 +1366,7 @@ ob_start();
     <li>Rute principale: <code>/projects</code>, <code>/projects/create</code>, <code>/projects/{id}</code>.</li>
     <li>DB: <code>projects</code>, <code>project_products</code>, <code>project_magazie_consumptions</code>, <code>project_hpl_consumptions</code>, <code>project_product_hpl_consumptions</code>, <code>project_deliveries</code>, <code>project_delivery_items</code>.</li>
     <li>Audit: <code>PROJECT_CREATE</code>, <code>PROJECT_UPDATE</code>, <code>PROJECT_STATUS_CHANGE</code>, <code>PROJECT_CONSUMPTION_*</code>, <code>PROJECT_PRODUCT_*</code>.</li>
+    <li>Listă: coloana „Zile rămase” calculează diferența până la deadline și se blochează la LIVRAT_COMPLET.</li>
   </ul>
 
   <h3 class="h6 mt-3">Formular: Proiect (creare)</h3>
@@ -1377,7 +1378,6 @@ ob_start();
     <tbody>
       <tr><td>Nume</td><td>name</td><td>text</td><td>Obligatoriu</td><td>projects.name</td><td>Validator::required.</td></tr>
       <tr><td>Status</td><td>status</td><td>select</td><td>Enum valid</td><td>projects.status</td><td>Validat cu lista de statusuri.</td></tr>
-      <tr><td>Prioritate</td><td>priority</td><td>number</td><td>int (-100000..100000)</td><td>projects.priority</td><td>—</td></tr>
       <tr><td>Categorie</td><td>category</td><td>text</td><td>Optional</td><td>projects.category</td><td>—</td></tr>
       <tr><td>Deadline</td><td>due_date</td><td>date</td><td>Optional</td><td>projects.due_date</td><td>—</td></tr>
       <tr><td>Descriere</td><td>description</td><td>textarea</td><td>Optional</td><td>projects.description</td><td>—</td></tr>
@@ -1400,7 +1400,6 @@ ob_start();
       <tr><td>Cod</td><td>code</td><td>text</td><td>Readonly</td><td>projects.code</td><td>Ignorat la update (se pastreaza codul existent).</td></tr>
       <tr><td>Nume</td><td>name</td><td>text</td><td>Obligatoriu</td><td>projects.name</td><td>—</td></tr>
       <tr><td>Descriere</td><td>description</td><td>textarea</td><td>Optional</td><td>projects.description</td><td>—</td></tr>
-      <tr><td>Prioritate</td><td>priority</td><td>number</td><td>int</td><td>projects.priority</td><td>—</td></tr>
       <tr><td>Categorie</td><td>category</td><td>text</td><td>Optional</td><td>projects.category</td><td>—</td></tr>
       <tr><td>Deadline</td><td>due_date</td><td>date</td><td>Optional</td><td>projects.due_date</td><td>—</td></tr>
       <tr><td>Client</td><td>client_id</td><td>select</td><td>int (optional)</td><td>projects.client_id</td><td>Mutual exclusiv cu grup.</td></tr>
