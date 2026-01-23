@@ -329,13 +329,14 @@ ob_start();
     // 4 Dim. standard
     // 5 Stoc FULL
     // 6 Stoc OFFCUT
-    // 7 Stoc (mp)
-    // 8 Preț/mp (optional)
-    // 9 Valoare (lei) (optional)
+    // 7 Stoc WinMentor
+    // 8 Stoc (mp)
+    // 9 Preț/mp (optional)
+    // 10 Valoare (lei) (optional)
     // last Acțiuni
     const IDX_WM = 1;
-    const IDX_PRICE_1 = 8;
-    const IDX_PRICE_2 = 9;
+    const IDX_PRICE_1 = 9;
+    const IDX_PRICE_2 = 10;
 
     function apply(){
       const showWm = !!(tWm && tWm.checked);
