@@ -638,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.10</strong> – Filtre range (min/max) pentru lungime si latime cu etichete dedicate.</li>
         <li><strong>v1.0.9</strong> – Filtre lungime/latime la Bucati rest + ascundere buton scoatere pentru stocabile.</li>
         <li><strong>v1.0.8</strong> – Stoc WinMentor + export CSV/XLS din Stoc HPL.</li>
         <li><strong>v1.0.7</strong> – Log-uri HPL imbunatatite (placa/culori/dimensiuni + user/ora consum).</li>
