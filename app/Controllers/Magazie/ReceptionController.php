@@ -61,31 +61,34 @@ final class ReceptionController
     {
         Csrf::verify($_POST['_csrf'] ?? null);
 
-        // Recepție cu multiple poziții (rânduri). Unitatea se setează implicit (nu se selectează în UI).
+        // Recepție cu multiple poziții (rânduri). Unitatea se poate selecta per linie (implicit buc).
         $codes = $_POST['winmentor_code'] ?? [];
         $names = $_POST['name'] ?? [];
         $qtys = $_POST['qty'] ?? [];
+        $units = $_POST['unit'] ?? [];
         $prices = $_POST['unit_price'] ?? [];
         $note = trim((string)($_POST['note'] ?? ''));
 
         $errors = [];
-        if (!is_array($codes) || !is_array($names) || !is_array($qtys) || !is_array($prices)) {
+        if (!is_array($codes) || !is_array($names) || !is_array($qtys) || !is_array($units) || !is_array($prices)) {
             Session::flash('toast_error', 'Formular invalid.');
             Response::redirect('/magazie/receptie');
         }
         if ($note !== '' && mb_strlen($note) > 255) $errors['note'] = 'Notă prea lungă.';
 
-        /** @var array<int, array{code:string,name:string,qty:float,unit_price:float|null}> $lines */
+        /** @var array<int, array{code:string,name:string,qty:float,unit:string,unit_price:float|null}> $lines */
         $lines = [];
-        $n = max(count($codes), count($names), count($qtys), count($prices));
+        $n = max(count($codes), count($names), count($qtys), count($units), count($prices));
         for ($i = 0; $i < $n; $i++) {
             $code = is_scalar($codes[$i] ?? null) ? trim((string)$codes[$i]) : '';
             $name = is_scalar($names[$i] ?? null) ? trim((string)$names[$i]) : '';
             $qtyRaw = is_scalar($qtys[$i] ?? null) ? trim((string)$qtys[$i]) : '';
+            $unitRaw = is_scalar($units[$i] ?? null) ? trim((string)$units[$i]) : '';
             $priceRaw = is_scalar($prices[$i] ?? null) ? trim((string)$prices[$i]) : '';
+            $unit = $unitRaw !== '' ? $unitRaw : 'buc';
 
             // Sari peste rând complet gol
-            if ($code === '' && $name === '' && $qtyRaw === '' && $priceRaw === '') {
+            if ($code === '' && $name === '' && $qtyRaw === '' && $unitRaw === '' && $priceRaw === '') {
                 continue;
             }
 
@@ -96,6 +99,7 @@ final class ReceptionController
             if ($name === '') $errors['row_' . $i] = 'Denumire lipsă (rând ' . ($i + 1) . ').';
             if ($code !== '' && mb_strlen($code) > 64) $errors['row_' . $i] = 'Cod prea lung (rând ' . ($i + 1) . ').';
             if ($name !== '' && mb_strlen($name) > 190) $errors['row_' . $i] = 'Denumire prea lungă (rând ' . ($i + 1) . ').';
+            if ($unit !== '' && mb_strlen($unit) > 16) $errors['row_' . $i] = 'Unitate prea lungă (rând ' . ($i + 1) . ').';
             if ($qty === null || $qty <= 0) $errors['row_' . $i] = 'Cantitate invalidă (rând ' . ($i + 1) . ').';
             if ($unitPrice === null || $unitPrice < 0 || $unitPrice > 100000000) $errors['row_' . $i] = 'Preț invalid (rând ' . ($i + 1) . ').';
 
@@ -104,6 +108,7 @@ final class ReceptionController
                     'code' => $code,
                     'name' => $name,
                     'qty' => (float)$qty,
+                    'unit' => $unit,
                     'unit_price' => $unitPrice,
                 ];
             }
@@ -125,14 +130,22 @@ final class ReceptionController
             if (!isset($byCode[$c])) {
                 $byCode[$c] = $ln;
             } else {
+                if ((string)($byCode[$c]['unit'] ?? '') !== (string)($ln['unit'] ?? '')) {
+                    $errors['unit'] = 'Unitate diferită pentru același cod WinMentor.';
+                    break;
+                }
                 $byCode[$c]['qty'] += (float)$ln['qty'];
                 // păstrăm ultima denumire/preț dacă sunt diferite (WinMentor poate actualiza)
                 $byCode[$c]['name'] = $ln['name'];
+                $byCode[$c]['unit'] = $ln['unit'];
                 $byCode[$c]['unit_price'] = $ln['unit_price'];
             }
         }
         $lines = array_values($byCode);
-        $unit = 'buc';
+        if ($errors) {
+            Session::flash('toast_error', 'Completează corect câmpurile pentru recepție.');
+            Response::redirect('/magazie/receptie');
+        }
 
         /** @var \PDO $pdo */
         $pdo = DB::pdo();
@@ -143,6 +156,7 @@ final class ReceptionController
                 $code = $ln['code'];
                 $name = $ln['name'];
                 $qty = (float)$ln['qty'];
+                $unit = (string)($ln['unit'] ?? 'buc');
                 $unitPrice = $ln['unit_price'];
 
                 $existing = MagazieItem::findByWinmentorForUpdate($code);

@@ -18,7 +18,7 @@ ob_start();
 <div class="app-page-title">
   <div>
     <h1 class="m-0">Stoc Magazie</h1>
-    <div class="text-muted">Accesorii (Cod WinMentor, bucăți, preț/buc)</div>
+    <div class="text-muted">Accesorii (Cod WinMentor, cantitate, preț/unitate)</div>
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/magazie/receptie')) ?>" class="btn btn-primary">
@@ -33,9 +33,9 @@ ob_start();
       <tr>
         <th style="width:160px">Cod WinMentor</th>
         <th>Denumire</th>
-        <th class="text-end" style="width:110px">Bucăți</th>
+        <th class="text-end" style="width:140px">Cantitate</th>
         <?php if ($canSeePrices): ?>
-          <th class="text-end" style="width:130px">Preț/buc</th>
+          <th class="text-end" style="width:130px">Preț/unit</th>
         <?php endif; ?>
         <th class="text-end" style="width:360px">Acțiuni</th>
       </tr>
@@ -49,6 +49,7 @@ ob_start();
           if (isset($it['unit_price']) && $it['unit_price'] !== null && $it['unit_price'] !== '' && is_numeric($it['unit_price'])) {
             $price = (float)$it['unit_price'];
           }
+          $unit = (string)($it['unit'] ?? 'buc');
         ?>
         <tr>
           <td class="fw-semibold">
@@ -61,7 +62,7 @@ ob_start();
               <?= htmlspecialchars((string)($it['name'] ?? '')) ?>
             </a>
           </td>
-          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
+          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>
@@ -73,7 +74,7 @@ ob_start();
                 <input type="text" name="project_code" class="form-control form-control-sm" style="width:160px"
                        placeholder="Cod proiect…" <?= $qty <= 0 ? 'disabled' : '' ?>>
                 <button class="btn btn-outline-secondary btn-sm" type="submit" <?= $qty <= 0 ? 'disabled' : '' ?>
-                        onclick="return confirm('Scazi ' + this.form.qty.value + ' buc din stoc pentru proiectul ' + (this.form.project_code.value || '—') + '?');">
+                        onclick="return confirm('Scazi ' + this.form.qty.value + ' <?= htmlspecialchars($unit) ?> din stoc pentru proiectul ' + (this.form.project_code.value || '—') + '?');">
                   <i class="bi bi-dash-lg me-1"></i> Scade
                 </button>
               </form>

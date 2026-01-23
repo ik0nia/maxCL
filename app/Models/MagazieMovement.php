@@ -64,6 +64,7 @@ final class MagazieMovement
                   m.*,
                   i.winmentor_code,
                   i.name AS item_name,
+                  i.unit AS item_unit,
                   COALESCE(NULLIF(m.project_code, \'\'), p.code) AS project_code_display,
                   p.name AS project_name,
                   CAST(JSON_UNQUOTE(JSON_EXTRACT(a.meta_json, \'$.project_product_id\')) AS UNSIGNED) AS project_product_id,

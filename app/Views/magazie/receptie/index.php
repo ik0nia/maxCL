@@ -41,8 +41,9 @@ ob_start();
               <tr>
                 <th style="width:220px">Cod WinMentor</th>
                 <th>Denumire</th>
-                <th class="text-end" style="width:140px">Bucăți</th>
-                <th class="text-end" style="width:140px">Preț/buc</th>
+                <th class="text-end" style="width:140px">Cantitate</th>
+                <th style="width:110px">U.M.</th>
+                <th class="text-end" style="width:140px">Preț/unit</th>
                 <th style="width:64px"></th>
               </tr>
             </thead>
@@ -56,6 +57,9 @@ ob_start();
                 </td>
                 <td class="text-end">
                   <input class="form-control text-end" type="number" name="qty[]" required min="0.001" step="0.001" value="1">
+                </td>
+                <td>
+                  <input class="form-control" name="unit[]" required maxlength="16" value="buc" list="magazieUnits">
                 </td>
                 <td class="text-end">
                   <input class="form-control text-end" name="unit_price[]" required placeholder="0.00">
@@ -74,7 +78,15 @@ ob_start();
             <i class="bi bi-plus-lg me-1"></i> Adaugă poziție
           </button>
         </div>
-        <div class="text-muted small mt-2">Unitatea este implicit <span class="fw-semibold">buc</span>.</div>
+        <datalist id="magazieUnits">
+          <option value="buc"></option>
+          <option value="set"></option>
+          <option value="m"></option>
+          <option value="m2"></option>
+          <option value="kg"></option>
+          <option value="l"></option>
+        </datalist>
+        <div class="text-muted small mt-2">Unitatea este implicit <span class="fw-semibold">buc</span>, dar poate fi modificată pe fiecare linie.</div>
       </div>
 
       <div class="col-12">
@@ -108,6 +120,8 @@ ob_start();
             tr.querySelectorAll('input').forEach(function(inp){ inp.value = ''; });
             const qty = tr.querySelector('input[name="qty[]"]');
             if (qty) qty.value = '1';
+            const unit = tr.querySelector('input[name="unit[]"]');
+            if (unit) unit.value = 'buc';
             return;
           }
           tr.remove();
@@ -125,6 +139,8 @@ ob_start();
         tr.querySelectorAll('input').forEach(function(inp){ inp.value = ''; });
         const qty = tr.querySelector('input[name="qty[]"]');
         if (qty) qty.value = '1';
+        const unit = tr.querySelector('input[name="unit[]"]');
+        if (unit) unit.value = 'buc';
         const rm = tr.querySelector('.mag-remove');
         if (rm) bindRemove(rm);
         body.appendChild(tr);
@@ -147,9 +163,9 @@ ob_start();
         <th style="width:70px">Tip</th>
         <th style="width:160px">Cod WinMentor</th>
         <th>Accesoriu</th>
-        <th class="text-end" style="width:110px">Bucăți</th>
+        <th class="text-end" style="width:140px">Cantitate</th>
         <?php if ($canSeePrices): ?>
-          <th class="text-end" style="width:130px">Preț/buc</th>
+          <th class="text-end" style="width:130px">Preț/unit</th>
         <?php endif; ?>
         <th style="width:160px">Proiect</th>
         <th style="width:200px">Produs proiect</th>
@@ -165,6 +181,7 @@ ob_start();
           if (isset($m['unit_price']) && $m['unit_price'] !== null && $m['unit_price'] !== '' && is_numeric($m['unit_price'])) {
             $price = (float)$m['unit_price'];
           }
+          $unit = (string)($m['item_unit'] ?? 'buc');
           $date = (string)($m['created_at'] ?? '');
         ?>
         <tr>
@@ -182,7 +199,7 @@ ob_start();
             $pname = (string)($m['project_name'] ?? '');
           ?>
           <td><?= htmlspecialchars((string)($m['item_name'] ?? '')) ?></td>
-          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?></td>
+          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>

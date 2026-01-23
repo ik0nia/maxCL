@@ -27,7 +27,7 @@ final class MagazieItemsController
                 $unit = (string)($r['unit'] ?? 'buc');
                 $qty = isset($r['stock_qty']) && $r['stock_qty'] !== null && $r['stock_qty'] !== '' ? (float)$r['stock_qty'] : 0.0;
                 $text = trim($code . ' · ' . $name);
-                $text .= ' · stoc: ' . number_format($qty, 3, '.', '');
+                $text .= ' · stoc: ' . number_format($qty, 3, '.', '') . ' ' . $unit;
                 $items[] = ['id' => $id, 'text' => $text, 'unit' => $unit];
             }
             Response::json(['ok' => true, 'q' => $q, 'count' => count($items), 'items' => $items]);
