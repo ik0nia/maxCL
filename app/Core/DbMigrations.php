@@ -126,6 +126,7 @@ final class DbMigrations
                           std_width_mm INT NOT NULL,
                           std_height_mm INT NOT NULL,
                           sale_price DECIMAL(12,2) NULL,
+                          mentor_stock DECIMAL(12,2) NULL,
                           face_color_id INT UNSIGNED NOT NULL,
                           face_texture_id INT UNSIGNED NOT NULL,
                           back_color_id INT UNSIGNED NULL,
@@ -229,6 +230,15 @@ final class DbMigrations
                     if (!self::tableExists($pdo, 'hpl_boards')) return;
                     if (self::columnExists($pdo, 'hpl_boards', 'sale_price')) return;
                     $pdo->exec("ALTER TABLE hpl_boards ADD COLUMN sale_price DECIMAL(12,2) NULL");
+                },
+            ],
+            [
+                'id' => '2026-01-24_01_add_hpl_boards_mentor_stock',
+                'label' => 'ALTER TABLE hpl_boards ADD mentor_stock',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'hpl_boards')) return;
+                    if (self::columnExists($pdo, 'hpl_boards', 'mentor_stock')) return;
+                    $pdo->exec("ALTER TABLE hpl_boards ADD COLUMN mentor_stock DECIMAL(12,2) NULL");
                 },
             ],
             [

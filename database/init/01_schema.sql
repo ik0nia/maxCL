@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS hpl_boards (
   std_width_mm INT NOT NULL,
   std_height_mm INT NOT NULL,
   sale_price DECIMAL(12,2) NULL,
+  mentor_stock DECIMAL(12,2) NULL,
   sale_price_per_m2 DECIMAL(12,2) AS (
     CASE
       WHEN sale_price IS NULL OR std_width_mm <= 0 OR std_height_mm <= 0 THEN NULL

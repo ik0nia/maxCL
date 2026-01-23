@@ -247,6 +247,113 @@ final class StockController
         exit;
     }
 
+    public static function syncMentorStock(): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $u = Auth::user();
+        if (!$u || (string)($u['role'] ?? '') !== Auth::ROLE_ADMIN) {
+            Session::flash('toast_error', 'Nu ai acces la actualizarea Mentor.');
+            Response::redirect('/stock');
+        }
+
+        try { DbMigrations::runAuto(); } catch (\Throwable $e) {}
+
+        $url = 'https://malinco.ro/prelucrare.php';
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => 20,
+                'header' => "User-Agent: maxcl\r\n",
+            ],
+        ]);
+        $csv = @file_get_contents($url, false, $ctx);
+        if ($csv === false || trim((string)$csv) === '') {
+            Session::flash('toast_error', 'Nu pot descărca fișierul Mentor.');
+            Response::redirect('/stock');
+        }
+
+        $lines = preg_split("/\r\n|\n|\r/", trim((string)$csv));
+        if (!$lines || count($lines) < 1) {
+            Session::flash('toast_error', 'Fișier Mentor invalid.');
+            Response::redirect('/stock');
+        }
+
+        $headerLine = array_shift($lines);
+        if ($headerLine === null) $headerLine = '';
+        $delimiter = ",";
+        if (str_contains($headerLine, "\t")) $delimiter = "\t";
+        elseif (substr_count($headerLine, ';') >= substr_count($headerLine, ',')) $delimiter = ";";
+
+        $headerCols = str_getcsv($headerLine, $delimiter);
+        if (!$headerCols) $headerCols = [];
+        if ($headerCols && isset($headerCols[0])) {
+            $headerCols[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string)$headerCols[0]);
+        }
+        $norm = function ($v): string {
+            $v = strtolower(trim((string)$v));
+            $v = preg_replace('/\s+/', '', $v);
+            return $v ?? '';
+        };
+        $normCols = array_map($norm, $headerCols);
+        $idxCode = array_search('codextern', $normCols, true);
+        $idxStock = array_search('stoc', $normCols, true);
+
+        // fallback dacă header-ul nu e detectat
+        if ($idxCode === false || $idxStock === false) {
+            array_unshift($lines, $headerLine);
+            $idxCode = 0;
+            $idxStock = 3;
+        }
+
+        $stockMap = [];
+        foreach ($lines as $line) {
+            $line = trim((string)$line);
+            if ($line === '') continue;
+            $cols = str_getcsv($line, $delimiter);
+            if (!is_array($cols)) continue;
+            if (!array_key_exists($idxCode, $cols) || !array_key_exists($idxStock, $cols)) continue;
+            $code = trim((string)$cols[$idxCode]);
+            if ($code === '') continue;
+            $stockRaw = trim((string)$cols[$idxStock]);
+            $stockVal = Validator::dec($stockRaw);
+            if ($stockVal === null) continue;
+            $stockMap[$code] = $stockVal;
+        }
+
+        if (!$stockMap) {
+            Session::flash('toast_error', 'Nu am găsit coduri valide în fișierul Mentor.');
+            Response::redirect('/stock');
+        }
+
+        /** @var \PDO $pdo */
+        $pdo = DB::pdo();
+        $pdo->beginTransaction();
+        try {
+            $updated = 0;
+            $codes = array_keys($stockMap);
+            $stUpd = $pdo->prepare('UPDATE hpl_boards SET mentor_stock = :stock WHERE id = :id');
+            foreach (array_chunk($codes, 400) as $chunk) {
+                $ph = implode(',', array_fill(0, count($chunk), '?'));
+                $stSel = $pdo->prepare("SELECT id, code FROM hpl_boards WHERE code IN ($ph)");
+                $stSel->execute($chunk);
+                foreach ($stSel->fetchAll() as $row) {
+                    $code = (string)($row['code'] ?? '');
+                    if ($code === '' || !array_key_exists($code, $stockMap)) continue;
+                    $stUpd->execute([
+                        ':stock' => $stockMap[$code],
+                        ':id' => (int)($row['id'] ?? 0),
+                    ]);
+                    $updated++;
+                }
+            }
+            $pdo->commit();
+            Session::flash('toast_success', 'Stocuri Mentor actualizate: ' . $updated . '.');
+        } catch (\Throwable $e) {
+            try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
+            Session::flash('toast_error', 'Nu pot actualiza stocurile Mentor: ' . $e->getMessage());
+        }
+        Response::redirect('/stock');
+    }
+
     public static function createBoardForm(): void
     {
         try {

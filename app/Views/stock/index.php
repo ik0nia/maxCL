@@ -7,6 +7,7 @@ use App\Core\View;
 $u = Auth::user();
 $canWrite = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
 $canSeePrices = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR], true);
+$isAdmin = $u && (string)$u['role'] === Auth::ROLE_ADMIN;
 $rows = $rows ?? [];
 $filterColor = $filterColor ?? null;
 $filterColorQuery = (string)($filterColorQuery ?? '');
@@ -49,6 +50,15 @@ ob_start();
     <div class="text-muted">Catalog plăci + total buc/mp (disponibil)</div>
   </div>
   <div class="d-flex gap-2">
+    <?php if ($isAdmin): ?>
+      <form method="post" action="<?= htmlspecialchars(Url::to('/stock/mentor-sync')) ?>" class="d-inline">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+        <button class="btn btn-outline-success" type="submit"
+                onclick="return confirm('Actualizezi stocurile din WinMentor?');">
+          <i class="bi bi-cloud-download me-1"></i> Actualizează Stocuri din Mentor
+        </button>
+      </form>
+    <?php endif; ?>
     <div class="d-flex gap-2 align-items-center flex-wrap">
       <a href="<?= htmlspecialchars($exportCsvUrl) ?>" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-filetype-csv me-1"></i> Export CSV
@@ -135,6 +145,9 @@ ob_start();
         <th class="text-end">Stoc FULL (buc)</th>
         <th class="text-end">Stoc OFFCUT (buc)</th>
         <th class="text-end">Stoc pt WinMentor</th>
+        <?php if ($isAdmin): ?>
+          <th class="text-end js-mentor-col">Stoc Actual Mentor</th>
+        <?php endif; ?>
         <th class="text-end">Stoc (mp)</th>
         <?php if ($canSeePrices): ?>
           <th class="text-end js-price-col">Preț/mp</th>
@@ -208,6 +221,15 @@ ob_start();
           <td class="text-end fw-semibold"><?= (int)$fullQty ?></td>
           <td class="text-end fw-semibold"><?= (int)$offcutQty ?></td>
           <td class="text-end fw-semibold"><?= htmlspecialchars($wmStockTxt) ?></td>
+          <?php if ($isAdmin): ?>
+            <?php
+              $mentorStock = $r['mentor_stock'] ?? null;
+              $mentorTxt = ($mentorStock !== null && $mentorStock !== '' && is_numeric($mentorStock))
+                ? number_format((float)$mentorStock, 2, '.', '')
+                : '—';
+            ?>
+            <td class="text-end fw-semibold js-mentor-col"><?= htmlspecialchars($mentorTxt) ?></td>
+          <?php endif; ?>
           <td class="text-end fw-semibold"><?= number_format((float)$r['stock_m2_available'], 2, '.', '') ?></td>
           <?php if ($canSeePrices): ?>
             <?php
@@ -321,22 +343,13 @@ ob_start();
     const valueCard = document.getElementById('stockValueCard');
     const dt = window.__stockBoardsDT || null;
 
-    // Column indices (DataTables)
-    // 0 Preview
-    // 1 Cod WinMentor
-    // 2 Denumire
-    // 3 Grosime
-    // 4 Dim. standard
-    // 5 Stoc FULL
-    // 6 Stoc OFFCUT
-    // 7 Stoc WinMentor
-    // 8 Stoc (mp)
-    // 9 Preț/mp (optional)
-    // 10 Valoare (lei) (optional)
-    // last Acțiuni
-    const IDX_WM = 1;
-    const IDX_PRICE_1 = 9;
-    const IDX_PRICE_2 = 10;
+    // Column indices (DataTables) – calculate from header (admin-only columns exist)
+    const headerCells = Array.from(document.querySelectorAll('#boardsTable thead th'));
+    const IDX_WM = headerCells.findIndex(th => th.classList.contains('js-wmcode-col'));
+    const PRICE_IDXS = headerCells.reduce((acc, th, idx) => {
+      if (th.classList.contains('js-price-col')) acc.push(idx);
+      return acc;
+    }, []);
 
     function apply(){
       const showWm = !!(tWm && tWm.checked);
@@ -345,11 +358,10 @@ ob_start();
 
       // Prefer DataTables visibility so columns reflow nicely.
       if (dt && dt.column) {
-        try { dt.column(IDX_WM).visible(showWm, false); } catch (e) {}
+        try { if (IDX_WM >= 0) dt.column(IDX_WM).visible(showWm, false); } catch (e) {}
         try {
           // price columns exist only for Admin/Gestionar (canSeePrices=true)
-          dt.column(IDX_PRICE_1).visible(showPrices, false);
-          dt.column(IDX_PRICE_2).visible(showPrices, false);
+          PRICE_IDXS.forEach(idx => { if (idx >= 0) dt.column(idx).visible(showPrices, false); });
         } catch (e) {}
       } else {
         // Fallback without DataTables
