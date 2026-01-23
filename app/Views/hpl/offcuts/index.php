@@ -12,6 +12,18 @@ $items = $items ?? [];
 $colors = is_array($colors ?? null) ? $colors : [];
 $u = Auth::user();
 $canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
+$lengthMin = $lengthMin ?? null;
+$lengthMax = $lengthMax ?? null;
+$widthMin = $widthMin ?? null;
+$widthMax = $widthMax ?? null;
+$lengthRangeMin = $lengthRangeMin ?? null;
+$lengthRangeMax = $lengthRangeMax ?? null;
+$widthRangeMin = $widthRangeMin ?? null;
+$widthRangeMax = $widthRangeMax ?? null;
+$lengthMinVal = $lengthMin !== null ? (int)$lengthMin : ($lengthRangeMin !== null ? (int)$lengthRangeMin : '');
+$lengthMaxVal = $lengthMax !== null ? (int)$lengthMax : ($lengthRangeMax !== null ? (int)$lengthRangeMax : '');
+$widthMinVal = $widthMin !== null ? (int)$widthMin : ($widthRangeMin !== null ? (int)$widthRangeMin : '');
+$widthMaxVal = $widthMax !== null ? (int)$widthMax : ($widthRangeMax !== null ? (int)$widthRangeMax : '');
 
 function _normImg2(string $p): string {
   $p = trim($p);
@@ -56,12 +68,25 @@ function _qs(array $params): string {
   return $parts ? ('?' . implode('&', $parts)) : '';
 }
 
-function _offcutsUrl(string $bucket, bool $scrapOnly, int $colorId, bool $showAccounting): string {
+function _offcutsUrl(
+  string $bucket,
+  bool $scrapOnly,
+  int $colorId,
+  bool $showAccounting,
+  ?int $lengthMin,
+  ?int $lengthMax,
+  ?int $widthMin,
+  ?int $widthMax
+): string {
   $params = [];
   if ($bucket !== '') $params['bucket'] = $bucket;
   if ($scrapOnly) $params['scrap'] = '1';
   if ($colorId > 0) $params['color_id'] = (string)$colorId;
   if ($showAccounting) $params['accounting'] = '1';
+  if ($lengthMin !== null) $params['length_min'] = (string)$lengthMin;
+  if ($lengthMax !== null) $params['length_max'] = (string)$lengthMax;
+  if ($widthMin !== null) $params['width_min'] = (string)$widthMin;
+  if ($widthMax !== null) $params['width_max'] = (string)$widthMax;
   return Url::to('/hpl/bucati-rest' . _qs($params));
 }
 
@@ -78,29 +103,33 @@ ob_start();
   <div class="d-flex flex-wrap gap-2 align-items-center">
     <div class="fw-semibold">Filtre:</div>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === '' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(_offcutsUrl('', false, $colorId, $showAccounting)) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('', false, $colorId, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>">
       Toate <span class="badge text-bg-light ms-1"><?= (int)($counts['all'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'gt_half' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(_offcutsUrl('gt_half', false, $colorId, $showAccounting)) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('gt_half', false, $colorId, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>">
       &gt; 1/2 <span class="badge text-bg-light ms-1"><?= (int)($counts['gt_half'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'half_to_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(_offcutsUrl('half_to_quarter', false, $colorId, $showAccounting)) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('half_to_quarter', false, $colorId, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>">
       1/2 – 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['half_to_quarter'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'lt_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(_offcutsUrl('lt_quarter', false, $colorId, $showAccounting)) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('lt_quarter', false, $colorId, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>">
       &lt; 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['lt_quarter'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= $scrapOnly ? 'btn-danger' : 'btn-outline-danger' ?>"
-       href="<?= htmlspecialchars(_offcutsUrl('', true, $colorId, $showAccounting)) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('', true, $colorId, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>">
       Stricate <span class="badge text-bg-light ms-1"><?= (int)($counts['scrap'] ?? 0) ?></span>
     </a>
     <form method="get" class="d-flex align-items-center gap-2 ms-2">
       <?php if ($bucket !== ''): ?><input type="hidden" name="bucket" value="<?= htmlspecialchars($bucket) ?>"><?php endif; ?>
       <?php if ($scrapOnly): ?><input type="hidden" name="scrap" value="1"><?php endif; ?>
       <?php if ($colorId > 0): ?><input type="hidden" name="color_id" value="<?= (int)$colorId ?>"><?php endif; ?>
+      <?php if ($lengthMin !== null): ?><input type="hidden" name="length_min" value="<?= (int)$lengthMin ?>"><?php endif; ?>
+      <?php if ($lengthMax !== null): ?><input type="hidden" name="length_max" value="<?= (int)$lengthMax ?>"><?php endif; ?>
+      <?php if ($widthMin !== null): ?><input type="hidden" name="width_min" value="<?= (int)$widthMin ?>"><?php endif; ?>
+      <?php if ($widthMax !== null): ?><input type="hidden" name="width_max" value="<?= (int)$widthMax ?>"><?php endif; ?>
       <div class="form-check form-switch m-0">
         <input class="form-check-input" type="checkbox" role="switch" id="toggleAccounting" name="accounting" value="1" <?= $showAccounting ? 'checked' : '' ?>
                onchange="this.form.submit()">
@@ -116,7 +145,7 @@ ob_start();
       <div class="fw-semibold mb-2">Filtru tip culoare:</div>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-sm <?= $colorId <= 0 ? 'btn-primary' : 'btn-outline-secondary' ?>"
-           href="<?= htmlspecialchars(_offcutsUrl($bucket, $scrapOnly, 0, $showAccounting)) ?>">
+           href="<?= htmlspecialchars(_offcutsUrl($bucket, $scrapOnly, 0, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>">
           Toate culorile
         </a>
         <?php foreach ($colors as $c): ?>
@@ -129,7 +158,7 @@ ob_start();
             $label = $code !== '' ? $code : ($name !== '' ? $name : ('#' . $cid));
           ?>
           <a class="btn btn-sm <?= $colorId === $cid ? 'btn-primary' : 'btn-outline-secondary' ?> d-flex align-items-center gap-2"
-             href="<?= htmlspecialchars(_offcutsUrl($bucket, $scrapOnly, $cid, $showAccounting)) ?>"
+             href="<?= htmlspecialchars(_offcutsUrl($bucket, $scrapOnly, $cid, $showAccounting, $lengthMin, $lengthMax, $widthMin, $widthMax)) ?>"
              title="<?= htmlspecialchars($name !== '' ? $name : $label) ?>">
             <?php if ($thumb !== ''): ?>
               <img src="<?= htmlspecialchars($thumb) ?>" alt="" style="width:26px;height:26px;object-fit:cover;border-radius:8px;border:1px solid #D9E3E6">
@@ -140,6 +169,49 @@ ob_start();
       </div>
     </div>
   <?php endif; ?>
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-end mt-3">
+    <?php if ($bucket !== ''): ?><input type="hidden" name="bucket" value="<?= htmlspecialchars($bucket) ?>"><?php endif; ?>
+    <?php if ($scrapOnly): ?><input type="hidden" name="scrap" value="1"><?php endif; ?>
+    <?php if ($colorId > 0): ?><input type="hidden" name="color_id" value="<?= (int)$colorId ?>"><?php endif; ?>
+    <?php if ($showAccounting): ?><input type="hidden" name="accounting" value="1"><?php endif; ?>
+    <div>
+      <label class="form-label small mb-1">Lungime min (mm)</label>
+      <input type="number"
+             class="form-control form-control-sm"
+             name="length_min"
+             value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
+             <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
+             <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
+    </div>
+    <div>
+      <label class="form-label small mb-1">Lungime max (mm)</label>
+      <input type="number"
+             class="form-control form-control-sm"
+             name="length_max"
+             value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
+             <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
+             <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
+    </div>
+    <div>
+      <label class="form-label small mb-1">Lățime min (mm)</label>
+      <input type="number"
+             class="form-control form-control-sm"
+             name="width_min"
+             value="<?= htmlspecialchars((string)$widthMinVal) ?>"
+             <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
+             <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
+    </div>
+    <div>
+      <label class="form-label small mb-1">Lățime max (mm)</label>
+      <input type="number"
+             class="form-control form-control-sm"
+             name="width_max"
+             value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
+             <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
+             <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
+    </div>
+    <button class="btn btn-sm btn-primary" type="submit">Aplică</button>
+  </form>
 </div>
 
 <style>
@@ -223,6 +295,10 @@ ob_start();
           'scrap' => $scrapOnly ? '1' : null,
           'color_id' => $colorId > 0 ? $colorId : null,
           'accounting' => $showAccounting ? '1' : null,
+          'length_min' => $lengthMin !== null ? $lengthMin : null,
+          'length_max' => $lengthMax !== null ? $lengthMax : null,
+          'width_min' => $widthMin !== null ? $widthMin : null,
+          'width_max' => $widthMax !== null ? $widthMax : null,
         ]);
         if ($qstr !== '') {
           $uploadAction .= $qstr;
@@ -312,7 +388,7 @@ ob_start();
               </div>
             </div>
           </div>
-          <?php if ($canUpload && !$isScrap): ?>
+          <?php if ($canUpload && !$isScrap && $isInternal): ?>
             <div class="mt-2 d-flex justify-content-end">
               <button class="btn btn-sm btn-outline-danger js-trash-piece"
                       type="button"

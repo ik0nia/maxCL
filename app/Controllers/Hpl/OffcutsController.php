@@ -11,6 +11,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Upload;
 use App\Core\Url;
+use App\Core\Validator;
 use App\Core\View;
 use App\Models\EntityFile;
 use App\Models\HplOffcuts;
@@ -26,6 +27,14 @@ final class OffcutsController
         $scrapOnly = isset($_GET['scrap']) && (string)$_GET['scrap'] === '1';
         $showAccounting = isset($_GET['accounting']) && (string)$_GET['accounting'] === '1';
         $colorId = isset($_GET['color_id']) ? (int)$_GET['color_id'] : 0;
+        $lengthMinRaw = isset($_GET['length_min']) ? trim((string)$_GET['length_min']) : '';
+        $lengthMaxRaw = isset($_GET['length_max']) ? trim((string)$_GET['length_max']) : '';
+        $widthMinRaw = isset($_GET['width_min']) ? trim((string)$_GET['width_min']) : '';
+        $widthMaxRaw = isset($_GET['width_max']) ? trim((string)$_GET['width_max']) : '';
+        $lengthMin = Validator::int($lengthMinRaw, 1);
+        $lengthMax = Validator::int($lengthMaxRaw, 1);
+        $widthMin = Validator::int($widthMinRaw, 1);
+        $widthMax = Validator::int($widthMaxRaw, 1);
         if ($bucket !== '' && !in_array($bucket, self::BUCKETS, true)) {
             Response::redirect('/hpl/bucati-rest');
         }
@@ -66,6 +75,52 @@ final class OffcutsController
             }
             $filteredRows[] = $r;
         }
+
+        // Intervale implicite pentru lungime/latime (mm) pe setul filtrat.
+        $lengthRangeMin = null;
+        $lengthRangeMax = null;
+        $widthRangeMin = null;
+        $widthRangeMax = null;
+        foreach ($filteredRows as $r) {
+            $w = (int)($r['width_mm'] ?? 0);
+            $h = (int)($r['height_mm'] ?? 0);
+            if ($h > 0) {
+                if ($lengthRangeMin === null || $h < $lengthRangeMin) $lengthRangeMin = $h;
+                if ($lengthRangeMax === null || $h > $lengthRangeMax) $lengthRangeMax = $h;
+            }
+            if ($w > 0) {
+                if ($widthRangeMin === null || $w < $widthRangeMin) $widthRangeMin = $w;
+                if ($widthRangeMax === null || $w > $widthRangeMax) $widthRangeMax = $w;
+            }
+        }
+
+        if ($lengthMin === null) $lengthMin = $lengthRangeMin;
+        if ($lengthMax === null) $lengthMax = $lengthRangeMax;
+        if ($widthMin === null) $widthMin = $widthRangeMin;
+        if ($widthMax === null) $widthMax = $widthRangeMax;
+
+        if ($lengthMin !== null && $lengthMax !== null && $lengthMin > $lengthMax) {
+            $tmp = $lengthMin;
+            $lengthMin = $lengthMax;
+            $lengthMax = $tmp;
+        }
+        if ($widthMin !== null && $widthMax !== null && $widthMin > $widthMax) {
+            $tmp = $widthMin;
+            $widthMin = $widthMax;
+            $widthMax = $tmp;
+        }
+
+        $sizeFilteredRows = [];
+        foreach ($filteredRows as $r) {
+            $w = (int)($r['width_mm'] ?? 0);
+            $h = (int)($r['height_mm'] ?? 0);
+            if ($lengthMin !== null && $h < $lengthMin) continue;
+            if ($lengthMax !== null && $h > $lengthMax) continue;
+            if ($widthMin !== null && $w < $widthMin) continue;
+            if ($widthMax !== null && $w > $widthMax) continue;
+            $sizeFilteredRows[] = $r;
+        }
+        $filteredRows = $sizeFilteredRows;
 
         if ($colors) {
             $colors = array_values($colors);
@@ -240,6 +295,14 @@ final class OffcutsController
             'colors' => $colors,
             'counts' => $counts,
             'items' => $items,
+            'lengthMin' => $lengthMin,
+            'lengthMax' => $lengthMax,
+            'widthMin' => $widthMin,
+            'widthMax' => $widthMax,
+            'lengthRangeMin' => $lengthRangeMin,
+            'lengthRangeMax' => $lengthRangeMax,
+            'widthRangeMin' => $widthRangeMin,
+            'widthRangeMax' => $widthRangeMax,
         ]);
     }
 
