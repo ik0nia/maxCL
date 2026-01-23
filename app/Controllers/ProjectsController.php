@@ -15,6 +15,7 @@ use App\Models\ClientAddress;
 use App\Models\ClientGroup;
 use App\Models\HplBoard;
 use App\Models\HplStockPiece;
+use App\Models\Finish;
 use App\Models\MagazieItem;
 use App\Models\Product;
 use App\Models\Project;
@@ -446,6 +447,59 @@ final class ProjectsController
         $txt = number_format($qty, $dec, '.', '');
         $txt = rtrim(rtrim($txt, '0'), '.');
         return $txt !== '' ? $txt : '0';
+    }
+
+    /** @return array<string,mixed> */
+    private static function boardMetaForLog(int $boardId): array
+    {
+        $meta = ['board_id' => $boardId];
+        if ($boardId <= 0) return $meta;
+        try {
+            $board = HplBoard::find($boardId);
+            if (!$board) return $meta;
+            $meta['board_code'] = (string)($board['code'] ?? '');
+            $meta['board_name'] = (string)($board['name'] ?? '');
+            $meta['board_std_width_mm'] = (int)($board['std_width_mm'] ?? 0);
+            $meta['board_std_height_mm'] = (int)($board['std_height_mm'] ?? 0);
+
+            $faceId = (int)($board['face_color_id'] ?? 0);
+            $backId = (int)($board['back_color_id'] ?? 0);
+            if ($faceId > 0) {
+                $f = Finish::find($faceId);
+                if ($f) $meta['face_color_code'] = (string)($f['code'] ?? '');
+            }
+            if ($backId > 0) {
+                $b = Finish::find($backId);
+                if ($b) $meta['back_color_code'] = (string)($b['code'] ?? '');
+            }
+        } catch (\Throwable $e) {
+            // best-effort
+        }
+        return $meta;
+    }
+
+    private static function boardLabelForLog(array $meta, int $w, int $h): string
+    {
+        $parts = [];
+        $code = trim((string)($meta['board_code'] ?? ''));
+        $name = trim((string)($meta['board_name'] ?? ''));
+        $label = trim($code . ($name !== '' ? (' · ' . $name) : ''));
+        if ($label !== '') $parts[] = $label;
+
+        $face = trim((string)($meta['face_color_code'] ?? ''));
+        $back = trim((string)($meta['back_color_code'] ?? ''));
+        $colors = $face;
+        if ($back !== '' && $back !== $face) $colors = $colors !== '' ? ($colors . '/' . $back) : $back;
+        if ($colors !== '') $parts[] = 'culori ' . $colors;
+
+        $dimParts = [];
+        if ($h > 0 && $w > 0) $dimParts[] = $h . '×' . $w . ' mm';
+        $stdW = (int)($meta['board_std_width_mm'] ?? 0);
+        $stdH = (int)($meta['board_std_height_mm'] ?? 0);
+        if ($stdW > 0 && $stdH > 0) $dimParts[] = 'std ' . $stdH . '×' . $stdW . ' mm';
+        if ($dimParts) $parts[] = 'dim ' . implode(', ', $dimParts);
+
+        return $parts ? ('Placă: ' . implode(' · ', $parts)) : '';
     }
 
     private static function fmtMoney(float $amount): string
@@ -6189,14 +6243,32 @@ final class ProjectsController
                     'created_by' => Auth::id(),
                 ]);
             }
+            $logW = $w;
+            $logH = $h;
+            if ($consumeMode === 'HALF' && $ptype === 'FULL' && isset($halfH) && $halfH > 0) {
+                $logH = $halfH;
+            }
+            $boardMeta = self::boardMetaForLog($boardId);
+            $boardMeta['piece_width_mm'] = (int)$logW;
+            $boardMeta['piece_height_mm'] = (int)$logH;
+            $boardLabel = self::boardLabelForLog($boardMeta, (int)$logW, (int)$logH);
+
             Audit::log('PROJECT_PRODUCT_HPL_RESERVE', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'HPL alocat pe produs (' . $source . ', ' . $consumeMode . ')',
+                'message' => 'HPL alocat pe produs (' . $source . ', ' . $consumeMode . ')' . ($boardLabel !== '' ? (' · ' . $boardLabel) : ''),
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'stock_piece_id' => (int)$allocPieceId,
                 'board_id' => $boardId,
                 'source' => $source,
                 'consume_mode' => $consumeMode,
+                'piece_width_mm' => (int)$logW,
+                'piece_height_mm' => (int)$logH,
+                'board_code' => (string)($boardMeta['board_code'] ?? ''),
+                'board_name' => (string)($boardMeta['board_name'] ?? ''),
+                'face_color_code' => (string)($boardMeta['face_color_code'] ?? ''),
+                'back_color_code' => (string)($boardMeta['back_color_code'] ?? ''),
+                'board_std_width_mm' => (int)($boardMeta['board_std_width_mm'] ?? 0),
+                'board_std_height_mm' => (int)($boardMeta['board_std_height_mm'] ?? 0),
             ]);
 
             $pdo->commit();
@@ -6374,8 +6446,13 @@ final class ProjectsController
                 }
             }
 
+            $boardMeta = self::boardMetaForLog($boardId);
+            $boardMeta['piece_width_mm'] = (int)$w;
+            $boardMeta['piece_height_mm'] = (int)$h;
+            $boardLabel = self::boardLabelForLog($boardMeta, (int)$w, (int)$h);
+
             Audit::log('PROJECT_PRODUCT_HPL_CONSUME', 'project_product_hpl_consumptions', $cid, null, null, [
-                'message' => 'HPL debitat pe produs.',
+                'message' => 'HPL debitat pe produs.' . ($boardLabel !== '' ? (' · ' . $boardLabel) : ''),
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'board_id' => (int)($c['board_id'] ?? 0),
@@ -6383,15 +6460,31 @@ final class ProjectsController
                 'consumed_piece_id' => (int)$consumedPieceId,
                 'source' => (string)($c['source'] ?? ''),
                 'consume_mode' => (string)($c['consume_mode'] ?? ''),
+                'piece_width_mm' => (int)$w,
+                'piece_height_mm' => (int)$h,
+                'board_code' => (string)($boardMeta['board_code'] ?? ''),
+                'board_name' => (string)($boardMeta['board_name'] ?? ''),
+                'face_color_code' => (string)($boardMeta['face_color_code'] ?? ''),
+                'back_color_code' => (string)($boardMeta['back_color_code'] ?? ''),
+                'board_std_width_mm' => (int)($boardMeta['board_std_width_mm'] ?? 0),
+                'board_std_height_mm' => (int)($boardMeta['board_std_height_mm'] ?? 0),
             ]);
             if ($boardId > 0) {
                 Audit::log('HPL_STOCK_CONSUME', 'hpl_boards', $boardId, null, null, [
-                    'message' => 'Consumat (Debitat) pe produs ' . $prodLabel . ' · Proiect ' . $projLabel,
+                    'message' => 'Consumat (Debitat) pe produs ' . $prodLabel . ' · Proiect ' . $projLabel . ($boardLabel !== '' ? (' · ' . $boardLabel) : ''),
                     'board_id' => $boardId,
                     'project_id' => $projectId,
                     'project_code' => (string)($project['code'] ?? ''),
                     'project_name' => (string)($project['name'] ?? ''),
                     'project_product_id' => $ppId,
+                    'piece_width_mm' => (int)$w,
+                    'piece_height_mm' => (int)$h,
+                    'board_code' => (string)($boardMeta['board_code'] ?? ''),
+                    'board_name' => (string)($boardMeta['board_name'] ?? ''),
+                    'face_color_code' => (string)($boardMeta['face_color_code'] ?? ''),
+                    'back_color_code' => (string)($boardMeta['back_color_code'] ?? ''),
+                    'board_std_width_mm' => (int)($boardMeta['board_std_width_mm'] ?? 0),
+                    'board_std_height_mm' => (int)($boardMeta['board_std_height_mm'] ?? 0),
                 ]);
             }
 

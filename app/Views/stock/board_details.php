@@ -194,6 +194,19 @@ try {
   // ignore - fallback to empty
 }
 
+$boardLabel = trim((string)($board['code'] ?? '') . ' · ' . (string)($board['name'] ?? ''));
+$boardColorCodes = '';
+if (is_array($faceFinish) && !empty($faceFinish['code'])) {
+  $boardColorCodes = (string)$faceFinish['code'];
+}
+if (is_array($backFinish) && !empty($backFinish['code'])) {
+  $backCode = (string)$backFinish['code'];
+  if ($backCode !== '' && $backCode !== $boardColorCodes) {
+    $boardColorCodes = $boardColorCodes !== '' ? ($boardColorCodes . '/' . $backCode) : $backCode;
+  }
+}
+$boardStdDim = ($stdH > 0 && $stdW > 0) ? ($stdH . '×' . $stdW . ' mm') : '';
+
 function _normImg(string $p): string {
   $p = trim($p);
   if ($p === '') return '';
@@ -352,17 +365,25 @@ ob_start();
                 $projId = (is_array($meta) && isset($meta['project_id']) && is_numeric($meta['project_id'])) ? (int)$meta['project_id'] : 0;
                 $projCode = (is_array($meta) && isset($meta['project_code'])) ? (string)$meta['project_code'] : '';
                 $projName = (is_array($meta) && isset($meta['project_name'])) ? (string)$meta['project_name'] : '';
-
-                // Pe pagina plăcii nu repetăm identificarea plăcii (cod/denumire/brand/grosime),
-                // fiindcă sunt deja în "Detalii placă".
-                // Tăiem orice sufix de forma "· Placă: ...".
-                if (str_contains($msg, '· Placă:')) {
-                  $msg = trim(explode('· Placă:', $msg, 2)[0]);
-                }
                 // Mesaje mai scurte pentru acțiuni pe placa însăși
                 if ($action === 'BOARD_CREATE') $msg = 'A creat placa.';
                 if ($action === 'BOARD_UPDATE') $msg = 'A actualizat placa.';
                 if ($action === 'BOARD_DELETE') $msg = 'A șters placa.';
+
+                $pieceDim = '';
+                if (is_array($meta)) {
+                  $ph = isset($meta['piece_height_mm']) ? (int)$meta['piece_height_mm'] : 0;
+                  $pw = isset($meta['piece_width_mm']) ? (int)$meta['piece_width_mm'] : 0;
+                  if ($ph > 0 && $pw > 0) $pieceDim = $ph . '×' . $pw . ' mm';
+                }
+                $extraParts = [];
+                if ($boardLabel !== '') $extraParts[] = 'Placă: ' . $boardLabel;
+                if ($boardColorCodes !== '') $extraParts[] = 'Culori: ' . $boardColorCodes;
+                if ($pieceDim !== '') $extraParts[] = 'Dim: ' . $pieceDim;
+                elseif ($boardStdDim !== '') $extraParts[] = 'Std: ' . $boardStdDim;
+                if ($extraParts && !str_contains($msg, 'Placă:')) {
+                  $msg = trim($msg . ' · ' . implode(' · ', $extraParts));
+                }
               ?>
               <div class="list-group-item px-0">
                 <div class="d-flex justify-content-between gap-2">
@@ -532,6 +553,15 @@ ob_start();
                   } elseif ($ppId > 0 && isset($ppLastLogById[$ppId])) {
                     $who = trim((string)($ppLastLogById[$ppId]['user_name'] ?? '') . ' ' . (string)($ppLastLogById[$ppId]['user_email'] ?? ''));
                     $when = (string)($ppLastLogById[$ppId]['created_at'] ?? '');
+                  }
+
+                  $consumeMeta = '';
+                  if (trim($who) !== '' || trim($when) !== '') {
+                    $consumeMeta = 'Consum: ' . trim($who !== '' ? $who : '') . ($when !== '' ? (' · ' . $when) : '');
+                    $consumeMeta = trim($consumeMeta);
+                  }
+                  if ($consumeMeta !== '') {
+                    $noteShort = $noteShort !== '' ? ($noteShort . "\n" . $consumeMeta) : $consumeMeta;
                   }
                 ?>
                 <tr>
