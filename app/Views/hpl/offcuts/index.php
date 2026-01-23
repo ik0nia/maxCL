@@ -5,8 +5,11 @@ use App\Core\View;
 
 $bucket = (string)($bucket ?? '');
 $scrapOnly = !empty($scrapOnly);
+$showAccounting = !empty($showAccounting);
+$colorId = (int)($colorId ?? 0);
 $counts = $counts ?? ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0, 'scrap' => 0];
 $items = $items ?? [];
+$colors = is_array($colors ?? null) ? $colors : [];
 $u = Auth::user();
 $canUpload = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 
@@ -44,6 +47,24 @@ function _ratioLabel(?float $pct): string {
   return number_format($pct, 0, '.', '') . '% din standard';
 }
 
+function _qs(array $params): string {
+  $parts = [];
+  foreach ($params as $k => $v) {
+    if ($v === null || $v === '' || $v === false) continue;
+    $parts[] = rawurlencode((string)$k) . '=' . rawurlencode((string)$v);
+  }
+  return $parts ? ('?' . implode('&', $parts)) : '';
+}
+
+function _offcutsUrl(string $bucket, bool $scrapOnly, int $colorId, bool $showAccounting): string {
+  $params = [];
+  if ($bucket !== '') $params['bucket'] = $bucket;
+  if ($scrapOnly) $params['scrap'] = '1';
+  if ($colorId > 0) $params['color_id'] = (string)$colorId;
+  if ($showAccounting) $params['accounting'] = '1';
+  return Url::to('/hpl/bucati-rest' . _qs($params));
+}
+
 ob_start();
 ?>
 <div class="app-page-title">
@@ -57,29 +78,68 @@ ob_start();
   <div class="d-flex flex-wrap gap-2 align-items-center">
     <div class="fw-semibold">Filtre:</div>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === '' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest')) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('', false, $colorId, $showAccounting)) ?>">
       Toate <span class="badge text-bg-light ms-1"><?= (int)($counts['all'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'gt_half' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=gt_half')) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('gt_half', false, $colorId, $showAccounting)) ?>">
       &gt; 1/2 <span class="badge text-bg-light ms-1"><?= (int)($counts['gt_half'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'half_to_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=half_to_quarter')) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('half_to_quarter', false, $colorId, $showAccounting)) ?>">
       1/2 – 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['half_to_quarter'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= !$scrapOnly && $bucket === 'lt_quarter' ? 'btn-primary' : 'btn-outline-secondary' ?>"
-       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?bucket=lt_quarter')) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('lt_quarter', false, $colorId, $showAccounting)) ?>">
       &lt; 1/4 <span class="badge text-bg-light ms-1"><?= (int)($counts['lt_quarter'] ?? 0) ?></span>
     </a>
     <a class="btn btn-sm <?= $scrapOnly ? 'btn-danger' : 'btn-outline-danger' ?>"
-       href="<?= htmlspecialchars(Url::to('/hpl/bucati-rest?scrap=1')) ?>">
+       href="<?= htmlspecialchars(_offcutsUrl('', true, $colorId, $showAccounting)) ?>">
       Stricate <span class="badge text-bg-light ms-1"><?= (int)($counts['scrap'] ?? 0) ?></span>
     </a>
+    <form method="get" class="d-flex align-items-center gap-2 ms-2">
+      <?php if ($bucket !== ''): ?><input type="hidden" name="bucket" value="<?= htmlspecialchars($bucket) ?>"><?php endif; ?>
+      <?php if ($scrapOnly): ?><input type="hidden" name="scrap" value="1"><?php endif; ?>
+      <?php if ($colorId > 0): ?><input type="hidden" name="color_id" value="<?= (int)$colorId ?>"><?php endif; ?>
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="toggleAccounting" name="accounting" value="1" <?= $showAccounting ? 'checked' : '' ?>
+               onchange="this.form.submit()">
+        <label class="form-check-label" for="toggleAccounting">Arată stocuri contabile</label>
+      </div>
+    </form>
     <div class="ms-auto text-muted small">
       <?= htmlspecialchars($scrapOnly ? _bucketLabel('scrap') : _bucketLabel($bucket)) ?> · Afișez <strong><?= count($items) ?></strong>
     </div>
   </div>
+  <?php if ($colors): ?>
+    <div class="mt-3">
+      <div class="fw-semibold mb-2">Filtru tip culoare:</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm <?= $colorId <= 0 ? 'btn-primary' : 'btn-outline-secondary' ?>"
+           href="<?= htmlspecialchars(_offcutsUrl($bucket, $scrapOnly, 0, $showAccounting)) ?>">
+          Toate culorile
+        </a>
+        <?php foreach ($colors as $c): ?>
+          <?php
+            $cid = (int)($c['id'] ?? 0);
+            $code = (string)($c['code'] ?? '');
+            $name = (string)($c['name'] ?? '');
+            $thumb = _normImg2((string)($c['thumb'] ?? ''));
+            if ($thumb === '') $thumb = _normImg2((string)($c['image'] ?? ''));
+            $label = $code !== '' ? $code : ($name !== '' ? $name : ('#' . $cid));
+          ?>
+          <a class="btn btn-sm <?= $colorId === $cid ? 'btn-primary' : 'btn-outline-secondary' ?> d-flex align-items-center gap-2"
+             href="<?= htmlspecialchars(_offcutsUrl($bucket, $scrapOnly, $cid, $showAccounting)) ?>"
+             title="<?= htmlspecialchars($name !== '' ? $name : $label) ?>">
+            <?php if ($thumb !== ''): ?>
+              <img src="<?= htmlspecialchars($thumb) ?>" alt="" style="width:26px;height:26px;object-fit:cover;border-radius:8px;border:1px solid #D9E3E6">
+            <?php endif; ?>
+            <span class="fw-semibold"><?= htmlspecialchars($label) ?></span>
+          </a>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endif; ?>
 </div>
 
 <style>
@@ -158,11 +218,13 @@ ob_start();
         $trashInfo = is_array($it['_trash'] ?? null) ? $it['_trash'] : null;
         $uploadAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/photo';
         $trashAction = '/hpl/bucati-rest/' . (int)($it['piece_id'] ?? 0) . '/trash';
-        $qs = [];
-        if ($bucket !== '') $qs[] = 'bucket=' . rawurlencode($bucket);
-        if ($scrapOnly) $qs[] = 'scrap=1';
-        if ($qs) {
-          $qstr = '?' . implode('&', $qs);
+        $qstr = _qs([
+          'bucket' => $bucket !== '' ? $bucket : null,
+          'scrap' => $scrapOnly ? '1' : null,
+          'color_id' => $colorId > 0 ? $colorId : null,
+          'accounting' => $showAccounting ? '1' : null,
+        ]);
+        if ($qstr !== '') {
           $uploadAction .= $qstr;
           $trashAction .= $qstr;
         }

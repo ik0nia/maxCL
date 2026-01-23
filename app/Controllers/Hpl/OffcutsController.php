@@ -24,6 +24,8 @@ final class OffcutsController
     {
         $bucket = isset($_GET['bucket']) ? trim((string)$_GET['bucket']) : '';
         $scrapOnly = isset($_GET['scrap']) && (string)$_GET['scrap'] === '1';
+        $showAccounting = isset($_GET['accounting']) && (string)$_GET['accounting'] === '1';
+        $colorId = isset($_GET['color_id']) ? (int)$_GET['color_id'] : 0;
         if ($bucket !== '' && !in_array($bucket, self::BUCKETS, true)) {
             Response::redirect('/hpl/bucati-rest');
         }
@@ -31,11 +33,57 @@ final class OffcutsController
 
         $rows = HplOffcuts::nonStandardPieces(6000);
 
+        // Filtru: stoc contabil + listă culori disponibile.
+        $colors = [];
+        $filteredRows = [];
+        foreach ($rows as $r) {
+            $isAcc = (int)($r['is_accounting'] ?? 1);
+            if (!$showAccounting && $isAcc === 1) {
+                continue;
+            }
+            $faceId = (int)($r['face_color_id'] ?? 0);
+            $backId = (int)($r['back_color_id'] ?? 0);
+            if ($faceId > 0 && !isset($colors[$faceId])) {
+                $colors[$faceId] = [
+                    'id' => $faceId,
+                    'code' => (string)($r['face_color_code'] ?? ''),
+                    'name' => (string)($r['face_color_name'] ?? ''),
+                    'thumb' => (string)($r['face_thumb_path'] ?? ''),
+                    'image' => (string)($r['face_image_path'] ?? ''),
+                ];
+            }
+            if ($backId > 0 && !isset($colors[$backId])) {
+                $colors[$backId] = [
+                    'id' => $backId,
+                    'code' => (string)($r['back_color_code'] ?? ''),
+                    'name' => (string)($r['back_color_name'] ?? ''),
+                    'thumb' => (string)($r['back_thumb_path'] ?? ''),
+                    'image' => (string)($r['back_image_path'] ?? ''),
+                ];
+            }
+            if ($colorId > 0 && $faceId !== $colorId && $backId !== $colorId) {
+                continue;
+            }
+            $filteredRows[] = $r;
+        }
+
+        if ($colors) {
+            $colors = array_values($colors);
+            usort($colors, function ($a, $b) {
+                $ac = strtolower((string)($a['code'] ?? ''));
+                $bc = strtolower((string)($b['code'] ?? ''));
+                if ($ac === $bc) {
+                    return strcmp((string)($a['name'] ?? ''), (string)($b['name'] ?? ''));
+                }
+                return strcmp($ac, $bc);
+            });
+        }
+
         // Calcul bucket în PHP (mai robust / compat)
         $items = [];
         $counts = ['all' => 0, 'gt_half' => 0, 'half_to_quarter' => 0, 'lt_quarter' => 0, 'scrap' => 0];
 
-        foreach ($rows as $r) {
+        foreach ($filteredRows as $r) {
             $stdW = (int)($r['std_width_mm'] ?? 0);
             $stdH = (int)($r['std_height_mm'] ?? 0);
             $w = (int)($r['width_mm'] ?? 0);
@@ -187,6 +235,9 @@ final class OffcutsController
             'title' => 'Bucăți rest',
             'bucket' => $bucket,
             'scrapOnly' => $scrapOnly,
+            'showAccounting' => $showAccounting,
+            'colorId' => $colorId,
+            'colors' => $colors,
             'counts' => $counts,
             'items' => $items,
         ]);
