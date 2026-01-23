@@ -705,7 +705,7 @@ final class ProjectsController
             if ($qtyA <= 0) continue;
             $unitA = trim((string)($a['unit'] ?? ''));
             $label = $code !== '' ? ($code . ' · ' . ($name !== '' ? $name : 'Accesoriu')) : ($name !== '' ? $name : 'Accesoriu');
-            $accLines[] = $label . ' — ' . self::fmtQty($qtyA) . ($unitA !== '' ? (' ' . $unitA) : '');
+            $accLines[] = $label . ' — ' . self::fmtQty($qtyA, 2) . ($unitA !== '' ? (' ' . $unitA) : '');
         }
         $logo = (string)($company['logo_url'] ?? '');
         if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
@@ -915,7 +915,7 @@ final class ProjectsController
             <th>Denumire</th>
             <th style="width:160px">Dimensiuni</th>
             <th style="width:80px">Cant.</th>
-            <th style="width:110px">Preț/buc</th>
+            <th style="width:110px">Preț/unit</th>
             <th style="width:110px">Total</th>
           </tr>
         </thead>
@@ -978,7 +978,7 @@ final class ProjectsController
             <tr>
               <td><?= $esc($r['code'] ?? '') ?></td>
               <td><?= $esc($r['name'] ?? '') ?></td>
-              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0), 2)) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
               <td><?= $accUp !== null ? $esc(self::fmtMoney($accUp)) : '—' ?></td>
               <td><?= $accTot !== null ? $esc(self::fmtMoney($accTot)) : '—' ?></td>
             </tr>
@@ -1220,7 +1220,7 @@ final class ProjectsController
             <tr>
               <td><?= $esc($r['code'] ?? '') ?></td>
               <td><?= $esc($r['name'] ?? '') ?></td>
-              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0))) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
+              <td><?= $esc(self::fmtQty((float)($r['qty'] ?? 0), 2)) ?><?= !empty($r['unit']) ? (' ' . $esc($r['unit'])) : '' ?></td>
               <td><?= $accUp !== null ? $esc(self::fmtMoney($accUp)) : '—' ?></td>
               <td><?= $accTot !== null ? $esc(self::fmtMoney($accTot)) : '—' ?></td>
             </tr>

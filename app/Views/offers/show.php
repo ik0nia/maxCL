@@ -312,7 +312,7 @@ ob_start();
                   <select class="form-select form-select-sm js-offer-hpl-board" name="board_id" data-placeholder="Caută placă HPL…" style="width:100%"></select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="qty" value="1">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="qty" value="1">
                 </div>
                 <div class="col-6 col-md-2">
                   <select class="form-select form-select-sm" name="consume_mode">
@@ -348,7 +348,7 @@ ob_start();
                     ?>
                     <tr>
                       <td><?= htmlspecialchars((string)($ar['item_code'] ?? '')) ?> · <?= htmlspecialchars((string)($ar['item_name'] ?? '')) ?></td>
-                      <td class="text-end"><?= number_format((float)($ar['qty'] ?? 0), 3, '.', '') ?> <?= htmlspecialchars((string)($ar['unit'] ?? 'buc')) ?></td>
+                      <td class="text-end"><?= number_format((float)($ar['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($ar['unit'] ?? 'buc')) ?></td>
                       <td class="text-end"><?= number_format($unitPrice, 2, '.', '') ?></td>
                       <td class="text-end fw-semibold"><?= number_format($lineTotal, 2, '.', '') ?></td>
                       <td class="text-end">

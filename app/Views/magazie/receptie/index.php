@@ -59,7 +59,26 @@ ob_start();
                   <input class="form-control text-end" type="number" name="qty[]" required min="0.001" step="0.001" value="1">
                 </td>
                 <td>
-                  <input class="form-control" name="unit[]" required maxlength="16" value="buc" list="magazieUnits">
+                  <select class="form-select" name="unit[]" required>
+                    <option value="buc" selected>buc</option>
+                    <option value="set">set</option>
+                    <option value="bax">bax</option>
+                    <option value="pachet">pachet</option>
+                    <option value="cutie">cutie</option>
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="mg">mg</option>
+                    <option value="ml">ml</option>
+                    <option value="mililitru">mililitru</option>
+                    <option value="l">l</option>
+                    <option value="litru">litru</option>
+                    <option value="m">m</option>
+                    <option value="metri liniari">metri liniari</option>
+                    <option value="m2">m2</option>
+                    <option value="m3">m3</option>
+                    <option value="cm">cm</option>
+                    <option value="mm">mm</option>
+                  </select>
                 </td>
                 <td class="text-end">
                   <input class="form-control text-end" name="unit_price[]" required placeholder="0.00">
@@ -78,14 +97,6 @@ ob_start();
             <i class="bi bi-plus-lg me-1"></i> Adaugă poziție
           </button>
         </div>
-        <datalist id="magazieUnits">
-          <option value="buc"></option>
-          <option value="set"></option>
-          <option value="m"></option>
-          <option value="m2"></option>
-          <option value="kg"></option>
-          <option value="l"></option>
-        </datalist>
         <div class="text-muted small mt-2">Unitatea este implicit <span class="fw-semibold">buc</span>, dar poate fi modificată pe fiecare linie.</div>
       </div>
 
@@ -120,7 +131,7 @@ ob_start();
             tr.querySelectorAll('input').forEach(function(inp){ inp.value = ''; });
             const qty = tr.querySelector('input[name="qty[]"]');
             if (qty) qty.value = '1';
-            const unit = tr.querySelector('input[name="unit[]"]');
+            const unit = tr.querySelector('select[name="unit[]"]');
             if (unit) unit.value = 'buc';
             return;
           }
@@ -139,7 +150,7 @@ ob_start();
         tr.querySelectorAll('input').forEach(function(inp){ inp.value = ''; });
         const qty = tr.querySelector('input[name="qty[]"]');
         if (qty) qty.value = '1';
-        const unit = tr.querySelector('input[name="unit[]"]');
+        const unit = tr.querySelector('select[name="unit[]"]');
         if (unit) unit.value = 'buc';
         const rm = tr.querySelector('.mag-remove');
         if (rm) bindRemove(rm);

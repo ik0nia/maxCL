@@ -272,7 +272,7 @@ ob_start();
                   —
                 <?php endif; ?>
               </td>
-              <td class="text-end fw-semibold"><?= number_format($qty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+              <td class="text-end fw-semibold"><?= number_format($qty, 2, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
               <td class="text-end fw-semibold"><?= $val !== null ? number_format((float)$val, 2, '.', '') . ' lei' : '—' ?></td>
               <td class="text-muted small"><?= htmlspecialchars($note) ?></td>
               <td class="text-muted small"><?= htmlspecialchars($user !== '' ? $user : '—') ?></td>
@@ -312,7 +312,7 @@ ob_start();
                   <?= htmlspecialchars($itemTxt) ?>
                 </a>
               </td>
-              <td class="text-end fw-semibold"><?= number_format($sumQty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+              <td class="text-end fw-semibold"><?= number_format($sumQty, 2, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
               <td class="text-end fw-semibold"><?= $hasVal ? (number_format($sumVal, 2, '.', '') . ' lei') : '—' ?></td>
               <td class="text-end text-muted"><?= (int)($r['rows'] ?? 0) ?></td>
             </tr>

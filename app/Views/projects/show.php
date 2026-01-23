@@ -901,7 +901,7 @@ ob_start();
                             <thead>
                               <tr class="text-muted small">
                                 <th>Accesoriu</th>
-                                <th style="width:110px" class="text-end">Buc</th>
+                                <th style="width:130px" class="text-end">Cantitate</th>
                                 <?php if ($canSeePricesRole): ?>
                                   <th style="width:140px" class="text-end js-price d-none">Preț</th>
                                 <?php endif; ?>
@@ -935,11 +935,11 @@ ob_start();
                                       <span class="badge rounded-pill bg-light text-secondary-emphasis ms-1">fără deviz</span>
                                     <?php endif; ?>
                                   </td>
-                                  <td class="text-end fw-semibold"><?= number_format($aq, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+                                  <td class="text-end fw-semibold"><?= number_format($aq, 2, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
                                   <?php if ($canSeePricesRole): ?>
                                     <td class="text-end js-price d-none">
                                       <?php if ($up !== null): ?>
-                                        <?= number_format((float)$up, 2, '.', '') ?> × <?= number_format((float)$aq, 3, '.', '') ?>
+                                        <?= number_format((float)$up, 2, '.', '') ?> × <?= number_format((float)$aq, 2, '.', '') ?>
                                         = <span class="fw-semibold"><?= number_format((float)$val, 2, '.', '') ?> lei</span>
                                       <?php else: ?>
                                         <span class="text-muted">—</span>
@@ -953,8 +953,8 @@ ob_start();
                                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                           <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
                                           <input type="hidden" name="include_in_deviz" value="0">
-                                          <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty"
-                                                 value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>" style="width:92px">
+                                          <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="qty"
+                                                 value="<?= htmlspecialchars(number_format((float)$aq, 2, '.', '')) ?>" style="width:92px">
                                           <label class="form-check m-0 d-flex align-items-center gap-1">
                                             <input class="form-check-input m-0" type="checkbox" name="include_in_deviz_flag" value="1" <?= $showDeviz ? 'checked' : '' ?>>
                                             <span class="small text-muted">Deviz</span>
@@ -965,7 +965,7 @@ ob_start();
                                               onsubmit="return confirm('Renunți la acest accesoriu rezervat pe produs?');">
                                           <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                           <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
-                                          <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>">
+                                          <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 2, '.', '')) ?>">
                                           <button class="btn btn-outline-danger btn-sm" type="submit">Renunță</button>
                                         </form>
                                       </div>
@@ -974,7 +974,7 @@ ob_start();
                                             onsubmit="return confirm('Renunți la acest accesoriu rezervat pe produs?');">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
                                         <input type="hidden" name="src" value="<?= htmlspecialchars($srcTag) ?>">
-                                        <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 3, '.', '')) ?>">
+                                        <input type="hidden" name="qty" value="<?= htmlspecialchars(number_format((float)$aq, 2, '.', '')) ?>">
                                         <button class="btn btn-outline-danger btn-sm" type="submit">Renunță</button>
                                       </form>
                                     <?php else: ?>
@@ -1424,7 +1424,7 @@ ob_start();
                           </div>
                           <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold mb-1">Cantitate</label>
-                            <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty" value="1" required>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="qty" value="1" required>
                           </div>
                           <div class="col-12">
                             <input type="hidden" name="include_in_deviz" value="0">
@@ -1671,7 +1671,7 @@ ob_start();
             if (!$m) return '—';
             $parts = [];
             foreach ($m as $u => $q) {
-              $parts[] = number_format((float)$q, 3, '.', '') . ' ' . (string)$u;
+              $parts[] = number_format((float)$q, 2, '.', '') . ' ' . (string)$u;
             }
             return implode(', ', $parts);
           };
@@ -1727,8 +1727,8 @@ ob_start();
                             </div>
                             <div class="text-muted small"><?= htmlspecialchars($unit) ?></div>
                           </td>
-                          <td class="text-end"><?= $qc > 0 ? number_format($qc, 3, '.', '') . ' ' . htmlspecialchars($unit) : '—' ?></td>
-                          <td class="text-end"><?= $qr > 0 ? number_format($qr, 3, '.', '') . ' ' . htmlspecialchars($unit) : '—' ?></td>
+                          <td class="text-end"><?= $qc > 0 ? number_format($qc, 2, '.', '') . ' ' . htmlspecialchars($unit) : '—' ?></td>
+                          <td class="text-end"><?= $qr > 0 ? number_format($qr, 2, '.', '') . ' ' . htmlspecialchars($unit) : '—' ?></td>
                           <td class="text-end"><?= number_format($price, 2, '.', '') ?></td>
                           <td class="text-end fw-semibold"><?= number_format($val, 2, '.', '') ?> lei</td>
                         </tr>
@@ -1804,7 +1804,7 @@ ob_start();
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Cantitate</label>
-              <input class="form-control" type="number" step="0.001" min="0.001" name="qty" value="1">
+              <input class="form-control" type="number" step="0.01" min="0.01" name="qty" value="1">
             </div>
             <input type="hidden" name="mode" value="RESERVED">
             <div class="col-12 col-md-6">
@@ -1929,7 +1929,7 @@ ob_start();
                           <div class="text-muted small">Consum la proiect</div>
                         <?php endif; ?>
                       </td>
-                      <td class="text-end fw-semibold"><?= number_format((float)($c['qty'] ?? 0), 3, '.', '') ?> <?= htmlspecialchars((string)($c['unit'] ?? '')) ?></td>
+                      <td class="text-end fw-semibold"><?= number_format((float)($c['qty'] ?? 0), 2, '.', '') ?> <?= htmlspecialchars((string)($c['unit'] ?? '')) ?></td>
                       <td><?= htmlspecialchars((string)($c['mode'] ?? '')) ?></td>
                       <td class="text-muted"><?= htmlspecialchars((string)($c['note'] ?? '')) ?></td>
                       <td class="text-end">
@@ -1958,7 +1958,7 @@ ob_start();
                             <input type="hidden" name="consum_tab" value="accesorii">
                             <div class="col-6 col-md-2">
                               <label class="form-label fw-semibold mb-1">Cant</label>
-                              <input class="form-control form-control-sm" type="number" step="0.001" min="0.001" name="qty" value="<?= htmlspecialchars((string)($c['qty'] ?? '')) ?>">
+                              <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="qty" value="<?= htmlspecialchars((string)($c['qty'] ?? '')) ?>">
                             </div>
                             <div class="col-6 col-md-2">
                               <label class="form-label fw-semibold mb-1">Unit</label>
