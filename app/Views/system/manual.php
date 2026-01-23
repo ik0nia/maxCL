@@ -638,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.12</strong> – Header proiect afisat mare, verde, cu ID si titlu.</li>
         <li><strong>v1.0.11</strong> – Deschiderea proiectului merge direct pe tabul Produse.</li>
         <li><strong>v1.0.10</strong> – Filtre range (min/max) pentru lungime si latime cu etichete dedicate.</li>
         <li><strong>v1.0.9</strong> – Filtre lungime/latime la Bucati rest + ascundere buton scoatere pentru stocabile.</li>
