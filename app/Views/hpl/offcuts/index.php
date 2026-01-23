@@ -24,6 +24,16 @@ $lengthMinVal = $lengthMin !== null ? (int)$lengthMin : ($lengthRangeMin !== nul
 $lengthMaxVal = $lengthMax !== null ? (int)$lengthMax : ($lengthRangeMax !== null ? (int)$lengthRangeMax : '');
 $widthMinVal = $widthMin !== null ? (int)$widthMin : ($widthRangeMin !== null ? (int)$widthRangeMin : '');
 $widthMaxVal = $widthMax !== null ? (int)$widthMax : ($widthRangeMax !== null ? (int)$widthRangeMax : '');
+$lengthRangeMinVal = $lengthRangeMin !== null ? (int)$lengthRangeMin : 0;
+$lengthRangeMaxVal = $lengthRangeMax !== null ? (int)$lengthRangeMax : 0;
+$widthRangeMinVal = $widthRangeMin !== null ? (int)$widthRangeMin : 0;
+$widthRangeMaxVal = $widthRangeMax !== null ? (int)$widthRangeMax : 0;
+$lengthRangeReady = ($lengthRangeMin !== null && $lengthRangeMax !== null);
+$widthRangeReady = ($widthRangeMin !== null && $widthRangeMax !== null);
+$lengthMinLabel = ($lengthMinVal === '' ? '—' : (string)$lengthMinVal);
+$lengthMaxLabel = ($lengthMaxVal === '' ? '—' : (string)$lengthMaxVal);
+$widthMinLabel = ($widthMinVal === '' ? '—' : (string)$widthMinVal);
+$widthMaxLabel = ($widthMaxVal === '' ? '—' : (string)$widthMaxVal);
 
 function _normImg2(string $p): string {
   $p = trim($p);
@@ -176,41 +186,49 @@ ob_start();
     <?php if ($showAccounting): ?><input type="hidden" name="accounting" value="1"><?php endif; ?>
     <div>
       <label class="form-label small mb-1">Lungime (mm)</label>
-      <div class="input-group input-group-sm">
-        <span class="input-group-text">min</span>
-        <input type="number"
-               class="form-control form-control-sm"
-               name="length_min"
-               value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
-               <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
-               <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
-        <span class="input-group-text">max</span>
-        <input type="number"
-               class="form-control form-control-sm"
-               name="length_max"
-               value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
-               <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
-               <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
+      <div class="small text-muted d-flex justify-content-between">
+        <span>min: <strong class="js-length-min-label"><?= htmlspecialchars($lengthMinLabel) ?></strong></span>
+        <span>max: <strong class="js-length-max-label"><?= htmlspecialchars($lengthMaxLabel) ?></strong></span>
       </div>
+      <input type="range"
+             class="form-range"
+             name="length_min"
+             id="lengthMinRange"
+             value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
+             min="<?= (int)$lengthRangeMinVal ?>"
+             max="<?= (int)$lengthRangeMaxVal ?>"
+             <?= $lengthRangeReady ? '' : 'disabled' ?>>
+      <input type="range"
+             class="form-range mt-1"
+             name="length_max"
+             id="lengthMaxRange"
+             value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
+             min="<?= (int)$lengthRangeMinVal ?>"
+             max="<?= (int)$lengthRangeMaxVal ?>"
+             <?= $lengthRangeReady ? '' : 'disabled' ?>>
     </div>
     <div>
       <label class="form-label small mb-1">Latime (mm)</label>
-      <div class="input-group input-group-sm">
-        <span class="input-group-text">min</span>
-        <input type="number"
-               class="form-control form-control-sm"
-               name="width_min"
-               value="<?= htmlspecialchars((string)$widthMinVal) ?>"
-               <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
-               <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
-        <span class="input-group-text">max</span>
-        <input type="number"
-               class="form-control form-control-sm"
-               name="width_max"
-               value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
-               <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
-               <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
+      <div class="small text-muted d-flex justify-content-between">
+        <span>min: <strong class="js-width-min-label"><?= htmlspecialchars($widthMinLabel) ?></strong></span>
+        <span>max: <strong class="js-width-max-label"><?= htmlspecialchars($widthMaxLabel) ?></strong></span>
       </div>
+      <input type="range"
+             class="form-range"
+             name="width_min"
+             id="widthMinRange"
+             value="<?= htmlspecialchars((string)$widthMinVal) ?>"
+             min="<?= (int)$widthRangeMinVal ?>"
+             max="<?= (int)$widthRangeMaxVal ?>"
+             <?= $widthRangeReady ? '' : 'disabled' ?>>
+      <input type="range"
+             class="form-range mt-1"
+             name="width_max"
+             id="widthMaxRange"
+             value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
+             min="<?= (int)$widthRangeMinVal ?>"
+             max="<?= (int)$widthRangeMaxVal ?>"
+             <?= $widthRangeReady ? '' : 'disabled' ?>>
     </div>
     <button class="btn btn-sm btn-primary" type="submit">Aplică</button>
   </form>
@@ -468,6 +486,44 @@ ob_start();
         el.style.width = wp + '%';
         el.style.height = hp + '%';
       });
+
+      function bindRangePair(minEl, maxEl, minLabelEl, maxLabelEl) {
+        if (!minEl || !maxEl) return;
+        function readVal(el) {
+          const v = parseInt(el.value || '0', 10);
+          return isFinite(v) ? v : 0;
+        }
+        function syncLabels() {
+          if (minLabelEl) minLabelEl.textContent = String(readVal(minEl));
+          if (maxLabelEl) maxLabelEl.textContent = String(readVal(maxEl));
+        }
+        minEl.addEventListener('input', function() {
+          const minVal = readVal(minEl);
+          const maxVal = readVal(maxEl);
+          if (minVal > maxVal) maxEl.value = String(minVal);
+          syncLabels();
+        });
+        maxEl.addEventListener('input', function() {
+          const minVal = readVal(minEl);
+          const maxVal = readVal(maxEl);
+          if (maxVal < minVal) minEl.value = String(maxVal);
+          syncLabels();
+        });
+        syncLabels();
+      }
+
+      bindRangePair(
+        document.getElementById('lengthMinRange'),
+        document.getElementById('lengthMaxRange'),
+        document.querySelector('.js-length-min-label'),
+        document.querySelector('.js-length-max-label')
+      );
+      bindRangePair(
+        document.getElementById('widthMinRange'),
+        document.getElementById('widthMaxRange'),
+        document.querySelector('.js-width-min-label'),
+        document.querySelector('.js-width-max-label')
+      );
 
       // Click pe card -> intră în pagina de stoc a materialului (plăcii).
       document.querySelectorAll('.js-card-link[data-href]').forEach(function(card){
