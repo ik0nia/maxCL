@@ -337,6 +337,14 @@ ob_start();
         <li><strong>Contine:</strong> lista bucati rest si statusul lor.</li>
         <li><strong>Foloseste-o pentru:</strong> identificarea rapida a pieselor reutilizabile.</li>
       </ul>
+      <div class="mt-2">
+        <div class="fw-semibold">Filtre disponibile</div>
+        <ul class="mb-0">
+          <li>Bucket (dimensiune fata de placa standard) si Stricate.</li>
+          <li>Toggle pentru stocuri contabile (implicit ascunse).</li>
+          <li>Filtru tip culoare (thumbnail + cod) – filtreaza atat fata cat si verso.</li>
+        </ul>
+      </div>
 
       <h3 id="basic-hpl-piese-interne" class="h6 mt-3">Adauga placi nestocabile</h3>
       <p class="mb-2">Introduci piese interne care nu intra in totalurile de stoc.</p>
@@ -538,6 +546,7 @@ ob_start();
         <li><strong>Rezervare</strong> – o piesa se poate aloca unui proiect.</li>
         <li><strong>Consum</strong> – piesele trec in status consumat la debitare.</li>
         <li><strong>Retur</strong> – resturile pot fi reintroduse in stoc.</li>
+        <li><strong>Debitare 1/2</strong> – la consum half, se cere lungimea reala a restului (minim jumatate din placa standard).</li>
       </ul>
     </div>
 
@@ -623,6 +632,8 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.5</strong> – Filtre noi la Bucati rest (toggle stoc contabil + tip culoare cu thumbnail).</li>
+        <li><strong>v1.0.4</strong> – Debitare 1/2: popup pentru lungimea reala a restului reintrat in stoc.</li>
         <li><strong>v1.0.3</strong> – Unitati de masura pentru accesoriile din magazie.</li>
         <li><strong>v1.0.2</strong> – Documentatie completa pentru cautarea globala (topnav) si indexare.</li>
         <li><strong>v1.0.1</strong> – Telefonul si emailul clientului sunt optionale la crearea ofertelor si proiectelor.</li>
@@ -964,6 +975,7 @@ ob_start();
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
   </table>
+  <div class="text-muted small mb-3">La debitare (butonul "Debitat") pentru consum <code>HALF</code>, aplicatia cere lungimea reala a restului care reintra in stoc. Valoarea nu poate fi mai mica decat jumatate din lungimea standard.</div>
 
   <h4 class="h6 mt-3">Formular: Adauga piesa in stoc</h4>
   <p class="text-muted">Ruta: <code>POST /stock/boards/{id}/pieces/add</code></p>
@@ -1013,6 +1025,7 @@ ob_start();
   <h3 class="h6 mt-4" id="hpl-offcuts">5.5 Bucati rest</h3>
   <ul>
     <li>Ruta: <code>GET /hpl/bucati-rest</code> (filtre bucket/scrap).</li>
+    <li>Filtre noi: <code>accounting=1</code> (toggle stoc contabil) si <code>color_id</code> (tip culoare, fata sau verso).</li>
     <li>Afiseaza piese OFFCUT (contabile + interne).</li>
     <li>Audit: <code>HPL_STOCK_TRASH</code>, <code>FILE_UPLOAD</code>.</li>
   </ul>
