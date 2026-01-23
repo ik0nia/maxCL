@@ -175,40 +175,42 @@ ob_start();
     <?php if ($colorId > 0): ?><input type="hidden" name="color_id" value="<?= (int)$colorId ?>"><?php endif; ?>
     <?php if ($showAccounting): ?><input type="hidden" name="accounting" value="1"><?php endif; ?>
     <div>
-      <label class="form-label small mb-1">Lungime min (mm)</label>
-      <input type="number"
-             class="form-control form-control-sm"
-             name="length_min"
-             value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
-             <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
-             <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
+      <label class="form-label small mb-1">Lungime (mm)</label>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">min</span>
+        <input type="number"
+               class="form-control form-control-sm"
+               name="length_min"
+               value="<?= htmlspecialchars((string)$lengthMinVal) ?>"
+               <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
+               <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
+        <span class="input-group-text">max</span>
+        <input type="number"
+               class="form-control form-control-sm"
+               name="length_max"
+               value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
+               <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
+               <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
+      </div>
     </div>
     <div>
-      <label class="form-label small mb-1">Lungime max (mm)</label>
-      <input type="number"
-             class="form-control form-control-sm"
-             name="length_max"
-             value="<?= htmlspecialchars((string)$lengthMaxVal) ?>"
-             <?= $lengthRangeMin !== null ? 'min="' . (int)$lengthRangeMin . '"' : '' ?>
-             <?= $lengthRangeMax !== null ? 'max="' . (int)$lengthRangeMax . '"' : '' ?>>
-    </div>
-    <div>
-      <label class="form-label small mb-1">Lățime min (mm)</label>
-      <input type="number"
-             class="form-control form-control-sm"
-             name="width_min"
-             value="<?= htmlspecialchars((string)$widthMinVal) ?>"
-             <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
-             <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
-    </div>
-    <div>
-      <label class="form-label small mb-1">Lățime max (mm)</label>
-      <input type="number"
-             class="form-control form-control-sm"
-             name="width_max"
-             value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
-             <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
-             <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
+      <label class="form-label small mb-1">Latime (mm)</label>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">min</span>
+        <input type="number"
+               class="form-control form-control-sm"
+               name="width_min"
+               value="<?= htmlspecialchars((string)$widthMinVal) ?>"
+               <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
+               <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
+        <span class="input-group-text">max</span>
+        <input type="number"
+               class="form-control form-control-sm"
+               name="width_max"
+               value="<?= htmlspecialchars((string)$widthMaxVal) ?>"
+               <?= $widthRangeMin !== null ? 'min="' . (int)$widthRangeMin . '"' : '' ?>
+               <?= $widthRangeMax !== null ? 'max="' . (int)$widthRangeMax . '"' : '' ?>>
+      </div>
     </div>
     <button class="btn btn-sm btn-primary" type="submit">Aplică</button>
   </form>
