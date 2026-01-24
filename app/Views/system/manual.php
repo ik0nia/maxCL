@@ -638,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.15</strong> – Adrese livrare: opțiuni Ridicare de la depozit / Ridicare din magazinul Malinco.</li>
         <li><strong>v1.0.14</strong> – Stoc HPL: sync WinMentor + coloana Stoc Actual Mentor (doar Admin).</li>
         <li><strong>v1.0.13</strong> – Proiecte: eliminare prioritate + coloana Zile rămase (blocată la livrat complet).</li>
         <li><strong>v1.0.12</strong> – Header proiect afisat mare, verde, cu ID si titlu.</li>
@@ -1495,7 +1496,7 @@ ob_start();
     </thead>
     <tbody>
       <tr><td>Firma facturare</td><td>invoice_client_id</td><td>select</td><td>client existent</td><td>project_products.invoice_client_id</td><td>Validat contra clients.</td></tr>
-      <tr><td>Adresa livrare</td><td>delivery_address_id</td><td>select</td><td>Adresa apartine clientului</td><td>project_products.delivery_address_id</td><td>Validat contra client_addresses.</td></tr>
+      <tr><td>Adresa livrare</td><td>delivery_address_id</td><td>select</td><td>Adresa apartine clientului</td><td>project_products.delivery_address_id</td><td>Include optiuni: Ridicare de la depozit / Ridicare din magazinul Malinco.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
   </table>
