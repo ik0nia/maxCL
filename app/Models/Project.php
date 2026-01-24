@@ -8,6 +8,26 @@ use PDO;
 
 final class Project
 {
+    /** @var array<string,bool> */
+    private static array $colCache = [];
+
+    private static function hasColumn(string $name): bool
+    {
+        if (array_key_exists($name, self::$colCache)) {
+            return self::$colCache[$name];
+        }
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        try {
+            $st = $pdo->prepare("SHOW COLUMNS FROM projects LIKE ?");
+            $st->execute([$name]);
+            $ok = (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
+        self::$colCache[$name] = $ok;
+        return $ok;
+    }
     private static function isUnknownColumn(\Throwable $e, string $col): bool
     {
         $m = strtolower($e->getMessage());
@@ -178,13 +198,23 @@ final class Project
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            INSERT INTO projects
-              (code, name, description, category, status, priority, start_date, due_date, days_remaining_locked, notes, technical_notes, tags, client_id, client_group_id, allocation_mode, allocations_locked, created_by)
-            VALUES
-              (:code, :name, :description, :category, :status, :priority, :start_date, :due_date, :days_remaining_locked, :notes, :technical_notes, :tags, :client_id, :client_group_id, :allocation_mode, :allocations_locked, :created_by)
-        ');
-        $st->execute([
+        $hasDays = self::hasColumn('days_remaining_locked');
+        if ($hasDays) {
+            $st = $pdo->prepare('
+                INSERT INTO projects
+                  (code, name, description, category, status, priority, start_date, due_date, days_remaining_locked, notes, technical_notes, tags, client_id, client_group_id, allocation_mode, allocations_locked, created_by)
+                VALUES
+                  (:code, :name, :description, :category, :status, :priority, :start_date, :due_date, :days_remaining_locked, :notes, :technical_notes, :tags, :client_id, :client_group_id, :allocation_mode, :allocations_locked, :created_by)
+            ');
+        } else {
+            $st = $pdo->prepare('
+                INSERT INTO projects
+                  (code, name, description, category, status, priority, start_date, due_date, notes, technical_notes, tags, client_id, client_group_id, allocation_mode, allocations_locked, created_by)
+                VALUES
+                  (:code, :name, :description, :category, :status, :priority, :start_date, :due_date, :notes, :technical_notes, :tags, :client_id, :client_group_id, :allocation_mode, :allocations_locked, :created_by)
+            ');
+        }
+        $params = [
             ':code' => trim((string)($data['code'] ?? '')),
             ':name' => trim((string)($data['name'] ?? '')),
             ':description' => $data['description'] ?? null,
@@ -193,7 +223,6 @@ final class Project
             ':priority' => (int)($data['priority'] ?? 0),
             ':start_date' => $data['start_date'] ?? null,
             ':due_date' => $data['due_date'] ?? null,
-            ':days_remaining_locked' => $data['days_remaining_locked'] ?? null,
             ':notes' => $data['notes'] ?? null,
             ':technical_notes' => $data['technical_notes'] ?? null,
             ':tags' => $data['tags'] ?? null,
@@ -202,7 +231,11 @@ final class Project
             ':allocation_mode' => (string)($data['allocation_mode'] ?? 'by_area'),
             ':allocations_locked' => (int)($data['allocations_locked'] ?? 0),
             ':created_by' => $data['created_by'] ?? null,
-        ]);
+        ];
+        if ($hasDays) {
+            $params[':days_remaining_locked'] = $data['days_remaining_locked'] ?? null;
+        }
+        $st->execute($params);
         return (int)$pdo->lastInsertId();
     }
 
@@ -213,29 +246,54 @@ final class Project
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('
-            UPDATE projects SET
-              code=:code,
-              name=:name,
-              description=:description,
-              category=:category,
-              status=:status,
-              priority=:priority,
-              start_date=:start_date,
-              due_date=:due_date,
-              days_remaining_locked=:days_remaining_locked,
-              completed_at=:completed_at,
-              cancelled_at=:cancelled_at,
-              notes=:notes,
-              technical_notes=:technical_notes,
-              tags=:tags,
-              client_id=:client_id,
-              client_group_id=:client_group_id,
-              allocation_mode=:allocation_mode,
-              allocations_locked=:allocations_locked
-            WHERE id=:id
-        ');
-        $st->execute([
+        $hasDays = self::hasColumn('days_remaining_locked');
+        if ($hasDays) {
+            $st = $pdo->prepare('
+                UPDATE projects SET
+                  code=:code,
+                  name=:name,
+                  description=:description,
+                  category=:category,
+                  status=:status,
+                  priority=:priority,
+                  start_date=:start_date,
+                  due_date=:due_date,
+                  days_remaining_locked=:days_remaining_locked,
+                  completed_at=:completed_at,
+                  cancelled_at=:cancelled_at,
+                  notes=:notes,
+                  technical_notes=:technical_notes,
+                  tags=:tags,
+                  client_id=:client_id,
+                  client_group_id=:client_group_id,
+                  allocation_mode=:allocation_mode,
+                  allocations_locked=:allocations_locked
+                WHERE id=:id
+            ');
+        } else {
+            $st = $pdo->prepare('
+                UPDATE projects SET
+                  code=:code,
+                  name=:name,
+                  description=:description,
+                  category=:category,
+                  status=:status,
+                  priority=:priority,
+                  start_date=:start_date,
+                  due_date=:due_date,
+                  completed_at=:completed_at,
+                  cancelled_at=:cancelled_at,
+                  notes=:notes,
+                  technical_notes=:technical_notes,
+                  tags=:tags,
+                  client_id=:client_id,
+                  client_group_id=:client_group_id,
+                  allocation_mode=:allocation_mode,
+                  allocations_locked=:allocations_locked
+                WHERE id=:id
+            ');
+        }
+        $params = [
             ':id' => $id,
             ':code' => trim((string)($data['code'] ?? '')),
             ':name' => trim((string)($data['name'] ?? '')),
@@ -245,7 +303,6 @@ final class Project
             ':priority' => (int)($data['priority'] ?? 0),
             ':start_date' => $data['start_date'] ?? null,
             ':due_date' => $data['due_date'] ?? null,
-            ':days_remaining_locked' => $data['days_remaining_locked'] ?? null,
             ':completed_at' => $data['completed_at'] ?? null,
             ':cancelled_at' => $data['cancelled_at'] ?? null,
             ':notes' => $data['notes'] ?? null,
@@ -255,7 +312,11 @@ final class Project
             ':client_group_id' => $data['client_group_id'] ?? null,
             ':allocation_mode' => (string)($data['allocation_mode'] ?? 'by_area'),
             ':allocations_locked' => (int)($data['allocations_locked'] ?? 0),
-        ]);
+        ];
+        if ($hasDays) {
+            $params[':days_remaining_locked'] = $data['days_remaining_locked'] ?? null;
+        }
+        $st->execute($params);
     }
 
     public static function updateSourceOffer(int $id, ?int $offerId): void
