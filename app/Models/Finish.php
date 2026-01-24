@@ -197,6 +197,20 @@ final class Finish
         if ($code === '') return null;
         /** @var PDO $pdo */
         $pdo = DB::pdo();
+        if (self::hasColumn('color_code')) {
+            $codeNoSpace = str_replace(' ', '', $code);
+            $st = $pdo->prepare("
+                SELECT * FROM finishes
+                WHERE code = ?
+                   OR color_code = ?
+                   OR REPLACE(code, ' ', '') = ?
+                   OR REPLACE(COALESCE(color_code,''), ' ', '') = ?
+                LIMIT 1
+            ");
+            $st->execute([$code, $code, $codeNoSpace, $codeNoSpace]);
+            $r = $st->fetch();
+            return $r ?: null;
+        }
         $st = $pdo->prepare('SELECT * FROM finishes WHERE code = ? LIMIT 1');
         $st->execute([$code]);
         $r = $st->fetch();
