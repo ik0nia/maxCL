@@ -1474,7 +1474,12 @@ ob_start();
                                     $addrId = (int)($addrRow['id'] ?? 0);
                                     $addrLabel = trim((string)($addrRow['label'] ?? ''));
                                     $addrText = trim((string)($addrRow['address'] ?? ''));
-                                    $addrFull = trim($addrLabel !== '' ? ($addrLabel . ' · ' . $addrText) : $addrText);
+                                    if ($addrLabel !== '' && $addrText !== '' && $addrLabel !== $addrText) {
+                                      $addrFull = $addrLabel . ' · ' . $addrText;
+                                    } else {
+                                      $addrFull = $addrLabel !== '' ? $addrLabel : $addrText;
+                                    }
+                                    $addrFull = trim($addrFull);
                                   ?>
                                   <option value="<?= $addrId ?>" <?= $addrId > 0 && $addrId === (int)$defaultAddrId ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($addrFull !== '' ? $addrFull : ('Adresă #' . $addrId)) ?>
