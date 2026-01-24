@@ -638,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.16</strong> – Stoc HPL: filtrul de culoare include și codul de culoare (față/verso).</li>
         <li><strong>v1.0.15</strong> – Adrese livrare: opțiuni Ridicare de la depozit / Ridicare din magazinul Malinco.</li>
         <li><strong>v1.0.14</strong> – Stoc HPL: sync WinMentor + coloana Stoc Actual Mentor (doar Admin).</li>
         <li><strong>v1.0.13</strong> – Proiecte: eliminare prioritate + coloana Zile rămase (blocată la livrat complet).</li>
