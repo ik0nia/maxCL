@@ -8,15 +8,76 @@ use PDO;
 
 final class ClientAddress
 {
+    private const PICKUP_OPTIONS = [
+        ['label' => 'Ridicare de la depozit', 'address' => 'Ridicare de la depozit'],
+        ['label' => 'Ridicare din magazinul Malinco', 'address' => 'Ridicare din magazinul Malinco'],
+    ];
+
+    private static function isPickupRow(array $row): bool
+    {
+        $label = trim((string)($row['label'] ?? ''));
+        $address = trim((string)($row['address'] ?? ''));
+        foreach (self::PICKUP_OPTIONS as $opt) {
+            if ($label === $opt['label'] || $address === $opt['address']) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function ensurePickupOptions(int $clientId): void
+    {
+        if ($clientId <= 0) return;
+        /** @var PDO $pdo */
+        $pdo = DB::pdo();
+        $st = $pdo->prepare('SELECT label, address FROM client_addresses WHERE client_id = ?');
+        $st->execute([$clientId]);
+        $rows = $st->fetchAll();
+        $existing = [];
+        foreach ($rows as $r) {
+            $label = trim((string)($r['label'] ?? ''));
+            if ($label !== '') $existing[$label] = true;
+            $addr = trim((string)($r['address'] ?? ''));
+            if ($addr !== '') $existing[$addr] = true;
+        }
+        foreach (self::PICKUP_OPTIONS as $opt) {
+            if (isset($existing[$opt['label']]) || isset($existing[$opt['address']])) {
+                continue;
+            }
+            $pdo->prepare('
+                INSERT INTO client_addresses (client_id, label, address, notes, is_default)
+                VALUES (:client_id, :label, :address, :notes, 0)
+            ')->execute([
+                ':client_id' => $clientId,
+                ':label' => $opt['label'],
+                ':address' => $opt['address'],
+                ':notes' => 'Optiune implicita',
+            ]);
+        }
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function forClient(int $clientId): array
     {
         /** @var PDO $pdo */
         $pdo = DB::pdo();
         try {
+            try {
+                self::ensurePickupOptions($clientId);
+            } catch (\Throwable $e) {
+                // ignore
+            }
             $st = $pdo->prepare('SELECT * FROM client_addresses WHERE client_id = ? ORDER BY is_default DESC, id DESC');
             $st->execute([$clientId]);
-            return $st->fetchAll();
+            $rows = $st->fetchAll();
+            if (!$rows) return [];
+            $pickup = [];
+            $normal = [];
+            foreach ($rows as $r) {
+                if (self::isPickupRow($r)) $pickup[] = $r;
+                else $normal[] = $r;
+            }
+            return array_merge($normal, $pickup);
         } catch (\Throwable $e) {
             return [];
         }
