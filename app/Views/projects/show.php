@@ -1474,8 +1474,11 @@ ob_start();
                                     $addrId = (int)($addrRow['id'] ?? 0);
                                     $addrLabel = trim((string)($addrRow['label'] ?? ''));
                                     $addrText = trim((string)($addrRow['address'] ?? ''));
+                                    $isPickup = ($addrLabel === 'Malinco' && $addrText === 'Ridicare din magazinul Malinco')
+                                      || ($addrLabel === 'maxCL' && $addrText === 'Ridicare de la depozit');
                                     if ($addrLabel !== '' && $addrText !== '' && $addrLabel !== $addrText) {
-                                      $addrFull = $addrLabel . ' · ' . $addrText;
+                                      $sep = $isPickup ? ' - ' : ' · ';
+                                      $addrFull = $addrLabel . $sep . $addrText;
                                     } else {
                                       $addrFull = $addrLabel !== '' ? $addrLabel : $addrText;
                                     }

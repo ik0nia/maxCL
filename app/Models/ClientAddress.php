@@ -9,8 +9,18 @@ use PDO;
 final class ClientAddress
 {
     private const PICKUP_OPTIONS = [
-        ['label' => 'Ridicare de la depozit', 'address' => 'Ridicare de la depozit'],
-        ['label' => 'Ridicare din magazinul Malinco', 'address' => 'Ridicare din magazinul Malinco'],
+        [
+            'label' => 'Malinco',
+            'address' => 'Ridicare din magazinul Malinco',
+            'legacy_labels' => ['Ridicare din magazinul Malinco'],
+            'legacy_addresses' => ['Ridicare din magazinul Malinco'],
+        ],
+        [
+            'label' => 'maxCL',
+            'address' => 'Ridicare de la depozit',
+            'legacy_labels' => ['Ridicare de la depozit'],
+            'legacy_addresses' => ['Ridicare de la depozit'],
+        ],
     ];
 
     private static function isPickupRow(array $row): bool
@@ -21,6 +31,12 @@ final class ClientAddress
             if ($label === $opt['label'] || $address === $opt['address']) {
                 return true;
             }
+            foreach ($opt['legacy_labels'] as $old) {
+                if ($label === $old) return true;
+            }
+            foreach ($opt['legacy_addresses'] as $old) {
+                if ($address === $old) return true;
+            }
         }
         return false;
     }
@@ -30,15 +46,36 @@ final class ClientAddress
         if ($clientId <= 0) return;
         /** @var PDO $pdo */
         $pdo = DB::pdo();
-        $st = $pdo->prepare('SELECT label, address FROM client_addresses WHERE client_id = ?');
+        $st = $pdo->prepare('SELECT id, label, address FROM client_addresses WHERE client_id = ?');
         $st->execute([$clientId]);
         $rows = $st->fetchAll();
         $existing = [];
+        $existingRows = [];
         foreach ($rows as $r) {
+            $id = (int)($r['id'] ?? 0);
             $label = trim((string)($r['label'] ?? ''));
             if ($label !== '') $existing[$label] = true;
             $addr = trim((string)($r['address'] ?? ''));
             if ($addr !== '') $existing[$addr] = true;
+            if ($id > 0) $existingRows[] = ['id' => $id, 'label' => $label, 'address' => $addr];
+        }
+        foreach ($existingRows as $r) {
+            $id = (int)$r['id'];
+            $label = $r['label'];
+            $address = $r['address'];
+            foreach (self::PICKUP_OPTIONS as $opt) {
+                $isLegacy = in_array($label, $opt['legacy_labels'], true) || in_array($address, $opt['legacy_addresses'], true);
+                if ($isLegacy) {
+                    $pdo->prepare('UPDATE client_addresses SET label = :label, address = :address WHERE id = :id')
+                        ->execute([
+                            ':label' => $opt['label'],
+                            ':address' => $opt['address'],
+                            ':id' => $id,
+                        ]);
+                    $existing[$opt['label']] = true;
+                    $existing[$opt['address']] = true;
+                }
+            }
         }
         foreach (self::PICKUP_OPTIONS as $opt) {
             if (isset($existing[$opt['label']]) || isset($existing[$opt['address']])) {
@@ -77,7 +114,17 @@ final class ClientAddress
                 if (self::isPickupRow($r)) $pickup[] = $r;
                 else $normal[] = $r;
             }
-            return array_merge($normal, $pickup);
+            $pickupOrdered = [];
+            foreach (self::PICKUP_OPTIONS as $opt) {
+                foreach ($pickup as $r) {
+                    $label = trim((string)($r['label'] ?? ''));
+                    $address = trim((string)($r['address'] ?? ''));
+                    if ($label === $opt['label'] || $address === $opt['address']) {
+                        $pickupOrdered[] = $r;
+                    }
+                }
+            }
+            return array_merge($normal, $pickupOrdered);
         } catch (\Throwable $e) {
             return [];
         }
