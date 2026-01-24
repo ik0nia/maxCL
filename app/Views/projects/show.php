@@ -2612,6 +2612,7 @@ ob_start();
           <div class="list-group list-group-flush mt-2">
             <?php foreach ($cncFiles as $f): ?>
               <?php
+                $fid = (int)($f['id'] ?? 0);
                 $url = Url::to('/uploads/files/' . (string)($f['stored_name'] ?? ''));
                 $cat = (string)($f['category'] ?? '');
                 $pname = (string)($f['_product_name'] ?? '');
@@ -2630,6 +2631,15 @@ ob_start();
                       <?= !empty($f['created_at']) ? (' · ' . htmlspecialchars((string)$f['created_at'])) : '' ?>
                     </div>
                   </div>
+                  <?php if ($canWrite && $fid > 0): ?>
+                    <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/files/' . $fid . '/delete')) ?>" class="m-0"
+                          onsubmit="return confirm('Ștergi fișierul?');">
+                      <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                      <button class="btn btn-outline-secondary btn-sm" type="submit">
+                        <i class="bi bi-trash me-1"></i> Șterge
+                      </button>
+                    </form>
+                  <?php endif; ?>
                 </div>
               </div>
             <?php endforeach; ?>

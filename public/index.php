@@ -281,10 +281,10 @@ $router->post('/system/admin-settings/snapshot/create', fn() => AdminSettingsCon
 $router->post('/system/admin-settings/snapshot/restore', fn() => AdminSettingsController::restoreSnapshot(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/search-index/rebuild', fn() => AdminSettingsController::rebuildSearchIndex(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 
-$projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
-$projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
-$projectsProductStatusMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
-$projectsProductEditMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsProductStatusMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
+$projectsProductEditMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 
 $offersReadMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
 $offersWriteMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR])];
