@@ -20,8 +20,8 @@ final class CatalogController
         // ca să găsească inclusiv după o singură cifră în cod.
         $finishes = Finish::catalogSearch($q, 2000);
 
-        // Stoc agregat pe Tip culoare (față) și grosimi (ignoră texturile)
-        $rows = StockStats::availableByColorAndThickness(null);
+        // Stoc agregat pe Tip culoare (față + verso) și grosimi (ignoră texturile)
+        $rows = StockStats::availableByAnySideColorAndThickness(null);
 
         $wanted = [];
         foreach ($finishes as $f) {
