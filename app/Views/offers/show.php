@@ -397,7 +397,7 @@ ob_start();
                 <thead>
                   <tr>
                     <th>Tip</th>
-                    <th class="text-end">Ore</th>
+                    <th class="text-end">Minute</th>
                     <th class="text-end">Cost/oră</th>
                     <th class="text-end">Total</th>
                     <th style="width:80px"></th>
@@ -408,7 +408,7 @@ ob_start();
                     <?php
                       $he = isset($wr['hours_estimated']) && $wr['hours_estimated'] !== null && $wr['hours_estimated'] !== '' ? (float)$wr['hours_estimated'] : 0.0;
                       $cph = isset($wr['cost_per_hour']) && $wr['cost_per_hour'] !== null && $wr['cost_per_hour'] !== '' ? (float)$wr['cost_per_hour'] : 0.0;
-                      $lineTotal = $he * $cph;
+                      $lineTotal = ($he / 60.0) * $cph;
                     ?>
                     <tr>
                       <td><?= htmlspecialchars((string)($wr['work_type'] ?? '')) ?></td>
@@ -442,7 +442,7 @@ ob_start();
                   </select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="hours_estimated" placeholder="Ore">
+                  <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="minutes_estimated" placeholder="Minute">
                 </div>
                 <div class="col-6 col-md-4">
                   <input class="form-control form-control-sm" name="note" placeholder="Notă (opțional)">

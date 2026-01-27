@@ -11,7 +11,7 @@ ob_start();
 <div class="app-page-title">
   <div>
     <h1 class="m-0">Setări costuri</h1>
-    <div class="text-muted">Valori globale folosite în Proiecte → Ore &amp; Manoperă</div>
+    <div class="text-muted">Valori globale folosite în Proiecte → Minute &amp; Manoperă</div>
   </div>
 </div>
 

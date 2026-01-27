@@ -66,7 +66,7 @@ $tabs = [
   'general' => 'General',
   'products' => 'Produse',
   'consum' => 'Consum materiale',
-  'hours' => 'Ore & Manoperă',
+  'hours' => 'Minute & Manoperă',
   'cnc' => 'CNC / Tehnic',
   'deliveries' => 'Livrări',
   'files' => 'Fișiere',
@@ -1298,12 +1298,12 @@ ob_start();
                     <div class="mt-2">
                       <div class="h5 m-0 text-success fw-semibold">Manopere</div>
                       <div class="text-muted small">
-                        CNC: <span class="fw-semibold"><?= number_format((float)$cncH, 2, '.', '') ?>h</span>
+                        CNC: <span class="fw-semibold"><?= number_format((float)$cncH, 2, '.', '') ?> min</span>
                         <?php if ($canSeePricesRole): ?>
                           <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$cncC, 2, '.', '') ?> lei</span></span>
                         <?php endif; ?>
                         <span class="text-muted"> · </span>
-                        Atelier: <span class="fw-semibold"><?= number_format((float)$atH, 2, '.', '') ?>h</span>
+                        Atelier: <span class="fw-semibold"><?= number_format((float)$atH, 2, '.', '') ?> min</span>
                         <?php if ($canSeePricesRole): ?>
                           <span class="js-price d-none"> · <span class="fw-semibold"><?= number_format((float)$atC, 2, '.', '') ?> lei</span></span>
                         <?php endif; ?>
@@ -1433,8 +1433,8 @@ ob_start();
                             </select>
                           </div>
                           <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold mb-1">Ore estimate</label>
-                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="hours_estimated" required>
+                            <label class="form-label fw-semibold mb-1">Minute estimate</label>
+                            <input class="form-control form-control-sm" type="number" step="0.01" min="0.01" name="minutes_estimated" required>
                           </div>
                           <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold mb-1">Notă</label>
@@ -1829,7 +1829,7 @@ ob_start();
             <div class="fw-semibold"><?= number_format($sumLabor, 2, '.', '') ?> lei</div>
           </div>
           <div class="text-muted small mt-1">
-            CNC: <?= number_format($cncH, 2, '.', '') ?> h · Atelier: <?= number_format($atH, 2, '.', '') ?> h
+            CNC: <?= number_format($cncH, 2, '.', '') ?> min · Atelier: <?= number_format($atH, 2, '.', '') ?> min
           </div>
           <div class="d-flex justify-content-between mt-1">
             <div class="text-muted">Materiale Magazie</div>
@@ -2897,10 +2897,10 @@ ob_start();
   </div>
 <?php elseif ($tab === 'hours'): ?>
   <?php
-    $totEst = 0.0;
+    $totEst = 0.0; // minute
     $totCostEst = 0.0;
-    $totEstCnc = 0.0;
-    $totEstAtelier = 0.0;
+    $totEstCnc = 0.0; // minute
+    $totEstAtelier = 0.0; // minute
     $totCostEstCnc = 0.0;
     $totCostEstAtelier = 0.0;
     $laborRate = isset($costSettings['labor']) && $costSettings['labor'] !== null ? (float)$costSettings['labor'] : null;
@@ -2910,14 +2910,14 @@ ob_start();
       $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
       $totEst += $he;
       if ($cph !== null && $cph >= 0 && is_finite($cph) && $he > 0) {
-        $totCostEst += ($he * $cph);
+        $totCostEst += (($he / 60.0) * $cph);
         $wt = (string)($w['work_type'] ?? '');
         if ($wt === 'CNC') {
           $totEstCnc += $he;
-          $totCostEstCnc += ($he * $cph);
+          $totCostEstCnc += (($he / 60.0) * $cph);
         } elseif ($wt === 'ATELIER') {
           $totEstAtelier += $he;
-          $totCostEstAtelier += ($he * $cph);
+          $totCostEstAtelier += (($he / 60.0) * $cph);
         }
       } else {
         $wt = (string)($w['work_type'] ?? '');
@@ -2929,7 +2929,7 @@ ob_start();
   <div class="row g-3">
     <div class="col-12 col-lg-5">
       <div class="card app-card p-3">
-        <div class="h5 m-0">Adaugă ore</div>
+        <div class="h5 m-0">Adaugă minute</div>
         <div class="text-muted">CNC / Atelier (doar estimări)</div>
         <div class="text-muted small mt-1">
           Costuri din Setări: CNC <strong><?= $cncRate !== null ? number_format($cncRate, 2, '.', '') : '—' ?></strong> lei/h ·
@@ -2958,9 +2958,9 @@ ob_start();
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">Ore estimate</label>
-              <input class="form-control" type="number" step="0.01" min="0.01" name="hours_estimated" required placeholder="ex: 2.50">
-              <div class="text-muted small mt-1">Câmp obligatoriu. Ore reale nu se mai introduc aici.</div>
+              <label class="form-label fw-semibold">Minute estimate</label>
+              <input class="form-control" type="number" step="0.01" min="0.01" name="minutes_estimated" required placeholder="ex: 90">
+              <div class="text-muted small mt-1">Câmp obligatoriu. Minutele reale nu se mai introduc aici.</div>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">Notă</label>
@@ -2980,7 +2980,7 @@ ob_start();
         <div class="text-muted">Sumar estimări + costuri</div>
         <div class="d-flex justify-content-between mt-2">
           <div class="text-muted">Estimate (total)</div>
-          <div class="fw-semibold"><?= number_format($totEst, 2, '.', '') ?> h</div>
+          <div class="fw-semibold"><?= number_format($totEst, 2, '.', '') ?> min</div>
         </div>
         <div class="d-flex justify-content-between mt-2">
           <div class="text-muted">Cost estimat (total)</div>
@@ -2989,18 +2989,18 @@ ob_start();
         <hr class="my-3">
         <div class="d-flex justify-content-between mt-2">
           <div class="text-muted">CNC (estim.)</div>
-          <div class="fw-semibold"><?= number_format($totEstCnc, 2, '.', '') ?> h · <?= number_format($totCostEstCnc, 2, '.', '') ?> lei</div>
+          <div class="fw-semibold"><?= number_format($totEstCnc, 2, '.', '') ?> min · <?= number_format($totCostEstCnc, 2, '.', '') ?> lei</div>
         </div>
         <div class="d-flex justify-content-between mt-2">
           <div class="text-muted">Atelier (estim.)</div>
-          <div class="fw-semibold"><?= number_format($totEstAtelier, 2, '.', '') ?> h · <?= number_format($totCostEstAtelier, 2, '.', '') ?> lei</div>
+          <div class="fw-semibold"><?= number_format($totEstAtelier, 2, '.', '') ?> min · <?= number_format($totCostEstAtelier, 2, '.', '') ?> lei</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-lg-7">
       <div class="card app-card p-3">
-        <div class="h5 m-0">Istoric ore</div>
+        <div class="h5 m-0">Istoric minute</div>
         <div class="text-muted">Toate modificările sunt logate</div>
 
         <?php if (!$workLogs): ?>
@@ -3013,7 +3013,7 @@ ob_start();
                   <th>Dată</th>
                   <th>Tip</th>
                   <th>Produs</th>
-                  <th class="text-end">Est.</th>
+                  <th class="text-end">Minute</th>
                   <th class="text-end">Cost/oră</th>
                   <th class="text-end">Cost (estim.)</th>
                   <th>Notă</th>
@@ -3026,7 +3026,7 @@ ob_start();
                     $wid = (int)($w['id'] ?? 0);
                     $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : null;
                     $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
-                    $costEst = ($he !== null && $cph !== null) ? ($he * $cph) : null;
+                    $costEst = ($he !== null && $cph !== null) ? (($he / 60.0) * $cph) : null;
 
                     $ppId = isset($w['project_product_id']) && $w['project_product_id'] !== null && $w['project_product_id'] !== '' ? (int)$w['project_product_id'] : 0;
                     $prodName = trim((string)($w['product_name'] ?? ''));
@@ -3075,7 +3075,7 @@ ob_start();
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div>
         <div class="h5 m-0">Istoric / Log-uri</div>
-        <div class="text-muted">Acțiuni pe proiect/produs/consum/livrare/fișiere/ore</div>
+        <div class="text-muted">Acțiuni pe proiect/produs/consum/livrare/fișiere/minute</div>
       </div>
       <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(Url::to('/audit')) ?>">
         <i class="bi bi-journal-text me-1"></i> Jurnal global
