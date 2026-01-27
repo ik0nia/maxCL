@@ -174,6 +174,7 @@ $toastError = Session::flash('toast_error');
               </a>
             <?php endif; ?>
           <?php endif; ?>
+        <?php endif; ?>
       </nav>
     </aside>
 
