@@ -27,6 +27,7 @@ final class InternalPiecesController
     public static function index(): void
     {
         $boards = [];
+        $preselectBoardId = Validator::int((string)($_GET['board_id'] ?? ''), 1);
         try {
             $boards = HplBoard::allWithTotals(null, null);
         } catch (\Throwable $e) {
@@ -35,6 +36,7 @@ final class InternalPiecesController
         echo View::render('hpl/internal_pieces/index', [
             'title' => 'Adăugare plăci mici (nestocabile)',
             'boards' => $boards,
+            'preselectBoardId' => $preselectBoardId,
         ]);
     }
 

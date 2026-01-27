@@ -7,6 +7,7 @@ use App\Core\View;
 $u = Auth::user();
 $can = $u && in_array((string)($u['role'] ?? ''), [Auth::ROLE_ADMIN, Auth::ROLE_MANAGER, Auth::ROLE_GESTIONAR, Auth::ROLE_OPERATOR], true);
 $boards = $boards ?? [];
+$preselectBoardId = (int)($preselectBoardId ?? 0);
 
 if (!function_exists('_hplInternalNormThumb')) {
   function _hplInternalNormThumb(string $p): string {
@@ -162,6 +163,7 @@ ob_start();
       const pickedIdEl = document.getElementById('board_id');
       const pickedLabelEl = document.getElementById('pickedBoardLabel');
       const step2Els = Array.from(document.querySelectorAll('.js-step2'));
+      const preselectId = <?= json_encode((int)$preselectBoardId) ?>;
 
       function setStep2Enabled(on){
         step2Els.forEach(el => { try { el.disabled = !on; } catch (e) {} });
@@ -177,6 +179,8 @@ ob_start();
         document.querySelectorAll('#boardsPicker tbody tr').forEach(r => r.classList.remove('table-active'));
         tr.classList.add('table-active');
       }
+
+      setStep2Enabled(false);
 
       if (tableEl && window.DataTable) {
         try {
@@ -204,7 +208,10 @@ ob_start();
         });
       });
 
-      setStep2Enabled(false);
+      if (preselectId > 0) {
+        const tr = document.querySelector('#boardsPicker tbody tr[data-board-id="' + String(preselectId) + '"]');
+        if (tr) pickFromRow(tr);
+      }
     });
   </script>
 <?php endif; ?>

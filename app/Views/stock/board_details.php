@@ -665,7 +665,7 @@ ob_start();
       <?php endif; ?>
 
       <div class="mt-2">
-        <a class="btn btn-outline-secondary w-100" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne')) ?>">
+        <a class="btn btn-outline-secondary w-100" href="<?= htmlspecialchars(Url::to('/hpl/piese-interne?board_id=' . (int)($board['id'] ?? 0))) ?>">
           <i class="bi bi-plus-lg me-1"></i> Adaugă piese interne (nestocabile)
         </a>
       </div>
