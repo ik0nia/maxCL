@@ -132,7 +132,7 @@ ob_start();
       <h3 id="basic-proiecte" class="h6 mt-3">Proiecte</h3>
       <p class="mb-2">Aici gestionezi lucrarile efective (executia ofertelor).</p>
       <ul class="mb-0">
-        <li><strong>Contine:</strong> lista proiectelor, acces la detalii, tab-uri cu produse, consumuri, livrari, fisiere, ore si discutii.</li>
+        <li><strong>Contine:</strong> lista proiectelor, acces la detalii, tab-uri cu produse, consumuri, livrari, fisiere, minute si discutii.</li>
         <li><strong>Operatiuni tipice:</strong> creare proiect, schimbare status, adaugare produse, alocare/consum materiale.</li>
       </ul>
       <div class="mt-2">
@@ -165,7 +165,7 @@ ob_start();
           <li>Adauga produs nou: Denumire, Descriere, Cod (optional), Cantitate, Pret cu discount.</li>
           <li>Consum HPL pe produs: Sursa (proiect/REST), Placa/Piesa, Consum (1/2 placa pentru FULL).</li>
           <li>Accesorii pe produs: Accesoriu, Cantitate, Apare pe deviz (checkbox).</li>
-          <li>Manopera pe produs: Tip (CNC/Atelier), Ore estimate, Nota.</li>
+          <li>Manopera pe produs: Tip (CNC/Atelier), Minute estimate, Nota.</li>
           <li>Observatii produs: Mesaj.</li>
           <li>Facturare/Livrare: Firma facturare, Adresa livrare.</li>
         </ul>
@@ -201,7 +201,7 @@ ob_start();
           <li>Actualizeaza produs: Cantitate, Unitate, Pret cu discount, Descriere.</li>
           <li>Consum HPL: Placa, Cantitate, Mod (Full/Jumatate).</li>
           <li>Consum accesorii: Accesoriu, Cantitate, Include in deviz (checkbox).</li>
-          <li>Manopera: Tip (CNC/Atelier), Ore estimate, Nota.</li>
+          <li>Manopera: Tip (CNC/Atelier), Minute estimate, Nota.</li>
         </ul>
       </div>
 
@@ -593,7 +593,7 @@ ob_start();
         <li><strong>Consumuri</strong> – aloci HPL si accesorii, apoi consumi pe masura debitarii.</li>
         <li><strong>Livrari</strong> – creezi livrari si urmaresti ce s-a predat clientului.</li>
         <li><strong>Fisiere</strong> – incarci documente tehnice sau poze la proiect.</li>
-        <li><strong>Ore lucrate</strong> – notezi timpul pe proiect sau produs.</li>
+        <li><strong>Minute lucrate</strong> – notezi timpul pe proiect sau produs.</li>
         <li><strong>Discutii & etichete</strong> – pastrezi contextul si organizarea.</li>
       </ul>
     </div>
@@ -638,6 +638,7 @@ ob_start();
     <div class="card app-card p-3 mb-3">
       <h2 class="h5">Actualizari recente</h2>
       <ul class="mb-0">
+        <li><strong>v1.0.21</strong> – Manoperă: introducere în minute (cost per oră din setări), conversie istoric și afișare minute în deviz/bon.</li>
         <li><strong>v1.0.18</strong> – Proiecte: buton ștergere fișiere și în CNC/Tehnic (Admin/Manager/Gestionar/Operator).</li>
         <li><strong>v1.0.17</strong> – Catalog HPL: stocul ține cont și de verso.</li>
         <li><strong>v1.0.16</strong> – Stoc HPL: filtrul de culoare include și codul de culoare (față/verso).</li>
@@ -1349,7 +1350,7 @@ ob_start();
     </thead>
     <tbody>
       <tr><td>Tip</td><td>work_type</td><td>select</td><td>CNC / ATELIER</td><td>offer_work_logs.work_type</td><td>Costul orar se ia din app_settings.</td></tr>
-      <tr><td>Ore</td><td>hours_estimated</td><td>number</td><td>decimal &gt; 0</td><td>offer_work_logs.hours_estimated</td><td>Necesar &gt; 0.</td></tr>
+      <tr><td>Minute</td><td>minutes_estimated</td><td>number</td><td>decimal &gt; 0</td><td>offer_work_logs.hours_estimated</td><td>Necesar &gt; 0 (salvat in minute).</td></tr>
       <tr><td>Nota</td><td>note</td><td>text</td><td>Optional</td><td>offer_work_logs.note</td><td>—</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
     </tbody>
@@ -1570,7 +1571,7 @@ ob_start();
     </tbody>
   </table>
 
-  <h3 class="h6 mt-3">Formular: Manopera (ore) pe produs</h3>
+  <h3 class="h6 mt-3">Formular: Manopera (minute) pe produs</h3>
   <p class="text-muted">Ruta: <code>POST /projects/{id}/hours/create</code> (cu <code>project_product_id</code>)</p>
   <table class="table table-sm table-bordered align-middle">
     <thead>
@@ -1578,7 +1579,7 @@ ob_start();
     </thead>
     <tbody>
       <tr><td>Tip</td><td>work_type</td><td>select</td><td>CNC / ATELIER</td><td>project_work_logs.work_type</td><td>Cost preluat din app_settings.</td></tr>
-      <tr><td>Ore estimate</td><td>hours_estimated</td><td>number</td><td>decimal &gt; 0</td><td>project_work_logs.hours_estimated</td><td>Validator::dec.</td></tr>
+      <tr><td>Minute estimate</td><td>minutes_estimated</td><td>number</td><td>decimal &gt; 0</td><td>project_work_logs.hours_estimated</td><td>Validator::dec (salvat in minute).</td></tr>
       <tr><td>Nota</td><td>note</td><td>text</td><td>Optional</td><td>project_work_logs.note</td><td>—</td></tr>
       <tr><td>ID produs proiect</td><td>project_product_id</td><td>hidden</td><td>int</td><td>project_work_logs.project_product_id</td><td>Legatura la piesa.</td></tr>
       <tr><td>Token CSRF</td><td>_csrf</td><td>hidden</td><td>Obligatoriu</td><td>n/a</td><td>—</td></tr>
