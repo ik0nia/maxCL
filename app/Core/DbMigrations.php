@@ -1308,6 +1308,37 @@ final class DbMigrations
                     try { if (self::tableExists($pdo, 'offers')) $pdo->exec("ALTER TABLE projects ADD CONSTRAINT fk_projects_source_offer FOREIGN KEY (source_offer_id) REFERENCES offers(id)"); } catch (\Throwable $e) {}
                 },
             ],
+            [
+                'id' => '2026-01-25_01_create_project_time_logs',
+                'label' => 'CREATE TABLE project_time_logs',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'project_time_logs')) return;
+                    if (!self::tableExists($pdo, 'projects')) return;
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    $pdo->exec("
+                        CREATE TABLE project_time_logs (
+                          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                          project_id INT UNSIGNED NOT NULL,
+                          project_product_id BIGINT UNSIGNED NULL,
+                          category ENUM('PROIECTARE','PREGATIRE_CNC','DEBITARE_CNC','ATELIER') NOT NULL,
+                          person VARCHAR(190) NOT NULL,
+                          description TEXT NULL,
+                          minutes INT UNSIGNED NOT NULL,
+                          created_by INT UNSIGNED NULL,
+                          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          PRIMARY KEY (id),
+                          KEY idx_ptl_project (project_id),
+                          KEY idx_ptl_pp (project_product_id),
+                          KEY idx_ptl_category (category),
+                          KEY idx_ptl_person (person),
+                          KEY idx_ptl_created (created_at),
+                          CONSTRAINT fk_ptl_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                          CONSTRAINT fk_ptl_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
+                          CONSTRAINT fk_ptl_user FOREIGN KEY (created_by) REFERENCES users(id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    ");
+                },
+            ],
         ];
     }
 

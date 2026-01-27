@@ -32,11 +32,13 @@ use App\Controllers\Api\FinishesController as ApiFinishesController;
 use App\Controllers\Api\HplBoardsController as ApiHplBoardsController;
 use App\Controllers\Api\HplPiecesController as ApiHplPiecesController;
 use App\Controllers\Api\MagazieItemsController as ApiMagazieItemsController;
+use App\Controllers\Api\TimeTrackingController as ApiTimeTrackingController;
 use App\Controllers\System\CostSettingsController;
 use App\Controllers\System\ConsumptionsResetController;
 use App\Controllers\System\AdminSettingsController;
 use App\Controllers\System\DbUpdateController;
 use App\Controllers\System\MaterialConsumptionsController;
+use App\Controllers\System\TimeTrackingController;
 
 require __DIR__ . '/../vendor_stub.php';
 
@@ -267,6 +269,7 @@ $router->post('/system/costuri', fn() => CostSettingsController::save(), $usersM
 
 $systemMW = [Auth::requireRole([Auth::ROLE_ADMIN, Auth::ROLE_GESTIONAR])];
 $router->get('/system/consumuri-materiale', fn() => MaterialConsumptionsController::index(), $systemMW);
+$router->get('/system/pontaj', fn() => TimeTrackingController::index(), $systemMW);
 $router->get('/system/consumuri/reset', fn() => ConsumptionsResetController::run(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->get('/system/admin-settings', fn() => AdminSettingsController::index(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
 $router->post('/system/admin-settings/company/update', fn() => AdminSettingsController::updateCompany(), [Auth::requireRole([Auth::ROLE_ADMIN])]);
@@ -321,6 +324,7 @@ $router->post('/projects/{id}/products/{ppId}/hpl/create', fn($p) => ProjectsCon
 $router->post('/projects/{id}/products/{ppId}/hpl/{cid}/cut', fn($p) => ProjectsController::cutHplForProjectProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/hpl/{cid}/unallocate', fn($p) => ProjectsController::unallocateHplForProjectProduct($p), $projectsProductEditMW);
 $router->post('/projects/{id}/products/{ppId}/comments/create', fn($p) => ProjectsController::addProductComment($p), $projectsReadMW);
+$router->post('/projects/{id}/products/{ppId}/time/create', fn($p) => ProjectsController::addProductTimeLog($p), $projectsProductEditMW);
 $router->post('/projects/{id}/hpl/pieces/{pieceId}/return', fn($p) => ProjectsController::returnRestHplToStock($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/magazie/create', fn($p) => ProjectsController::addMagazieConsumption($p), $projectsWriteMW);
 $router->post('/projects/{id}/consum/hpl/create', fn($p) => ProjectsController::addHplConsumption($p), $projectsWriteMW);
@@ -389,6 +393,8 @@ $router->get('/api/hpl/boards/search', fn() => ApiHplBoardsController::search(),
 $router->get('/api/hpl/boards/offcuts', fn() => ApiHplBoardsController::offcuts(), $hplReadMW);
 $router->get('/api/hpl/pieces/search', fn() => ApiHplPiecesController::search(), $hplReadMW);
 $router->get('/api/magazie/items/search', fn() => ApiMagazieItemsController::search(), $magReadMW);
+$router->get('/api/time/people/search', fn() => ApiTimeTrackingController::peopleSearch(), [Auth::requireLogin()]);
+$router->get('/api/time/descriptions/search', fn() => ApiTimeTrackingController::descriptionSearch(), [Auth::requireLogin()]);
 
 $router->get('/system/db-update', fn() => DbUpdateController::index(), [Auth::requireLogin()]);
 $router->post('/system/db-update/run', fn() => DbUpdateController::runNow(), [Auth::requireLogin()]);
