@@ -151,6 +151,9 @@ $toastError = Session::flash('toast_error');
               <a class="app-nav-link <?= str_starts_with($p, '/system/consumuri-materiale') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/consumuri-materiale')) ?>">
                 <i class="bi bi-clipboard-data me-2"></i> Consumuri materiale
               </a>
+              <a class="app-nav-link <?= str_starts_with($p, '/system/pontaj') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/system/pontaj')) ?>">
+                <i class="bi bi-stopwatch me-2"></i> Pontaj
+              </a>
             <?php endif; ?>
             <a class="app-nav-link <?= str_starts_with($p, '/users') ? 'active' : '' ?>" href="<?= htmlspecialchars(Url::to('/users')) ?>">
               <i class="bi bi-person-gear me-2"></i> Utilizatori
@@ -171,7 +174,6 @@ $toastError = Session::flash('toast_error');
               </a>
             <?php endif; ?>
           <?php endif; ?>
-        <?php endif; ?>
       </nav>
     </aside>
 

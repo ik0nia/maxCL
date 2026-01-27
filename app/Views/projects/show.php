@@ -36,6 +36,8 @@ $billingClients = $billingClients ?? [];
 $billingAddresses = $billingAddresses ?? [];
 $projectLabels = $projectLabels ?? [];
 $cncFiles = $cncFiles ?? [];
+$timeLogCategories = $timeLogCategories ?? [];
+$timeLogsByProduct = $timeLogsByProduct ?? [];
 $statuses = $statuses ?? [];
 $clients = $clients ?? [];
 $groups = $groups ?? [];
@@ -51,6 +53,13 @@ if (is_string($ppStatusErrorRaw) && $ppStatusErrorRaw !== '') {
       'message' => (string)$ppStatusError['message'],
     ];
   }
+}
+
+$timeCategoriesMap = [];
+foreach ($timeLogCategories as $c) {
+  $val = (string)($c['value'] ?? '');
+  $lbl = (string)($c['label'] ?? '');
+  if ($val !== '') $timeCategoriesMap[$val] = $lbl;
 }
 
 $tabs = [
@@ -330,6 +339,74 @@ ob_start();
                     cache: true
                   }
                 });
+              });
+            });
+          </script>
+
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+              const $ = window.jQuery;
+              function initPerson(el){
+                const $el = $(el);
+                if ($el.data('select2')) return;
+                const placeholder = String($el.data('placeholder') || 'Alege persoana...');
+                $el.select2({
+                  width: '100%',
+                  placeholder,
+                  allowClear: true,
+                  tags: true,
+                  minimumInputLength: 1,
+                  ajax: {
+                    url: "<?= htmlspecialchars(Url::to('/api/time/people/search')) ?>",
+                    dataType: 'json',
+                    delay: 250,
+                    headers: { 'Accept': 'application/json' },
+                    data: function(params){ return { q: params.term }; },
+                    processResults: function(resp){
+                      const items = (resp && resp.items) ? resp.items : [];
+                      return { results: items };
+                    },
+                    cache: true
+                  }
+                });
+              }
+              function initDesc(el){
+                const $el = $(el);
+                if ($el.data('select2')) return;
+                const placeholder = String($el.data('placeholder') || 'Descriere faza...');
+                $el.select2({
+                  width: '100%',
+                  placeholder,
+                  allowClear: true,
+                  tags: true,
+                  minimumInputLength: 1,
+                  ajax: {
+                    url: "<?= htmlspecialchars(Url::to('/api/time/descriptions/search')) ?>",
+                    dataType: 'json',
+                    delay: 250,
+                    headers: { 'Accept': 'application/json' },
+                    data: function(params){
+                      const form = $el.closest('form');
+                      const cat = form.find('.js-pp-time-category').val() || '';
+                      return { q: params.term, category: cat };
+                    },
+                    processResults: function(resp){
+                      const items = (resp && resp.items) ? resp.items : [];
+                      return { results: items };
+                    },
+                    cache: true
+                  }
+                });
+              }
+              $('.js-pp-time-person').each(function(){ initPerson(this); });
+              $('.js-pp-time-desc').each(function(){ initDesc(this); });
+              $('.js-pp-time-category').on('change', function(){
+                const $form = $(this).closest('form');
+                const $desc = $form.find('.js-pp-time-desc');
+                if ($desc.length && $desc.data('select2')) {
+                  $desc.val(null).trigger('change');
+                }
               });
             });
           </script>
@@ -1277,6 +1354,9 @@ ob_start();
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppBill<?= $ppId ?>">
                         <i class="bi bi-receipt me-1"></i> Facturare/Livrare
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppTime<?= $ppId ?>">
+                        <i class="bi bi-stopwatch me-1"></i> Pontaj
+                      </button>
                       <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#ppObs<?= $ppId ?>">
                         <i class="bi bi-chat-dots me-1"></i> Observații(<?= (int)$ppCommentsCount ?>)
                       </button>
@@ -1366,6 +1446,68 @@ ob_start();
                             </button>
                           </div>
                         </form>
+                      </div>
+                    </div>
+
+                    <div class="collapse mt-3" id="ppTime<?= $ppId ?>">
+                      <div class="p-2 rounded" style="background:#F3F7F8;border:1px solid #D9E3E6">
+                        <div class="fw-semibold">Pontaj</div>
+                        <div class="text-muted small">Timp efectiv lucrat pe produs (minute).</div>
+                        <form method="post" action="<?= htmlspecialchars(Url::to('/projects/' . (int)$project['id'] . '/products/' . $ppId . '/time/create')) ?>" class="row g-2 mt-2 js-pp-time-form">
+                          <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>">
+                          <div class="col-12 col-md-3">
+                            <label class="form-label fw-semibold mb-1">Categorie</label>
+                            <select class="form-select form-select-sm js-pp-time-category" name="category" required>
+                              <?php foreach ($timeLogCategories as $cat): ?>
+                                <option value="<?= htmlspecialchars((string)($cat['value'] ?? '')) ?>">
+                                  <?= htmlspecialchars((string)($cat['label'] ?? '')) ?>
+                                </option>
+                              <?php endforeach; ?>
+                            </select>
+                          </div>
+                          <div class="col-12 col-md-3">
+                            <label class="form-label fw-semibold mb-1">Persoana</label>
+                            <select class="form-select form-select-sm js-pp-time-person" name="person" data-placeholder="Alege persoana..." required></select>
+                          </div>
+                          <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold mb-1">Descriere faza</label>
+                            <select class="form-select form-select-sm js-pp-time-desc" name="description" data-placeholder="Descriere faza..." required></select>
+                          </div>
+                          <div class="col-12 col-md-2">
+                            <label class="form-label fw-semibold mb-1">Minute</label>
+                            <input class="form-control form-control-sm" type="number" min="1" step="1" name="minutes" required>
+                          </div>
+                          <div class="col-12 d-flex justify-content-end">
+                            <button class="btn btn-primary btn-sm" type="submit">
+                              <i class="bi bi-stopwatch me-1"></i> Salveaza pontaj
+                            </button>
+                          </div>
+                        </form>
+                        <?php $ppTimeLogs = isset($timeLogsByProduct[$ppId]) && is_array($timeLogsByProduct[$ppId]) ? $timeLogsByProduct[$ppId] : []; ?>
+                        <?php if ($ppTimeLogs): ?>
+                          <hr class="my-3">
+                          <div class="text-muted small">Ultimele pontaje</div>
+                          <div class="d-flex flex-column gap-2 mt-2">
+                            <?php foreach ($ppTimeLogs as $log): ?>
+                              <?php
+                                $logPerson = (string)($log['person'] ?? '');
+                                $logDesc = (string)($log['description'] ?? '');
+                                $logCat = (string)($log['category'] ?? '');
+                                $logMin = (int)($log['minutes'] ?? 0);
+                                $logDt = (string)($log['created_at'] ?? '');
+                                $logCatLabel = $timeCategoriesMap[$logCat] ?? $logCat;
+                              ?>
+                              <div class="p-2 rounded" style="background:#F7FAFB;border:1px solid #D9E3E6">
+                                <div class="d-flex justify-content-between gap-2">
+                                  <div class="fw-semibold"><?= htmlspecialchars($logPerson !== '' ? $logPerson : '—') ?></div>
+                                  <div class="text-muted small"><?= htmlspecialchars($logDt) ?></div>
+                                </div>
+                                <div class="text-muted small"><?= htmlspecialchars($logCatLabel) ?> · <?= (int)$logMin ?> min</div>
+                                <div class="mt-1"><?= htmlspecialchars($logDesc) ?></div>
+                              </div>
+                            <?php endforeach; ?>
+                          </div>
+                        <?php endif; ?>
                       </div>
                     </div>
 
