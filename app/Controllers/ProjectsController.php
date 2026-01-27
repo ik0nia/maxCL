@@ -261,11 +261,15 @@ final class ProjectsController
         }
 
         foreach ($workLogs as $w) {
-            $he = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== '' ? (float)$w['hours_estimated'] : 0.0;
-            if ($he <= 0) continue;
+            // NOTĂ: stocăm minute în hours_estimated (retro-compat)
+            $minutes = isset($w['hours_estimated']) && $w['hours_estimated'] !== null && $w['hours_estimated'] !== ''
+                ? (float)$w['hours_estimated']
+                : 0.0;
+            if ($minutes <= 0) continue;
             $cph = isset($w['cost_per_hour']) && $w['cost_per_hour'] !== null && $w['cost_per_hour'] !== '' ? (float)$w['cost_per_hour'] : null;
             if ($cph === null || $cph < 0 || !is_finite($cph)) continue;
-            $cost = $he * $cph;
+            $hours = $minutes / 60.0;
+            $cost = $hours * $cph;
             $type = (string)($w['work_type'] ?? '');
             $logTs = self::dtToTs(isset($w['created_at']) ? (string)$w['created_at'] : null);
 
@@ -279,10 +283,10 @@ final class ProjectsController
                     $direct[$ppId] = ['cnc_hours' => 0.0, 'cnc_cost' => 0.0, 'atelier_hours' => 0.0, 'atelier_cost' => 0.0];
                 }
                 if ($type === 'CNC') {
-                    $direct[$ppId]['cnc_hours'] += $he;
+                    $direct[$ppId]['cnc_hours'] += $minutes;
                     $direct[$ppId]['cnc_cost'] += $cost;
                 } elseif ($type === 'ATELIER') {
-                    $direct[$ppId]['atelier_hours'] += $he;
+                    $direct[$ppId]['atelier_hours'] += $minutes;
                     $direct[$ppId]['atelier_cost'] += $cost;
                 }
                 continue;
@@ -296,10 +300,10 @@ final class ProjectsController
                 $wgt = (float)($weights[$pid] ?? 0.0);
                 if ($wgt <= 0) continue;
                 if ($type === 'CNC') {
-                    $projShares[$pid]['cnc_hours'] += $he * $wgt;
+                    $projShares[$pid]['cnc_hours'] += $minutes * $wgt;
                     $projShares[$pid]['cnc_cost'] += $cost * $wgt;
                 } elseif ($type === 'ATELIER') {
-                    $projShares[$pid]['atelier_hours'] += $he * $wgt;
+                    $projShares[$pid]['atelier_hours'] += $minutes * $wgt;
                     $projShares[$pid]['atelier_cost'] += $cost * $wgt;
                 }
             }
@@ -319,8 +323,8 @@ final class ProjectsController
                 'atelier_hours' => $atH,
                 'atelier_cost' => $atC,
                 'total_cost' => $cncC + $atC,
-                'cnc_rate' => $cncH > 0 ? ($cncC / $cncH) : 0.0,
-                'atelier_rate' => $atH > 0 ? ($atC / $atH) : 0.0,
+                'cnc_rate' => $cncH > 0 ? ($cncC / ($cncH / 60.0)) : 0.0,
+                'atelier_rate' => $atH > 0 ? ($atC / ($atH / 60.0)) : 0.0,
             ];
         }
         return $out;
@@ -920,9 +924,9 @@ final class ProjectsController
             ? (float)$product['sale_price']
             : 0.0;
         $saleTotal = ($salePrice > 0 && $qty > 0) ? ($salePrice * $qty) : null;
-        $cncHours = (float)($labor['cnc_hours'] ?? 0.0);
+        $cncMinutes = (float)($labor['cnc_hours'] ?? 0.0);
         $cncCost = (float)($labor['cnc_cost'] ?? 0.0);
-        $atelierHours = (float)($labor['atelier_hours'] ?? 0.0);
+        $atelierMinutes = (float)($labor['atelier_hours'] ?? 0.0);
         $atelierCost = (float)($labor['atelier_cost'] ?? 0.0);
         $logo = (string)($company['logo_url'] ?? '');
         if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
@@ -1059,29 +1063,29 @@ final class ProjectsController
   </div>
   <div class="section">
     <div class="title">Manoperă</div>
-    <?php if ($cncHours <= 0 && $atelierHours <= 0): ?>
+    <?php if ($cncMinutes <= 0 && $atelierMinutes <= 0): ?>
       <div class="muted">Nu există manoperă.</div>
     <?php else: ?>
       <table>
         <thead>
           <tr>
             <th>Tip</th>
-            <th style="width:110px">Ore</th>
+            <th style="width:110px">Minute</th>
             <th style="width:140px">Cost</th>
           </tr>
         </thead>
         <tbody>
-          <?php if ($cncHours > 0 || $cncCost > 0): ?>
+          <?php if ($cncMinutes > 0 || $cncCost > 0): ?>
             <tr>
               <td>CNC</td>
-              <td><?= $esc(self::fmtQty($cncHours, 2)) ?></td>
+              <td><?= $esc(self::fmtQty($cncMinutes, 2)) ?></td>
               <td><?= $esc(self::fmtMoney($cncCost)) ?></td>
             </tr>
           <?php endif; ?>
-          <?php if ($atelierHours > 0 || $atelierCost > 0): ?>
+          <?php if ($atelierMinutes > 0 || $atelierCost > 0): ?>
             <tr>
               <td>Atelier</td>
-              <td><?= $esc(self::fmtQty($atelierHours, 2)) ?></td>
+              <td><?= $esc(self::fmtQty($atelierMinutes, 2)) ?></td>
               <td><?= $esc(self::fmtMoney($atelierCost)) ?></td>
             </tr>
           <?php endif; ?>
@@ -1134,9 +1138,9 @@ final class ProjectsController
         $accRows = is_array($ctx['acc_rows'] ?? null) ? $ctx['acc_rows'] : [];
         $labor = is_array($ctx['labor'] ?? null) ? $ctx['labor'] : [];
         $totalSale = isset($ctx['total_sale']) ? (float)($ctx['total_sale'] ?? 0.0) : 0.0;
-        $cncHours = (float)($labor['cnc_hours'] ?? 0.0);
+        $cncMinutes = (float)($labor['cnc_hours'] ?? 0.0);
         $cncCost = (float)($labor['cnc_cost'] ?? 0.0);
-        $atelierHours = (float)($labor['atelier_hours'] ?? 0.0);
+        $atelierMinutes = (float)($labor['atelier_hours'] ?? 0.0);
         $atelierCost = (float)($labor['atelier_cost'] ?? 0.0);
         $logo = (string)($company['logo_url'] ?? '');
         if ($logo === '' && isset($company['logo_thumb'])) $logo = (string)$company['logo_thumb'];
@@ -1302,29 +1306,29 @@ final class ProjectsController
 
   <div class="section">
     <div class="title">Manoperă</div>
-    <?php if ($cncHours <= 0 && $atelierHours <= 0): ?>
+    <?php if ($cncMinutes <= 0 && $atelierMinutes <= 0): ?>
       <div class="muted">Nu există manoperă.</div>
     <?php else: ?>
       <table>
         <thead>
           <tr>
             <th>Tip</th>
-            <th style="width:110px">Ore</th>
+            <th style="width:110px">Minute</th>
             <th style="width:140px">Cost</th>
           </tr>
         </thead>
         <tbody>
-          <?php if ($cncHours > 0 || $cncCost > 0): ?>
+          <?php if ($cncMinutes > 0 || $cncCost > 0): ?>
             <tr>
               <td>CNC</td>
-              <td><?= $esc(self::fmtQty($cncHours, 2)) ?></td>
+              <td><?= $esc(self::fmtQty($cncMinutes, 2)) ?></td>
               <td><?= $esc(self::fmtMoney($cncCost)) ?></td>
             </tr>
           <?php endif; ?>
-          <?php if ($atelierHours > 0 || $atelierCost > 0): ?>
+          <?php if ($atelierMinutes > 0 || $atelierCost > 0): ?>
             <tr>
               <td>Atelier</td>
-              <td><?= $esc(self::fmtQty($atelierHours, 2)) ?></td>
+              <td><?= $esc(self::fmtQty($atelierMinutes, 2)) ?></td>
               <td><?= $esc(self::fmtMoney($atelierCost)) ?></td>
             </tr>
           <?php endif; ?>
@@ -7448,14 +7452,14 @@ final class ProjectsController
             Response::redirect('/projects/' . $projectId . '?tab=hours');
         }
         $ppId = Validator::int(trim((string)($_POST['project_product_id'] ?? '')), 1);
-        $he = Validator::dec(trim((string)($_POST['hours_estimated'] ?? '')));
+        $minutes = Validator::dec(trim((string)($_POST['minutes_estimated'] ?? ($_POST['hours_estimated'] ?? ''))));
         $note = trim((string)($_POST['note'] ?? ''));
 
-        if ($he !== null && $he <= 0) $he = null;
-        $ha = null; // nu mai folosim ore reale în formular
+        if ($minutes !== null && $minutes <= 0) $minutes = null;
+        $ha = null; // nu mai folosim minute reale în formular
 
-        if ($he === null) {
-            Session::flash('toast_error', 'Completează orele estimate (valoare > 0).');
+        if ($minutes === null) {
+            Session::flash('toast_error', 'Completează minutele estimate (valoare > 0).');
             Response::redirect('/projects/' . $projectId . '?tab=hours');
         }
 
@@ -7487,17 +7491,17 @@ final class ProjectsController
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
                 'work_type' => $type,
-                'hours_estimated' => $he,
+                'hours_estimated' => $minutes,
                 'hours_actual' => $ha,
                 'cost_per_hour' => $cph,
                 'note' => $note !== '' ? $note : null,
                 'created_by' => Auth::id(),
             ]);
             Audit::log('PROJECT_WORK_LOG_CREATE', 'project_work_logs', $wid, null, null, [
-                'message' => 'A adăugat ore ' . $type,
+                'message' => 'A adăugat minute ' . $type,
                 'project_id' => $projectId,
                 'project_product_id' => $ppId,
-                'hours_estimated' => $he,
+                'hours_estimated' => $minutes,
                 'hours_actual' => $ha,
                 'cost_per_hour' => $cph,
                 'note' => $note !== '' ? $note : null,
@@ -7680,7 +7684,7 @@ final class ProjectsController
         try {
             ProjectWorkLog::delete($workId);
             Audit::log('PROJECT_WORK_LOG_DELETE', 'project_work_logs', $workId, $before, null, [
-                'message' => 'A șters înregistrare ore.',
+                'message' => 'A șters înregistrare minute.',
                 'project_id' => $projectId,
             ]);
             Session::flash('toast_success', 'Înregistrare ștearsă.');

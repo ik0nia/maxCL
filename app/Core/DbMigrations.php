@@ -1451,6 +1451,19 @@ final class DbMigrations
                     }
                 },
             ],
+            [
+                'id' => '2026-01-27_01_work_logs_minutes',
+                'label' => 'Convert work log hours to minutes',
+                'fn' => function (PDO $pdo): void {
+                    if (self::tableExists($pdo, 'project_work_logs')) {
+                        try { $pdo->exec("UPDATE project_work_logs SET hours_estimated = hours_estimated * 60 WHERE hours_estimated IS NOT NULL"); } catch (\Throwable $e) {}
+                        try { $pdo->exec("UPDATE project_work_logs SET hours_actual = hours_actual * 60 WHERE hours_actual IS NOT NULL"); } catch (\Throwable $e) {}
+                    }
+                    if (self::tableExists($pdo, 'offer_work_logs')) {
+                        try { $pdo->exec("UPDATE offer_work_logs SET hours_estimated = hours_estimated * 60 WHERE hours_estimated IS NOT NULL"); } catch (\Throwable $e) {}
+                    }
+                },
+            ],
         ];
     }
 

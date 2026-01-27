@@ -368,13 +368,13 @@ final class OffersController
 
             $laborCost = 0.0;
             foreach ($workByProduct[$opId] as $wr) {
-                $he = isset($wr['hours_estimated']) && $wr['hours_estimated'] !== null && $wr['hours_estimated'] !== ''
+                $minutes = isset($wr['hours_estimated']) && $wr['hours_estimated'] !== null && $wr['hours_estimated'] !== ''
                     ? (float)$wr['hours_estimated']
                     : 0.0;
                 $cph = isset($wr['cost_per_hour']) && $wr['cost_per_hour'] !== null && $wr['cost_per_hour'] !== ''
                     ? (float)$wr['cost_per_hour']
                     : 0.0;
-                $laborCost += $he * $cph;
+                $laborCost += ($minutes / 60.0) * $cph;
             }
 
             $totalCost = $hplCost + $accCost + $laborCost;
@@ -744,10 +744,10 @@ final class OffersController
             Session::flash('toast_error', 'Tip invalid.');
             Response::redirect('/offers/' . $offerId . '?tab=products');
         }
-        $he = Validator::dec(trim((string)($_POST['hours_estimated'] ?? '')));
-        if ($he !== null && $he <= 0) $he = null;
-        if ($he === null) {
-            Session::flash('toast_error', 'Completează orele estimate (valoare > 0).');
+        $minutes = Validator::dec(trim((string)($_POST['minutes_estimated'] ?? ($_POST['hours_estimated'] ?? ''))));
+        if ($minutes !== null && $minutes <= 0) $minutes = null;
+        if ($minutes === null) {
+            Session::flash('toast_error', 'Completează minutele estimate (valoare > 0).');
             Response::redirect('/offers/' . $offerId . '?tab=products');
         }
 
@@ -769,7 +769,7 @@ final class OffersController
                 'offer_id' => $offerId,
                 'offer_product_id' => $opId,
                 'work_type' => $type,
-                'hours_estimated' => $he,
+                'hours_estimated' => $minutes,
                 'cost_per_hour' => $cph,
                 'note' => $_POST['note'] ?? null,
                 'created_by' => Auth::id(),
@@ -857,13 +857,13 @@ final class OffersController
 
             $laborCost = 0.0;
             foreach ($workRows as $wr) {
-                $he = isset($wr['hours_estimated']) && $wr['hours_estimated'] !== null && $wr['hours_estimated'] !== ''
+                $minutes = isset($wr['hours_estimated']) && $wr['hours_estimated'] !== null && $wr['hours_estimated'] !== ''
                     ? (float)$wr['hours_estimated']
                     : 0.0;
                 $cph = isset($wr['cost_per_hour']) && $wr['cost_per_hour'] !== null && $wr['cost_per_hour'] !== ''
                     ? (float)$wr['cost_per_hour']
                     : 0.0;
-                $laborCost += $he * $cph;
+                $laborCost += ($minutes / 60.0) * $cph;
             }
 
             $costTotal = $hplCost + $accCost + $laborCost;

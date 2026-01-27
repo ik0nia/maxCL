@@ -597,7 +597,7 @@ CREATE TABLE IF NOT EXISTS entity_files (
   CONSTRAINT fk_entity_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---- Ore CNC / Atelier
+-- ---- Minute CNC / Atelier
 CREATE TABLE IF NOT EXISTS project_work_logs (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   project_id INT UNSIGNED NOT NULL,
