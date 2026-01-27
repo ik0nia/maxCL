@@ -23,6 +23,7 @@ use App\Models\ProjectDeliveryItem;
 use App\Models\ProjectHplConsumption;
 use App\Models\ProjectMagazieConsumption;
 use App\Models\ProjectProduct;
+use App\Models\ProjectTimeLog;
 use App\Models\EntityFile;
 use App\Core\Upload;
 use App\Models\ProjectWorkLog;
@@ -3168,6 +3169,21 @@ final class ProjectsController
                     }
                 }
 
+                $timeLogCategories = ProjectTimeLog::categories();
+                $timeLogsByProduct = [];
+                try {
+                    $timeLogs = ProjectTimeLog::forProject($id, 300);
+                    foreach ($timeLogs as $r) {
+                        $ppId = (int)($r['project_product_id'] ?? 0);
+                        if ($ppId <= 0) continue;
+                        if (!isset($timeLogsByProduct[$ppId])) $timeLogsByProduct[$ppId] = [];
+                        if (count($timeLogsByProduct[$ppId]) >= 5) continue;
+                        $timeLogsByProduct[$ppId][] = $r;
+                    }
+                } catch (\Throwable $e) {
+                    $timeLogsByProduct = [];
+                }
+
                 echo View::render('projects/show', [
                     'title' => 'Proiect',
                     'project' => $project,
@@ -3199,6 +3215,8 @@ final class ProjectsController
                     'projectProductLabels' => $projectProductLabels,
                     'projectLabels' => $projectLabels,
                     'cncFiles' => $cncFiles,
+                    'timeLogCategories' => $timeLogCategories,
+                    'timeLogsByProduct' => $timeLogsByProduct,
                     'statuses' => self::statuses(),
                     'allocationModes' => [],
                     'clients' => Client::forSelect(),
@@ -7338,6 +7356,82 @@ final class ProjectsController
             }
         } catch (\Throwable $e) {
             Session::flash('toast_error', 'Nu pot salva observația.');
+        }
+        Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+    }
+
+    public static function addProductTimeLog(array $params): void
+    {
+        Csrf::verify($_POST['_csrf'] ?? null);
+        $projectId = (int)($params['id'] ?? 0);
+        $ppId = (int)($params['ppId'] ?? 0);
+        $project = Project::find($projectId);
+        if (!$project) {
+            Session::flash('toast_error', 'Proiect inexistent.');
+            Response::redirect('/projects');
+        }
+        $pp = ProjectProduct::find($ppId);
+        if (!$pp || (int)($pp['project_id'] ?? 0) !== $projectId) {
+            Session::flash('toast_error', 'Produs proiect invalid.');
+            Response::redirect('/projects/' . $projectId . '?tab=products');
+        }
+        if (!self::canEditProjectProducts() || !self::canOperatorEditProjectProduct($pp)) {
+            Session::flash('toast_error', 'Nu ai drepturi pentru pontaj.');
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+
+        $category = trim((string)($_POST['category'] ?? ''));
+        $person = trim((string)($_POST['person'] ?? ''));
+        $desc = trim((string)($_POST['description'] ?? ''));
+        $minutes = Validator::int(trim((string)($_POST['minutes'] ?? '')), 1, 1000000);
+
+        $allowed = array_map(static fn(array $c): string => (string)($c['value'] ?? ''), ProjectTimeLog::categories());
+        if ($category === '' || !in_array($category, $allowed, true)) {
+            Session::flash('toast_error', 'Categorie invalida.');
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+        if ($person === '') {
+            Session::flash('toast_error', 'Persoana este obligatorie.');
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+        if (mb_strlen($person) > 190) {
+            $person = mb_substr($person, 0, 190);
+        }
+        if ($desc === '') {
+            Session::flash('toast_error', 'Descrierea este obligatorie.');
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+        if (mb_strlen($desc) > 2000) {
+            $desc = mb_substr($desc, 0, 2000);
+        }
+        if ($minutes === null) {
+            Session::flash('toast_error', 'Minute invalide.');
+            Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
+        }
+
+        try {
+            $tid = ProjectTimeLog::create([
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'category' => $category,
+                'person' => $person,
+                'description' => $desc,
+                'minutes' => $minutes,
+                'created_by' => Auth::id(),
+            ]);
+            if ($tid > 0) {
+                Audit::log('PROJECT_PRODUCT_TIME_LOG_ADD', 'project_time_logs', $tid, null, null, [
+                    'message' => 'Pontaj produs.',
+                    'project_id' => $projectId,
+                    'project_product_id' => $ppId,
+                    'category' => $category,
+                    'person' => $person,
+                    'minutes' => $minutes,
+                ]);
+            }
+            Session::flash('toast_success', 'Pontaj salvat.');
+        } catch (\Throwable $e) {
+            Session::flash('toast_error', 'Nu pot salva pontajul.');
         }
         Response::redirect('/projects/' . $projectId . '?tab=products#pp-' . $ppId);
     }
