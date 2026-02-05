@@ -13,6 +13,12 @@ $canDelete = $u && in_array((string)$u['role'], [Auth::ROLE_ADMIN, Auth::ROLE_MA
 $items = $items ?? [];
 $q = trim((string)($q ?? ''));
 
+$fmtQty = function ($v): string {
+  $s = number_format((float)$v, 3, '.', '');
+  $s = rtrim(rtrim($s, '0'), '.');
+  return $s === '' ? '0' : $s;
+};
+
 ob_start();
 ?>
 <div class="app-page-title">
@@ -62,7 +68,7 @@ ob_start();
               <?= htmlspecialchars((string)($it['name'] ?? '')) ?>
             </a>
           </td>
-          <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+          <td class="text-end fw-semibold"><?= $fmtQty($qty) ?> <?= htmlspecialchars($unit) ?></td>
           <?php if ($canSeePrices): ?>
             <td class="text-end"><?= $price !== null ? number_format($price, 2, '.', '') : '—' ?></td>
           <?php endif; ?>

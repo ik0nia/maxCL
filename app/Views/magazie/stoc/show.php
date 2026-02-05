@@ -15,6 +15,11 @@ if (isset($item['unit_price']) && $item['unit_price'] !== null && $item['unit_pr
   $price = (float)$item['unit_price'];
 }
 $unit = (string)($item['unit'] ?? 'buc');
+$fmtQty = function ($v): string {
+  $s = number_format((float)$v, 3, '.', '');
+  $s = rtrim(rtrim($s, '0'), '.');
+  return $s === '' ? '0' : $s;
+};
 
 ob_start();
 ?>
@@ -40,7 +45,7 @@ ob_start();
       <div class="mt-3">
         <div class="text-muted small">Bucăți</div>
         <div class="fw-semibold" style="font-size:1.15rem">
-          <?= number_format((float)$qty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?>
+          <?= $fmtQty($qty) ?> <?= htmlspecialchars($unit) ?>
         </div>
       </div>
       <?php if ($canSeePrices): ?>
@@ -91,7 +96,7 @@ ob_start();
               <tr>
                 <td class="text-muted"><?= htmlspecialchars((string)($m['created_at'] ?? '')) ?></td>
                 <td class="fw-semibold"><?= htmlspecialchars($dir) ?></td>
-                <td class="text-end fw-semibold"><?= number_format((float)$mqty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+                <td class="text-end fw-semibold"><?= $fmtQty($mqty) ?> <?= htmlspecialchars($unit) ?></td>
                 <?php if ($canSeePrices): ?>
                   <td class="text-end"><?= $mprice !== null ? number_format($mprice, 2, '.', '') : '—' ?></td>
                 <?php endif; ?>
