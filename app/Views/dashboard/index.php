@@ -20,6 +20,12 @@ $lowMagazieItems = is_array($lowMagazieItems ?? null) ? $lowMagazieItems : [];
 $lowMagazieError = $lowMagazieError ?? null;
 $u = Auth::user();
 $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
+
+$fmtQty = function ($v): string {
+  $s = number_format((float)$v, 3, '.', '');
+  $s = rtrim(rtrim($s, '0'), '.');
+  return $s === '' ? '0' : $s;
+};
 ?>
 <div class="row g-3">
   <div class="col-12">
@@ -311,7 +317,7 @@ $isViewRole = $u && (string)($u['role'] ?? '') === Auth::ROLE_VIEW;
                       <?= htmlspecialchars($label !== '' ? $label : ('Produs #' . $id)) ?>
                     </a>
                   </td>
-                  <td class="text-end fw-semibold"><?= number_format((float)$qty, 3, '.', '') ?> <?= htmlspecialchars($unit) ?></td>
+                  <td class="text-end fw-semibold"><?= $fmtQty($qty) ?> <?= htmlspecialchars($unit) ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
