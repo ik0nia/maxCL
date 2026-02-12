@@ -791,29 +791,38 @@ final class ProjectsController
      */
     private static function buildWinMentorCsv(array $hplRows, array $accRows): string
     {
-        $agg = [];
-        foreach ($hplRows as $r) {
-            if (!empty($r['is_rest'])) continue;
-            $code = trim((string)($r['board_code'] ?? ''));
-            if ($code === '') {
-                $code = trim((string)($r['board_name'] ?? ''));
+        $collect = function (bool $skipRest) use ($hplRows, $accRows): array {
+            $agg = [];
+            foreach ($hplRows as $r) {
+                if ($skipRest && !empty($r['is_rest'])) continue;
+                $code = trim((string)($r['board_code'] ?? ''));
+                if ($code === '') {
+                    $code = trim((string)($r['board_name'] ?? ''));
+                }
+                if ($code === '') continue;
+                $qty = isset($r['display_qty']) ? (float)$r['display_qty'] : 0.0;
+                if ($qty <= 0) continue;
+                if (!isset($agg[$code])) $agg[$code] = 0.0;
+                $agg[$code] += $qty;
             }
-            if ($code === '') continue;
-            $qty = isset($r['display_qty']) ? (float)$r['display_qty'] : 0.0;
-            if ($qty <= 0) continue;
-            if (!isset($agg[$code])) $agg[$code] = 0.0;
-            $agg[$code] += $qty;
-        }
-        foreach ($accRows as $r) {
-            $code = trim((string)($r['code'] ?? ''));
-            if ($code === '') {
-                $code = trim((string)($r['name'] ?? ''));
+            foreach ($accRows as $r) {
+                $code = trim((string)($r['code'] ?? ''));
+                if ($code === '') {
+                    $code = trim((string)($r['name'] ?? ''));
+                }
+                if ($code === '') continue;
+                $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
+                if ($qty <= 0) continue;
+                if (!isset($agg[$code])) $agg[$code] = 0.0;
+                $agg[$code] += $qty;
             }
-            if ($code === '') continue;
-            $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
-            if ($qty <= 0) continue;
-            if (!isset($agg[$code])) $agg[$code] = 0.0;
-            $agg[$code] += $qty;
+            return $agg;
+        };
+
+        $agg = $collect(true);
+        if (!$agg) {
+            // dacă nu există consum contabil, includem și resturile ca fallback
+            $agg = $collect(false);
         }
         $lines = [];
         foreach ($agg as $code => $qty) {
