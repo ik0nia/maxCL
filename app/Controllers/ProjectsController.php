@@ -183,7 +183,7 @@ final class ProjectsController
     private static function isFinalProductStatus(string $st): bool
     {
         $st = strtoupper(trim($st));
-        return in_array($st, ['GATA_DE_LIVRARE', 'AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true);
+        return in_array($st, ['GATA_DE_LIVRARE', 'SPRE_AVIZARE', 'AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true);
     }
 
     /**
@@ -753,6 +753,67 @@ final class ProjectsController
             'size_bytes' => $size !== false ? (int)$size : 0,
             'mime' => 'text/html',
         ];
+    }
+
+    /**
+     * @return array{stored_name:string,size_bytes:int,mime:string}
+     */
+    private static function saveCsvDocument(string $storedName, string $csv): array
+    {
+        $safe = preg_replace('/[^a-zA-Z0-9_\-\.]+/', '_', $storedName) ?? 'document.csv';
+        if (!str_ends_with(strtolower($safe), '.csv')) {
+            $safe .= '.csv';
+        }
+        $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException('Nu pot crea directorul de documente.');
+        }
+        $path = $dir . '/' . $safe;
+        $suffix = 0;
+        while (is_file($path)) {
+            $suffix++;
+            $path = $dir . '/' . preg_replace('/\.csv$/', '', $safe) . '-' . $suffix . '.csv';
+        }
+        if (file_put_contents($path, $csv) === false) {
+            throw new \RuntimeException('Nu pot salva documentul CSV pe server.');
+        }
+        $size = filesize($path);
+        return [
+            'stored_name' => basename($path),
+            'size_bytes' => $size !== false ? (int)$size : 0,
+            'mime' => 'text/csv',
+        ];
+    }
+
+    /**
+     * @param array<int, array{board_code:string,display_qty:float,is_rest:bool}> $hplRows
+     * @param array<int, array{code:string,qty:float}> $accRows
+     */
+    private static function buildWinMentorCsv(array $hplRows, array $accRows): string
+    {
+        $agg = [];
+        foreach ($hplRows as $r) {
+            if (!empty($r['is_rest'])) continue;
+            $code = trim((string)($r['board_code'] ?? ''));
+            if ($code === '') continue;
+            $qty = isset($r['display_qty']) ? (float)$r['display_qty'] : 0.0;
+            if ($qty <= 0) continue;
+            if (!isset($agg[$code])) $agg[$code] = 0.0;
+            $agg[$code] += $qty;
+        }
+        foreach ($accRows as $r) {
+            $code = trim((string)($r['code'] ?? ''));
+            if ($code === '') continue;
+            $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
+            if ($qty <= 0) continue;
+            if (!isset($agg[$code])) $agg[$code] = 0.0;
+            $agg[$code] += $qty;
+        }
+        $lines = [];
+        foreach ($agg as $code => $qty) {
+            $lines[] = $code . ',0,' . self::fmtQty($qty);
+        }
+        return $lines ? (implode("\n", $lines) . "\n") : '';
     }
 
     /** @param array<string,mixed> $ctx */
@@ -1361,9 +1422,18 @@ final class ProjectsController
     }
 
     /**
-     * @return array{deviz_number:int,bon_number:int}
+     * @return array{deviz_number?:int,bon_number?:int,winmentor?:bool}
      */
-    private static function generateDocumentsForAvizare(int $projectId, int $ppId, array $before, string $avizNumber, string $avizDate = ''): array
+    private static function generateDocumentsForAvizare(
+        int $projectId,
+        int $ppId,
+        array $before,
+        string $avizNumber,
+        string $avizDate = '',
+        bool $includeDeviz = true,
+        bool $includeBon = true,
+        bool $includeWinMentor = false
+    ): array
     {
         $project = Project::find($projectId);
         if (!$project) {
@@ -1382,12 +1452,16 @@ final class ProjectsController
             throw new \RuntimeException('Produs proiect invalid pentru deviz.');
         }
 
-        $invoiceClientId = isset($before['invoice_client_id']) ? (int)$before['invoice_client_id'] : 0;
-        $deliveryAddressId = isset($before['delivery_address_id']) ? (int)$before['delivery_address_id'] : 0;
-        $client = $invoiceClientId > 0 ? Client::find($invoiceClientId) : null;
-        $delivery = $deliveryAddressId > 0 ? ClientAddress::find($deliveryAddressId) : null;
-        if (!$client || !$delivery) {
-            throw new \RuntimeException('Date de facturare/livrare invalide pentru deviz.');
+        $client = null;
+        $delivery = null;
+        if ($includeDeviz) {
+            $invoiceClientId = isset($before['invoice_client_id']) ? (int)$before['invoice_client_id'] : 0;
+            $deliveryAddressId = isset($before['delivery_address_id']) ? (int)$before['delivery_address_id'] : 0;
+            $client = $invoiceClientId > 0 ? Client::find($invoiceClientId) : null;
+            $delivery = $deliveryAddressId > 0 ? ClientAddress::find($deliveryAddressId) : null;
+            if (!$client || !$delivery) {
+                throw new \RuntimeException('Date de facturare/livrare invalide pentru deviz.');
+            }
         }
 
         $magConsum = ProjectMagazieConsumption::forProject($projectId);
@@ -1410,17 +1484,23 @@ final class ProjectsController
             ? (float)$ppRow['product_sale_price']
             : 0.0;
 
-        try {
-            $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
-        } catch (\Throwable $e) {
-            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
-            $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+        $devizNumber = null;
+        if ($includeDeviz) {
+            try {
+                $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+            } catch (\Throwable $e) {
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                $devizNumber = self::nextDocNumber('deviz_last_number', 10000);
+            }
         }
-        try {
-            $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
-        } catch (\Throwable $e) {
-            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
-            $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+        $bonNumber = null;
+        if ($includeBon) {
+            try {
+                $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+            } catch (\Throwable $e) {
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
+            }
         }
 
         $docDate = date('Y-m-d');
@@ -1429,108 +1509,139 @@ final class ProjectsController
         if ($projectNameForDoc === '') $projectNameForDoc = trim((string)($project['code'] ?? ''));
         if ($projectNameForDoc === '') $projectNameForDoc = 'Proiect';
         $productNameForDoc = $productName !== '' ? $productName : 'Produs';
-        $devizLabel = 'DEVIZ #' . $devizNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
-        $bonLabel = 'BON CONSUM #' . $bonNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
-
-        $devizHtml = self::renderDevizHtml([
-            'company' => $company,
-            'client' => $client,
-            'delivery' => $delivery,
-            'product' => [
-                'name' => $productName !== '' ? $productName : 'Produs',
-                'description' => $description,
-                'qty' => $qty,
-                'unit' => $unit,
-                'unit_price' => $unitPrice,
-            ],
-            'accessories' => self::aggregateAccessories($accRowsDeviz),
-            'doc_number' => $devizNumber,
-            'doc_date' => $docDate,
-            'project_label' => $projectLabel,
-            'aviz_number' => $avizNumber,
-            'aviz_date' => $avizDate,
-        ]);
-        $devizFile = self::saveHtmlDocument(
-            'deviz-' . $devizNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
-            $devizHtml
-        );
-        $devizId = EntityFile::create([
-            'entity_type' => 'projects',
-            'entity_id' => $projectId,
-            'category' => $devizLabel,
-            'original_name' => $devizLabel . '.html',
-            'stored_name' => $devizFile['stored_name'],
-            'mime' => $devizFile['mime'],
-            'size_bytes' => $devizFile['size_bytes'],
-            'uploaded_by' => Auth::id(),
-        ]);
-        Audit::log('DEVIZ_GENERATED', 'entity_files', $devizId, null, null, [
-            'project_id' => $projectId,
-            'project_product_id' => $ppId,
-            'number' => $devizNumber,
-        ]);
-
-        $hplRows = [];
-        try {
-            $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId);
-        } catch (\Throwable $e) {
-            try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
-            try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
+        if ($includeDeviz && $devizNumber !== null) {
+            $devizLabel = 'DEVIZ #' . $devizNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
+            $devizHtml = self::renderDevizHtml([
+                'company' => $company,
+                'client' => $client,
+                'delivery' => $delivery,
+                'product' => [
+                    'name' => $productName !== '' ? $productName : 'Produs',
+                    'description' => $description,
+                    'qty' => $qty,
+                    'unit' => $unit,
+                    'unit_price' => $unitPrice,
+                ],
+                'accessories' => self::aggregateAccessories($accRowsDeviz),
+                'doc_number' => $devizNumber,
+                'doc_date' => $docDate,
+                'project_label' => $projectLabel,
+                'aviz_number' => $avizNumber,
+                'aviz_date' => $avizDate,
+            ]);
+            $devizFile = self::saveHtmlDocument(
+                'deviz-' . $devizNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
+                $devizHtml
+            );
+            $devizId = EntityFile::create([
+                'entity_type' => 'projects',
+                'entity_id' => $projectId,
+                'category' => $devizLabel,
+                'original_name' => $devizLabel . '.html',
+                'stored_name' => $devizFile['stored_name'],
+                'mime' => $devizFile['mime'],
+                'size_bytes' => $devizFile['size_bytes'],
+                'uploaded_by' => Auth::id(),
+            ]);
+            Audit::log('DEVIZ_GENERATED', 'entity_files', $devizId, null, null, [
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'number' => $devizNumber,
+            ]);
         }
-        $bonAccRows = self::aggregateAccessories($accRowsAll, 'CONSUMED');
-        $workLogs = [];
-        try {
-            $workLogs = ProjectWorkLog::forProject($projectId);
-        } catch (\Throwable $e) {
+
+        if ($includeBon && $bonNumber !== null) {
+            $hplRows = [];
+            try {
+                $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId);
+            } catch (\Throwable $e) {
+                try { \App\Core\DbMigrations::runAuto(); } catch (\Throwable $e2) {}
+                try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
+            }
+            $bonAccRows = self::aggregateAccessories($accRowsAll, 'CONSUMED');
             $workLogs = [];
+            try {
+                $workLogs = ProjectWorkLog::forProject($projectId);
+            } catch (\Throwable $e) {
+                $workLogs = [];
+            }
+            $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
+            $labor = $laborByProduct[$ppId] ?? [
+                'cnc_hours' => 0.0,
+                'cnc_cost' => 0.0,
+                'atelier_hours' => 0.0,
+                'atelier_cost' => 0.0,
+            ];
+
+            $bonLabel = 'BON CONSUM #' . $bonNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
+            $hplAgg = self::aggregateConsumedHpl($hplRows);
+            $bonHtml = self::renderBonConsumHtml([
+                'company' => $company,
+                'product' => [
+                    'name' => $productName !== '' ? $productName : 'Produs',
+                    'code' => $productCode,
+                    'qty' => $qty,
+                    'unit' => $unit,
+                    'sale_price' => $unitPrice,
+                ],
+                'hpl_rows' => $hplAgg,
+                'acc_rows' => $bonAccRows,
+                'labor' => $labor,
+                'doc_number' => $bonNumber,
+                'doc_date' => $docDate,
+                'project_label' => $projectLabel,
+                'aviz_number' => $avizNumber,
+                'aviz_date' => $avizDate,
+            ]);
+            $bonFile = self::saveHtmlDocument(
+                'bon-consum-' . $bonNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
+                $bonHtml
+            );
+            $bonId = EntityFile::create([
+                'entity_type' => 'projects',
+                'entity_id' => $projectId,
+                'category' => $bonLabel,
+                'original_name' => $bonLabel . '.html',
+                'stored_name' => $bonFile['stored_name'],
+                'mime' => $bonFile['mime'],
+                'size_bytes' => $bonFile['size_bytes'],
+                'uploaded_by' => Auth::id(),
+            ]);
+            Audit::log('BON_CONSUM_GENERATED', 'entity_files', $bonId, null, null, [
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'number' => $bonNumber,
+            ]);
+            if ($includeWinMentor) {
+                $csvBody = self::buildWinMentorCsv($hplAgg, $bonAccRows);
+                $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productNameForDoc;
+                $wmFile = self::saveCsvDocument(
+                    'bon-consum-winmentor-pp' . $ppId . '-' . $projectId . '-' . $productNameForDoc . '-' . $docDate . '.csv',
+                    $csvBody
+                );
+                $wmId = EntityFile::create([
+                    'entity_type' => 'project_products',
+                    'entity_id' => $ppId,
+                    'category' => $wmLabel,
+                    'original_name' => $wmLabel . '.csv',
+                    'stored_name' => $wmFile['stored_name'],
+                    'mime' => $wmFile['mime'],
+                    'size_bytes' => $wmFile['size_bytes'],
+                    'uploaded_by' => Auth::id(),
+                ]);
+                Audit::log('BON_CONSUM_WINMENTOR_GENERATED', 'entity_files', $wmId, null, null, [
+                    'project_id' => $projectId,
+                    'project_product_id' => $ppId,
+                    'number' => $bonNumber,
+                ]);
+            }
         }
-        $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
-        $labor = $laborByProduct[$ppId] ?? [
-            'cnc_hours' => 0.0,
-            'cnc_cost' => 0.0,
-            'atelier_hours' => 0.0,
-            'atelier_cost' => 0.0,
-        ];
 
-        $bonHtml = self::renderBonConsumHtml([
-            'company' => $company,
-            'product' => [
-                'name' => $productName !== '' ? $productName : 'Produs',
-                'code' => $productCode,
-                'qty' => $qty,
-                'unit' => $unit,
-                'sale_price' => $unitPrice,
-            ],
-            'hpl_rows' => self::aggregateConsumedHpl($hplRows),
-            'acc_rows' => $bonAccRows,
-            'labor' => $labor,
-            'doc_number' => $bonNumber,
-            'doc_date' => $docDate,
-            'project_label' => $projectLabel,
-            'aviz_number' => $avizNumber,
-            'aviz_date' => $avizDate,
-        ]);
-        $bonFile = self::saveHtmlDocument(
-            'bon-consum-' . $bonNumber . '-pp' . $ppId . '-' . $projectNameForDoc . '-' . $productNameForDoc . '-' . $docDate . '.html',
-            $bonHtml
-        );
-        $bonId = EntityFile::create([
-            'entity_type' => 'projects',
-            'entity_id' => $projectId,
-            'category' => $bonLabel,
-            'original_name' => $bonLabel . '.html',
-            'stored_name' => $bonFile['stored_name'],
-            'mime' => $bonFile['mime'],
-            'size_bytes' => $bonFile['size_bytes'],
-            'uploaded_by' => Auth::id(),
-        ]);
-        Audit::log('BON_CONSUM_GENERATED', 'entity_files', $bonId, null, null, [
-            'project_id' => $projectId,
-            'project_product_id' => $ppId,
-            'number' => $bonNumber,
-        ]);
-
-        return ['deviz_number' => $devizNumber, 'bon_number' => $bonNumber];
+        $out = [];
+        if ($devizNumber !== null) $out['deviz_number'] = $devizNumber;
+        if ($bonNumber !== null) $out['bon_number'] = $bonNumber;
+        if ($includeWinMentor && $bonNumber !== null) $out['winmentor'] = true;
+        return $out;
     }
 
     public static function bonConsumGeneral(array $params): void
@@ -1549,7 +1660,7 @@ final class ProjectsController
             $ppId = (int)($pp['id'] ?? 0);
             if ($ppId <= 0) continue;
             $st = strtoupper((string)($pp['production_status'] ?? ''));
-            if (in_array($st, ['AVIZAT', 'LIVRAT'], true)) {
+            if (in_array($st, ['SPRE_AVIZARE', 'AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true)) {
                 $eligible[] = $pp;
                 $eligibleIds[] = $ppId;
             }
@@ -3063,6 +3174,7 @@ final class ProjectsController
                                OR (entity_type = "projects" AND entity_id = ? AND (
                                     stored_name LIKE "deviz-%-pp%.html"
                                     OR stored_name LIKE "bon-consum-%-pp%.html"
+                                    OR stored_name LIKE "bon-consum-winmentor-%-pp%.csv"
                                   ))
                             ORDER BY created_at DESC, id DESC
                         ';
@@ -3089,7 +3201,7 @@ final class ProjectsController
                                         FROM audit_log
                                         WHERE entity_type = 'entity_files'
                                           AND entity_id IN ($ph)
-                                          AND action IN ('DEVIZ_GENERATED','BON_CONSUM_GENERATED')
+                                          AND action IN ('DEVIZ_GENERATED','BON_CONSUM_GENERATED','BON_CONSUM_WINMENTOR_GENERATED')
                                     ");
                                     $stA->execute($fileIds);
                                     $audRows = $stA->fetchAll();
@@ -3102,7 +3214,9 @@ final class ProjectsController
                                             : 0;
                                         if ($ppId <= 0) continue;
                                         $action = (string)($ar['action'] ?? '');
-                                        $type = $action === 'DEVIZ_GENERATED' ? 'deviz' : ($action === 'BON_CONSUM_GENERATED' ? 'bon' : null);
+                                        $type = $action === 'DEVIZ_GENERATED'
+                                            ? 'deviz'
+                                            : ($action === 'BON_CONSUM_GENERATED' ? 'bon' : ($action === 'BON_CONSUM_WINMENTOR_GENERATED' ? 'bon_wm' : null));
                                         $auditByFileId[$fid] = ['ppId' => $ppId, 'type' => $type];
                                     }
                                 } catch (\Throwable $e) {
@@ -3120,7 +3234,7 @@ final class ProjectsController
                             if ($etype === 'project_products') {
                                 $ppId = (int)($f['entity_id'] ?? 0);
                             } else {
-                                if (preg_match('/-pp(\d+)(?:-\d+)?\.html$/', $stored, $m)) {
+                                if (preg_match('/-pp(\d+)(?:-\d+)?\.(html|csv)$/', $stored, $m)) {
                                     $ppId = (int)$m[1];
                                 }
                             }
@@ -3130,7 +3244,9 @@ final class ProjectsController
                             if ($ppId <= 0 || !isset($ppIdSet[$ppId])) continue;
 
                             $type = null;
-                            if (str_starts_with($stored, 'deviz-') || stripos($category, 'deviz') !== false) {
+                            if (str_starts_with($stored, 'bon-consum-winmentor-') || stripos($category, 'bon consum winmentor') !== false) {
+                                $type = 'bon_wm';
+                            } elseif (str_starts_with($stored, 'deviz-') || stripos($category, 'deviz') !== false) {
                                 $type = 'deviz';
                             } elseif (str_starts_with($stored, 'bon-consum-') || stripos($category, 'bon consum') !== false) {
                                 $type = 'bon';
@@ -3141,8 +3257,8 @@ final class ProjectsController
                             if ($type === null) continue;
                             if (isset($docsByPp[$ppId][$type])) continue;
 
-                            $label = $type === 'deviz' ? 'Deviz' : 'Bon consum';
-                            $appendNum = true;
+                            $label = $type === 'deviz' ? 'Deviz' : ($type === 'bon_wm' ? 'Bon consum WinMentor' : 'Bon consum');
+                            $appendNum = $type !== 'bon_wm';
                             $orig = trim((string)($f['original_name'] ?? ''));
                             $origBase = $orig !== '' ? preg_replace('/\.html$/i', '', $orig) : '';
                             if ($origBase !== '' && preg_match('/^(DEVIZ|BON\s+CONSUM)\s*#\d+\s*-/i', $origBase)) {
@@ -3554,6 +3670,7 @@ final class ProjectsController
             ['value' => 'CNC', 'label' => 'CNC'],
             ['value' => 'MONTAJ', 'label' => 'Montaj'],
             ['value' => 'GATA_DE_LIVRARE', 'label' => 'Gata de livrare'],
+            ['value' => 'SPRE_AVIZARE', 'label' => 'Spre avizare'],
             ['value' => 'AVIZAT', 'label' => 'Avizare'],
             ['value' => 'LIVRAT_PARTIAL', 'label' => 'Livrat parțial'],
             ['value' => 'LIVRAT', 'label' => 'Livrat'],
@@ -3566,7 +3683,7 @@ final class ProjectsController
         $all = array_map(fn($s) => (string)$s['value'], self::projectProductStatuses());
         if (self::canSetProjectProductFinalStatus()) return $all;
         // Operatorii nu pot seta statusurile finale.
-        return array_values(array_filter($all, fn($v) => !in_array($v, ['AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true)));
+        return array_values(array_filter($all, fn($v) => !in_array($v, ['SPRE_AVIZARE', 'AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true)));
     }
 
     public static function addExistingProduct(array $params): void
@@ -3872,7 +3989,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -3984,7 +4101,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($before['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate edita.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate edita.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -4063,7 +4180,7 @@ final class ProjectsController
 
         $allowed = self::allowedProjectProductStatusesForCurrentUser();
         if (!in_array($next, $allowed, true)) {
-            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Avizare/Livrat sunt doar pentru Admin/Gestionar).');
+            Session::flash('toast_error', 'Nu ai drepturi să avansezi la următorul status (Spre avizare/Avizare/Livrat parțial/Livrat sunt doar pentru Admin/Gestionar).');
             Response::redirect('/projects/' . $projectId . '?tab=products');
         }
 
@@ -4366,8 +4483,10 @@ final class ProjectsController
             }
 
             $docInfo = null;
-            if ($next === 'AVIZAT') {
-                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber, $avizDateLabel);
+            if ($next === 'SPRE_AVIZARE') {
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, '', '', false, true, true);
+            } elseif ($next === 'AVIZAT') {
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber, $avizDateLabel, true, false, false);
             }
 
             if ($useTx) {
@@ -4456,8 +4575,17 @@ final class ProjectsController
                 'new_status' => $appliedStatus,
             ]);
             $msg = 'Status produs actualizat.';
-            if (is_array($docInfo) && isset($docInfo['deviz_number'], $docInfo['bon_number'])) {
-                $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
+            if (is_array($docInfo)) {
+                if (isset($docInfo['deviz_number']) && isset($docInfo['bon_number'])) {
+                    $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' și Bon consum nr. ' . $docInfo['bon_number'] . ' generate.';
+                } elseif (isset($docInfo['deviz_number'])) {
+                    $msg .= ' Deviz nr. ' . $docInfo['deviz_number'] . ' generat.';
+                } elseif (isset($docInfo['bon_number'])) {
+                    $msg .= ' Bon consum nr. ' . $docInfo['bon_number'] . ' generat.';
+                }
+                if (!empty($docInfo['winmentor'])) {
+                    $msg .= ' Bon consum WinMentor generat.';
+                }
             }
             if ($useTx) {
                 $msg .= ' Livrare înregistrată' . ($deliveryDateLabel !== '' ? (' (' . $deliveryDateLabel . ').') : '.');
@@ -5711,7 +5839,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -5792,7 +5920,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -5914,7 +6042,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -5985,7 +6113,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -6124,7 +6252,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -6373,7 +6501,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }
@@ -6587,7 +6715,7 @@ final class ProjectsController
         if ($u && (string)($u['role'] ?? '') === Auth::ROLE_OPERATOR) {
             $st = (string)($pp['production_status'] ?? 'CREAT');
             if (self::isFinalProductStatus($st)) {
-                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Avizare/Livrat). Doar Admin/Gestionar poate modifica.');
+                Session::flash('toast_error', 'Produsul este definitivat (Gata de livrare/Spre avizare/Avizare/Livrat parțial/Livrat). Doar Admin/Gestionar poate modifica.');
                 Response::redirect('/projects/' . $projectId . '?tab=products');
             }
         }

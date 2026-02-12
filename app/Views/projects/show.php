@@ -670,7 +670,7 @@ ob_start();
           $canSetPPStatus = ProjectsController::canSetProjectProductStatus();
           $canSetPPFinal = ProjectsController::canSetProjectProductFinalStatus();
           $ppAllowedValues = array_map(fn($s) => (string)$s['value'], $ppStatusesAll);
-          if (!$canSetPPFinal) $ppAllowedValues = array_values(array_filter($ppAllowedValues, fn($v) => !in_array($v, ['AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true)));
+          if (!$canSetPPFinal) $ppAllowedValues = array_values(array_filter($ppAllowedValues, fn($v) => !in_array($v, ['SPRE_AVIZARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true)));
 
           // HPL "stoc proiect" pentru CNC->Montaj (din hpl_stock_pieces):
           // - FULL RESERVED per board
@@ -868,7 +868,7 @@ ob_start();
                             $isCur = ($i === $idxAll);
                             $isNext = ($i === $idxAll + 1);
                             $isVisible = true;
-                            if (!$canSetPPFinal && in_array($v, ['AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true) && !in_array($stVal, ['AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true)) {
+                            if (!$canSetPPFinal && in_array($v, ['SPRE_AVIZARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true) && !in_array($stVal, ['SPRE_AVIZARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true)) {
                               // Operator: arătăm statusurile finale ca "locked", dar nu le facem clickabile.
                               $isVisible = true;
                             }
@@ -1335,6 +1335,12 @@ ob_start();
                         <?php $b = $docLinks['bon']; ?>
                         <a class="text-decoration-none small" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($b['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
                           <i class="bi bi-receipt me-1"></i><?= htmlspecialchars((string)($b['label'] ?? 'Bon consum')) ?>
+                        </a>
+                      <?php endif; ?>
+                      <?php if (isset($docLinks['bon_wm'])): ?>
+                        <?php $bw = $docLinks['bon_wm']; ?>
+                        <a class="text-decoration-none small" href="<?= htmlspecialchars(Url::to('/uploads/files/' . (string)($bw['stored_name'] ?? ''))) ?>" target="_blank" rel="noopener">
+                          <i class="bi bi-filetype-csv me-1"></i><?= htmlspecialchars((string)($bw['label'] ?? 'Bon consum WinMentor')) ?>
                         </a>
                       <?php endif; ?>
                     </div>
@@ -3211,7 +3217,7 @@ ob_start();
         <label for="avizDateInput" class="form-label fw-semibold mt-2">Data avizului</label>
         <input class="form-control" id="avizDateInput" maxlength="10" placeholder="zz.ll.aaaa">
         <div class="invalid-feedback">Introdu data în format zz.ll.aaaa.</div>
-        <div class="text-muted small mt-2">Numărul și data avizului vor fi afișate jos pe Deviz și Bonul de consum.</div>
+        <div class="text-muted small mt-2">Numărul și data avizului vor fi afișate jos pe Deviz.</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Renunță</button>

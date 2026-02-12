@@ -150,7 +150,7 @@ final class ProjectProduct
         $pdo = DB::pdo();
         $status = trim($status);
         // finalized_at: setăm când trece la GATA_DE_LIVRARE (sau după), iar dacă revine înapoi înainte de asta, resetăm.
-        $isFinal = in_array($status, ['GATA_DE_LIVRARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true);
+        $isFinal = in_array($status, ['GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT_PARTIAL','LIVRAT'], true);
         $isBeforeFinal = in_array($status, ['CREAT','PROIECTARE','CNC','MONTAJ'], true);
         try {
             if ($isFinal) {
