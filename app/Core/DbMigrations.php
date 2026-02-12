@@ -494,7 +494,7 @@ final class DbMigrations
                           product_id INT UNSIGNED NOT NULL,
                           qty DECIMAL(12,2) NOT NULL DEFAULT 1,
                           unit VARCHAR(32) NOT NULL DEFAULT 'buc',
-                          production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
+                          production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
                           hpl_board_id INT UNSIGNED NULL,
                           delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
                           notes TEXT NULL,
@@ -849,7 +849,7 @@ final class DbMigrations
                             ALTER TABLE project_products
                             MODIFY production_status ENUM(
                               'DE_PREGATIT','CNC','ATELIER','FINISARE','GATA','LIVRAT_PARTIAL','LIVRAT_COMPLET','REBUT',
-                              'CREAT','PROIECTARE','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT'
+                              'CREAT','PROIECTARE','MONTAJ','GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT'
                             ) NOT NULL DEFAULT 'CREAT'
                         ");
                     } catch (\Throwable $e) {
@@ -879,7 +879,7 @@ final class DbMigrations
                     try {
                         $pdo->exec("
                             ALTER TABLE project_products
-                            MODIFY production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT')
+                            MODIFY production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT')
                             NOT NULL DEFAULT 'CREAT'
                         ");
                     } catch (\Throwable $e) {
@@ -1337,6 +1337,23 @@ final class DbMigrations
                           CONSTRAINT fk_ptl_user FOREIGN KEY (created_by) REFERENCES users(id)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     ");
+                },
+            ],
+            [
+                'id' => '2026-01-26_01_project_products_spre_avizare',
+                'label' => 'ALTER project_products.production_status add SPRE_AVIZARE',
+                'fn' => function (PDO $pdo): void {
+                    if (!self::tableExists($pdo, 'project_products')) return;
+                    try {
+                        $pdo->exec("
+                            ALTER TABLE project_products
+                            MODIFY production_status ENUM(
+                              'CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT'
+                            ) NOT NULL DEFAULT 'CREAT'
+                        ");
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
                 },
             ],
         ];
