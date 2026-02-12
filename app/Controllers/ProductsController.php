@@ -17,7 +17,7 @@ final class ProductsController
             $where = [];
             $params = [];
             // Cerință: aici afișăm doar piesele care au minim "GATA_DE_LIVRARE".
-            $where[] = "pp.production_status IN ('GATA_DE_LIVRARE','AVIZAT','LIVRAT')";
+            $where[] = "pp.production_status IN ('GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT')";
             if ($q !== '') {
                 $where[] = '(p.name LIKE :q OR p.code LIKE :q OR pr.code LIKE :q OR pr.name LIKE :q)';
                 $params[':q'] = '%' . $q . '%';

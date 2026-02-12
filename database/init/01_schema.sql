@@ -399,7 +399,7 @@ CREATE TABLE IF NOT EXISTS project_products (
   m2_per_unit DECIMAL(12,4) NOT NULL DEFAULT 0,
   surface_type ENUM('BOARD','M2') NULL,
   surface_value DECIMAL(12,2) NULL,
-  production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
+  production_status ENUM('CREAT','PROIECTARE','CNC','MONTAJ','GATA_DE_LIVRARE','SPRE_AVIZARE','AVIZAT','LIVRAT') NOT NULL DEFAULT 'CREAT',
   hpl_board_id INT UNSIGNED NULL,
   delivered_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
   notes TEXT NULL,
@@ -597,6 +597,28 @@ CREATE TABLE IF NOT EXISTS project_work_logs (
   CONSTRAINT fk_work_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_work_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
   CONSTRAINT fk_work_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---- Pontaj productie
+CREATE TABLE IF NOT EXISTS project_time_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id INT UNSIGNED NOT NULL,
+  project_product_id BIGINT UNSIGNED NULL,
+  category ENUM('PROIECTARE','PREGATIRE_CNC','DEBITARE_CNC','ATELIER') NOT NULL,
+  person VARCHAR(190) NOT NULL,
+  description TEXT NULL,
+  minutes INT UNSIGNED NOT NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_ptl_project (project_id),
+  KEY idx_ptl_pp (project_product_id),
+  KEY idx_ptl_category (category),
+  KEY idx_ptl_person (person),
+  KEY idx_ptl_created (created_at),
+  CONSTRAINT fk_ptl_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ptl_pp FOREIGN KEY (project_product_id) REFERENCES project_products(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ptl_user FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Magazie (accesorii)
