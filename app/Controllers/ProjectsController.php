@@ -795,6 +795,9 @@ final class ProjectsController
         foreach ($hplRows as $r) {
             if (!empty($r['is_rest'])) continue;
             $code = trim((string)($r['board_code'] ?? ''));
+            if ($code === '') {
+                $code = trim((string)($r['board_name'] ?? ''));
+            }
             if ($code === '') continue;
             $qty = isset($r['display_qty']) ? (float)$r['display_qty'] : 0.0;
             if ($qty <= 0) continue;
@@ -803,6 +806,9 @@ final class ProjectsController
         }
         foreach ($accRows as $r) {
             $code = trim((string)($r['code'] ?? ''));
+            if ($code === '') {
+                $code = trim((string)($r['name'] ?? ''));
+            }
             if ($code === '') continue;
             $qty = isset($r['qty']) ? (float)$r['qty'] : 0.0;
             if ($qty <= 0) continue;
