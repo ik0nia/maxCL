@@ -760,9 +760,13 @@ final class ProjectsController
      */
     private static function saveCsvDocument(string $storedName, string $csv): array
     {
-        $safe = preg_replace('/[^a-zA-Z0-9_\-\.]+/', '_', $storedName) ?? 'document.csv';
-        if (!str_ends_with(strtolower($safe), '.csv')) {
-            $safe .= '.csv';
+        $safe = preg_replace('/[^a-zA-Z0-9_\-\.]+/', '_', $storedName) ?? 'document.txt';
+        $lower = strtolower($safe);
+        if (!str_ends_with($lower, '.txt')) {
+            if (str_ends_with($lower, '.csv')) {
+                $safe = substr($safe, 0, -4);
+            }
+            $safe .= '.txt';
         }
         $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
@@ -772,7 +776,7 @@ final class ProjectsController
         $suffix = 0;
         while (is_file($path)) {
             $suffix++;
-            $path = $dir . '/' . preg_replace('/\.csv$/', '', $safe) . '-' . $suffix . '.csv';
+            $path = $dir . '/' . preg_replace('/\.txt$/', '', $safe) . '-' . $suffix . '.txt';
         }
         if (file_put_contents($path, $csv) === false) {
             throw new \RuntimeException('Nu pot salva documentul CSV pe server.');
@@ -781,7 +785,7 @@ final class ProjectsController
         return [
             'stored_name' => basename($path),
             'size_bytes' => $size !== false ? (int)$size : 0,
-            'mime' => 'text/csv',
+            'mime' => 'text/plain',
         ];
     }
 
@@ -1631,14 +1635,14 @@ final class ProjectsController
                 $csvBody = self::buildWinMentorCsv($hplAgg, $bonAccRows);
                 $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productNameForDoc;
                 $wmFile = self::saveCsvDocument(
-                    'bon-consum-winmentor-pp' . $ppId . '-' . $projectId . '-' . $productNameForDoc . '-' . $docDate . '.csv',
+                    'bon-consum-winmentor-pp' . $ppId . '-' . $projectId . '-' . $productNameForDoc . '-' . $docDate . '.txt',
                     $csvBody
                 );
                 $wmId = EntityFile::create([
                     'entity_type' => 'project_products',
                     'entity_id' => $ppId,
                     'category' => $wmLabel,
-                    'original_name' => $wmLabel . '.csv',
+                    'original_name' => $wmLabel . '.txt',
                     'stored_name' => $wmFile['stored_name'],
                     'mime' => $wmFile['mime'],
                     'size_bytes' => $wmFile['size_bytes'],
@@ -3190,6 +3194,7 @@ final class ProjectsController
                                     stored_name LIKE "deviz-%-pp%.html"
                                     OR stored_name LIKE "bon-consum-%-pp%.html"
                                     OR stored_name LIKE "bon-consum-winmentor-%-pp%.csv"
+                                    OR stored_name LIKE "bon-consum-winmentor-%-pp%.txt"
                                   ))
                             ORDER BY created_at DESC, id DESC
                         ';
@@ -3249,7 +3254,7 @@ final class ProjectsController
                             if ($etype === 'project_products') {
                                 $ppId = (int)($f['entity_id'] ?? 0);
                             } else {
-                                if (preg_match('/-pp(\d+)(?:-\d+)?\.(html|csv)$/', $stored, $m)) {
+                                if (preg_match('/-pp(\d+)(?:-\d+)?\.(html|csv|txt)$/', $stored, $m)) {
                                     $ppId = (int)$m[1];
                                 }
                             }
