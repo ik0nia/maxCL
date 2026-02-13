@@ -805,6 +805,44 @@ final class ProjectsController
         return $raw !== '' ? $raw : 'document';
     }
 
+    /** @param array<int, array{board_code:string,display_qty:float,is_rest:bool}> $hplRows
+     *  @param array<int, array{code:string,qty:float}> $accRows
+     *  @return array{stored_name:string,label:string}|null
+     */
+    private static function saveWinMentorDocForProduct(
+        int $projectId,
+        string $projectCode,
+        int $ppId,
+        string $productName,
+        array $hplRows,
+        array $accRows
+    ): ?array {
+        if ($ppId <= 0) return null;
+        $csvBody = self::buildWinMentorCsv($hplRows, $accRows);
+        if ($csvBody === '') return null;
+        $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productName;
+        $wmBase = self::winMentorDocBase($projectCode, $productName);
+        $wmFile = self::saveCsvDocument($wmBase . '.txt', $csvBody);
+        $wmId = EntityFile::create([
+            'entity_type' => 'project_products',
+            'entity_id' => $ppId,
+            'category' => $wmLabel,
+            'original_name' => $wmBase . '.txt',
+            'stored_name' => $wmFile['stored_name'],
+            'mime' => $wmFile['mime'],
+            'size_bytes' => $wmFile['size_bytes'],
+            'uploaded_by' => Auth::id(),
+        ]);
+        Audit::log('BON_CONSUM_WINMENTOR_GENERATED', 'entity_files', $wmId, null, null, [
+            'project_id' => $projectId,
+            'project_product_id' => $ppId,
+        ]);
+        return [
+            'stored_name' => $wmFile['stored_name'],
+            'label' => 'Bon consum WinMentor',
+        ];
+    }
+
     private static function hasWinMentorDoc(int $ppId): bool
     {
         if ($ppId <= 0) return false;
@@ -1719,7 +1757,7 @@ final class ProjectsController
                 'number' => $bonNumber,
             ]);
         }
-        if ($includeWinMentor && $bonNumber !== null) {
+        if ($includeWinMentor && $bonNumber !== null && !self::hasWinMentorDoc($ppId)) {
             $hplAgg = self::aggregateConsumedHpl($hplRows);
             $csvBody = self::buildWinMentorCsv($hplAgg, $bonAccRows);
             $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productNameForDoc;
@@ -3198,6 +3236,7 @@ final class ProjectsController
                     $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
                     try { $magazieConsum = ProjectMagazieConsumption::forProject($id); } catch (\Throwable $e) { $magazieConsum = []; }
                     try { $hplConsum = ProjectHplConsumption::forProject($id); } catch (\Throwable $e) { $hplConsum = []; }
+                    $accBy = self::accessoriesByProductForDisplay($projectProducts, $magazieConsum);
                     $projectHplPieces = [];
                     try { $projectHplPieces = HplStockPiece::forProject($id); } catch (\Throwable $e) { $projectHplPieces = []; }
                     $billingClients = [];
@@ -3409,9 +3448,27 @@ final class ProjectsController
                             ];
                         }
                     }
+                    // Autogenerate Bon consum WinMentor for eligible products if missing.
+                    $projectCode = (string)($project['code'] ?? '');
+                    foreach ($projectProducts as $ppRow) {
+                        $ppId = (int)($ppRow['id'] ?? 0);
+                        if ($ppId <= 0) continue;
+                        if (isset($docsByPp[$ppId]['bon_wm'])) continue;
+                        $st = strtoupper((string)($ppRow['production_status'] ?? ''));
+                        if (!in_array($st, ['SPRE_AVIZARE', 'AVIZAT', 'LIVRAT_PARTIAL', 'LIVRAT'], true)) continue;
+                        $ppName = trim((string)($ppRow['product_name'] ?? ''));
+                        $hplAgg = self::aggregateConsumedHpl($ppHplByProduct[$ppId] ?? []);
+                        $accAgg = self::aggregateAccessories($accBy[$ppId] ?? [], 'CONSUMED');
+                        $doc = self::saveWinMentorDocForProduct($id, $projectCode, $ppId, $ppName, $hplAgg, $accAgg);
+                        if ($doc) {
+                            $docsByPp[$ppId]['bon_wm'] = $doc;
+                        }
+                    }
                     $magBy = self::magazieCostByProduct($projectProducts, $magazieConsum);
         $hplBy = self::hplCostByProduct($projectProducts);
-                    $accBy = self::accessoriesByProductForDisplay($projectProducts, $magazieConsum);
+                    if (!isset($accBy) || !is_array($accBy)) {
+                        $accBy = self::accessoriesByProductForDisplay($projectProducts, $magazieConsum);
+                    }
                     foreach ($projectProducts as $pp) {
                         $ppId = (int)($pp['id'] ?? 0);
                         if ($ppId <= 0) continue;
