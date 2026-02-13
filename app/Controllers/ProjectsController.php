@@ -805,6 +805,25 @@ final class ProjectsController
         return $raw !== '' ? $raw : 'document';
     }
 
+    private static function hasWinMentorDoc(int $ppId): bool
+    {
+        if ($ppId <= 0) return false;
+        try {
+            $st = \App\Core\DB::pdo()->prepare("
+                SELECT id
+                FROM entity_files
+                WHERE entity_type = 'project_products'
+                  AND entity_id = ?
+                  AND LOWER(category) LIKE 'bon consum winmentor%'
+                LIMIT 1
+            ");
+            $st->execute([$ppId]);
+            return (bool)$st->fetch();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /** @return array{stored_name:string,original_name:string}|null */
     private static function renameWinMentorCsvFile(
         int $fileId,
@@ -830,7 +849,6 @@ final class ProjectsController
             }
             if (!@rename($oldPath, $newPath)) return null;
         }
-        $orig = $originalName;
         $orig = $base . '.txt';
         $size = is_file($newPath) ? filesize($newPath) : null;
         try {
@@ -1576,7 +1594,7 @@ final class ProjectsController
             }
         }
         $bonNumber = null;
-        if ($includeBon) {
+        if ($includeBon || $includeWinMentor) {
             try {
                 $bonNumber = self::nextDocNumber('bon_consum_last_number', 10000);
             } catch (\Throwable $e) {
@@ -1632,8 +1650,15 @@ final class ProjectsController
             ]);
         }
 
-        if ($includeBon && $bonNumber !== null) {
-            $hplRows = [];
+        $hplRows = [];
+        $bonAccRows = [];
+        $labor = [
+            'cnc_hours' => 0.0,
+            'cnc_cost' => 0.0,
+            'atelier_hours' => 0.0,
+            'atelier_cost' => 0.0,
+        ];
+        if (($includeBon || $includeWinMentor) && $bonNumber !== null) {
             try {
                 $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId);
             } catch (\Throwable $e) {
@@ -1641,20 +1666,19 @@ final class ProjectsController
                 try { $hplRows = ProjectProductHplConsumption::forProjectProduct($ppId); } catch (\Throwable $e3) { $hplRows = []; }
             }
             $bonAccRows = self::aggregateAccessories($accRowsAll, 'CONSUMED');
-            $workLogs = [];
-            try {
-                $workLogs = ProjectWorkLog::forProject($projectId);
-            } catch (\Throwable $e) {
+            if ($includeBon) {
                 $workLogs = [];
+                try {
+                    $workLogs = ProjectWorkLog::forProject($projectId);
+                } catch (\Throwable $e) {
+                    $workLogs = [];
+                }
+                $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
+                $labor = $laborByProduct[$ppId] ?? $labor;
             }
-            $laborByProduct = self::laborEstimateByProduct($projectProducts, $workLogs);
-            $labor = $laborByProduct[$ppId] ?? [
-                'cnc_hours' => 0.0,
-                'cnc_cost' => 0.0,
-                'atelier_hours' => 0.0,
-                'atelier_cost' => 0.0,
-            ];
+        }
 
+        if ($includeBon && $bonNumber !== null) {
             $bonLabel = 'BON CONSUM #' . $bonNumber . ' - ' . $projectNameForDoc . ' - ' . $productNameForDoc . ' - ' . $docDate;
             $hplAgg = self::aggregateConsumedHpl($hplRows);
             $bonHtml = self::renderBonConsumHtml([
@@ -1694,32 +1718,33 @@ final class ProjectsController
                 'project_product_id' => $ppId,
                 'number' => $bonNumber,
             ]);
-            if ($includeWinMentor) {
-                $csvBody = self::buildWinMentorCsv($hplAgg, $bonAccRows);
-                $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productNameForDoc;
-                $wmBase = self::winMentorDocBase((string)($project['code'] ?? ''), $productNameForDoc);
-                $wmFile = self::saveCsvDocument($wmBase . '.txt', $csvBody);
-                $wmId = EntityFile::create([
-                    'entity_type' => 'project_products',
-                    'entity_id' => $ppId,
-                    'category' => $wmLabel,
-                    'original_name' => $wmBase . '.txt',
-                    'stored_name' => $wmFile['stored_name'],
-                    'mime' => $wmFile['mime'],
-                    'size_bytes' => $wmFile['size_bytes'],
-                    'uploaded_by' => Auth::id(),
-                ]);
-                Audit::log('BON_CONSUM_WINMENTOR_GENERATED', 'entity_files', $wmId, null, null, [
-                    'project_id' => $projectId,
-                    'project_product_id' => $ppId,
-                    'number' => $bonNumber,
-                ]);
-            }
+        }
+        if ($includeWinMentor && $bonNumber !== null) {
+            $hplAgg = self::aggregateConsumedHpl($hplRows);
+            $csvBody = self::buildWinMentorCsv($hplAgg, $bonAccRows);
+            $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productNameForDoc;
+            $wmBase = self::winMentorDocBase((string)($project['code'] ?? ''), $productNameForDoc);
+            $wmFile = self::saveCsvDocument($wmBase . '.txt', $csvBody);
+            $wmId = EntityFile::create([
+                'entity_type' => 'project_products',
+                'entity_id' => $ppId,
+                'category' => $wmLabel,
+                'original_name' => $wmBase . '.txt',
+                'stored_name' => $wmFile['stored_name'],
+                'mime' => $wmFile['mime'],
+                'size_bytes' => $wmFile['size_bytes'],
+                'uploaded_by' => Auth::id(),
+            ]);
+            Audit::log('BON_CONSUM_WINMENTOR_GENERATED', 'entity_files', $wmId, null, null, [
+                'project_id' => $projectId,
+                'project_product_id' => $ppId,
+                'number' => $bonNumber,
+            ]);
         }
 
         $out = [];
         if ($devizNumber !== null) $out['deviz_number'] = $devizNumber;
-        if ($bonNumber !== null) $out['bon_number'] = $bonNumber;
+        if ($includeBon && $bonNumber !== null) $out['bon_number'] = $bonNumber;
         if ($includeWinMentor && $bonNumber !== null) $out['winmentor'] = true;
         return $out;
     }
@@ -4588,7 +4613,8 @@ final class ProjectsController
             if ($next === 'SPRE_AVIZARE') {
                 $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, '', '', false, true, true);
             } elseif ($next === 'AVIZAT') {
-                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber, $avizDateLabel, true, false, false);
+                $needsWm = !self::hasWinMentorDoc($ppId);
+                $docInfo = self::generateDocumentsForAvizare($projectId, $ppId, $before, $avizNumber, $avizDateLabel, true, false, $needsWm);
             }
 
             if ($useTx) {
