@@ -789,25 +789,49 @@ final class ProjectsController
         ];
     }
 
+    private static function winMentorDocBase(string $projectCode, string $productName): string
+    {
+        $pcode = trim($projectCode);
+        $pname = trim($productName);
+        if ($pcode === '') $pcode = 'proiect';
+        if ($pname === '') $pname = 'produs';
+        $raw = $pcode . '-' . $pname;
+        if (function_exists('iconv')) {
+            $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $raw);
+            if (is_string($conv) && $conv !== '') $raw = $conv;
+        }
+        $raw = preg_replace('/[^A-Za-z0-9\-_]+/', '-', $raw) ?? 'document';
+        $raw = trim($raw, '-_');
+        return $raw !== '' ? $raw : 'document';
+    }
+
     /** @return array{stored_name:string,original_name:string}|null */
-    private static function renameWinMentorCsvFile(int $fileId, string $storedName, string $originalName): ?array
+    private static function renameWinMentorCsvFile(
+        int $fileId,
+        string $storedName,
+        string $originalName,
+        string $projectCode,
+        string $productName
+    ): ?array
     {
         if ($fileId <= 0 || $storedName === '') return null;
-        $lower = strtolower($storedName);
-        if (!str_ends_with($lower, '.csv')) return null;
-        $base = substr($storedName, 0, -4);
+        $base = self::winMentorDocBase($projectCode, $productName);
         $newName = $base . '.txt';
         $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
         $oldPath = $dir . '/' . $storedName;
         $newPath = $dir . '/' . $newName;
-        if (!is_file($newPath)) {
+        if ($storedName !== $newName) {
             if (!is_file($oldPath)) return null;
+            $suffix = 0;
+            while (is_file($newPath)) {
+                $suffix++;
+                $newName = $base . '-' . $suffix . '.txt';
+                $newPath = $dir . '/' . $newName;
+            }
             if (!@rename($oldPath, $newPath)) return null;
         }
         $orig = $originalName;
-        if ($orig !== '' && str_ends_with(strtolower($orig), '.csv')) {
-            $orig = substr($orig, 0, -4) . '.txt';
-        }
+        $orig = $base . '.txt';
         $size = is_file($newPath) ? filesize($newPath) : null;
         try {
             $st = \App\Core\DB::pdo()->prepare("
@@ -1673,15 +1697,13 @@ final class ProjectsController
             if ($includeWinMentor) {
                 $csvBody = self::buildWinMentorCsv($hplAgg, $bonAccRows);
                 $wmLabel = 'BON CONSUM WINMENTOR - ' . $projectId . ' - ' . $productNameForDoc;
-                $wmFile = self::saveCsvDocument(
-                    'bon-consum-winmentor-pp' . $ppId . '-' . $projectId . '-' . $productNameForDoc . '-' . $docDate . '.txt',
-                    $csvBody
-                );
+                $wmBase = self::winMentorDocBase((string)($project['code'] ?? ''), $productNameForDoc);
+                $wmFile = self::saveCsvDocument($wmBase . '.txt', $csvBody);
                 $wmId = EntityFile::create([
                     'entity_type' => 'project_products',
                     'entity_id' => $ppId,
                     'category' => $wmLabel,
-                    'original_name' => $wmLabel . '.txt',
+                    'original_name' => $wmBase . '.txt',
                     'stored_name' => $wmFile['stored_name'],
                     'mime' => $wmFile['mime'],
                     'size_bytes' => $wmFile['size_bytes'],
@@ -3224,6 +3246,12 @@ final class ProjectsController
                     $ppIds = array_values(array_unique($ppIds));
                     if ($ppIds) {
                         $ppIdSet = array_fill_keys($ppIds, true);
+                        $ppNameById = [];
+                        foreach ($projectProducts as $ppRow) {
+                            $pid = (int)($ppRow['id'] ?? 0);
+                            if ($pid <= 0) continue;
+                            $ppNameById[$pid] = trim((string)($ppRow['product_name'] ?? ''));
+                        }
                         $in = implode(',', array_fill(0, count($ppIds), '?'));
                         $sqlFiles = '
                             SELECT id, entity_type, entity_id, category, original_name, stored_name, created_at
@@ -3289,14 +3317,6 @@ final class ProjectsController
                             $category = (string)($f['category'] ?? '');
                             $fid = (int)($f['id'] ?? 0);
                             $audit = $fid > 0 && isset($auditByFileId[$fid]) ? $auditByFileId[$fid] : null;
-                            if ($fid > 0 && str_starts_with($stored, 'bon-consum-winmentor-') && str_ends_with(strtolower($stored), '.csv')) {
-                                $renamed = self::renameWinMentorCsvFile($fid, $stored, (string)($f['original_name'] ?? ''));
-                                if ($renamed) {
-                                    $stored = $renamed['stored_name'];
-                                    $f['stored_name'] = $stored;
-                                    $f['original_name'] = $renamed['original_name'];
-                                }
-                            }
                             $ppId = 0;
                             if ($etype === 'project_products') {
                                 $ppId = (int)($f['entity_id'] ?? 0);
@@ -3307,6 +3327,21 @@ final class ProjectsController
                             }
                             if ($ppId <= 0 && $audit && isset($audit['ppId'])) {
                                 $ppId = (int)$audit['ppId'];
+                            }
+                            if ($fid > 0 && $ppId > 0 && (str_starts_with($stored, 'bon-consum-winmentor-') || stripos($category, 'bon consum winmentor') !== false)) {
+                                $ppName = (string)($ppNameById[$ppId] ?? '');
+                                $renamed = self::renameWinMentorCsvFile(
+                                    $fid,
+                                    $stored,
+                                    (string)($f['original_name'] ?? ''),
+                                    (string)($project['code'] ?? ''),
+                                    $ppName
+                                );
+                                if ($renamed) {
+                                    $stored = $renamed['stored_name'];
+                                    $f['stored_name'] = $stored;
+                                    $f['original_name'] = $renamed['original_name'];
+                                }
                             }
                             if ($ppId <= 0 || !isset($ppIdSet[$ppId])) continue;
 
