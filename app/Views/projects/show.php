@@ -82,8 +82,10 @@ ob_start();
     <?php
       $projTitle = trim((string)($project['name'] ?? ''));
       if ($projTitle === '') $projTitle = trim((string)($project['code'] ?? ''));
+      $projCode = trim((string)($project['code'] ?? ''));
+      if ($projCode === '') $projCode = (string)(int)($project['id'] ?? 0);
     ?>
-    <h1 class="m-0 text-success display-1 fw-bold">PROIECT: #<?= (int)($project['id'] ?? 0) ?> - <?= htmlspecialchars($projTitle) ?></h1>
+    <h1 class="m-0 text-success display-1 fw-bold">PROIECT: #<?= htmlspecialchars($projCode) ?> - <?= htmlspecialchars($projTitle) ?></h1>
   </div>
   <div class="d-flex gap-2">
     <a href="<?= htmlspecialchars(Url::to('/projects')) ?>" class="btn btn-outline-secondary">Înapoi</a>
