@@ -92,7 +92,14 @@ ob_start();
             <?php endif; ?>
           </td>
           <td class="text-muted fw-semibold"><?= htmlspecialchars((string)($r['created_at'] ?? '')) ?></td>
-          <td><?= htmlspecialchars((string)($r['name'] ?? '')) ?></td>
+          <td>
+            <?php
+              $pCode = trim((string)($r['code'] ?? ''));
+              $pName = (string)($r['name'] ?? '');
+              $nameLabel = $pCode !== '' ? ($pCode . ' - ' . $pName) : $pName;
+            ?>
+            <?= htmlspecialchars($nameLabel) ?>
+          </td>
           <td class="text-muted">
             <?php if (!empty($r['client_name'])): ?>
               <?= htmlspecialchars((string)$r['client_name']) ?>
