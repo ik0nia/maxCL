@@ -789,6 +789,45 @@ final class ProjectsController
         ];
     }
 
+    /** @return array{stored_name:string,original_name:string}|null */
+    private static function renameWinMentorCsvFile(int $fileId, string $storedName, string $originalName): ?array
+    {
+        if ($fileId <= 0 || $storedName === '') return null;
+        $lower = strtolower($storedName);
+        if (!str_ends_with($lower, '.csv')) return null;
+        $base = substr($storedName, 0, -4);
+        $newName = $base . '.txt';
+        $dir = dirname(__DIR__, 2) . '/storage/uploads/files';
+        $oldPath = $dir . '/' . $storedName;
+        $newPath = $dir . '/' . $newName;
+        if (!is_file($newPath)) {
+            if (!is_file($oldPath)) return null;
+            if (!@rename($oldPath, $newPath)) return null;
+        }
+        $orig = $originalName;
+        if ($orig !== '' && str_ends_with(strtolower($orig), '.csv')) {
+            $orig = substr($orig, 0, -4) . '.txt';
+        }
+        $size = is_file($newPath) ? filesize($newPath) : null;
+        try {
+            $st = \App\Core\DB::pdo()->prepare("
+                UPDATE entity_files
+                SET stored_name = ?, original_name = ?, mime = ?, size_bytes = ?
+                WHERE id = ?
+            ");
+            $st->execute([
+                $newName,
+                $orig !== '' ? $orig : $newName,
+                'text/plain',
+                $size !== false ? (int)$size : null,
+                $fileId,
+            ]);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        return ['stored_name' => $newName, 'original_name' => $orig !== '' ? $orig : $newName];
+    }
+
     /**
      * @param array<int, array{board_code:string,display_qty:float,is_rest:bool}> $hplRows
      * @param array<int, array{code:string,qty:float}> $accRows
@@ -3250,6 +3289,14 @@ final class ProjectsController
                             $category = (string)($f['category'] ?? '');
                             $fid = (int)($f['id'] ?? 0);
                             $audit = $fid > 0 && isset($auditByFileId[$fid]) ? $auditByFileId[$fid] : null;
+                            if ($fid > 0 && str_starts_with($stored, 'bon-consum-winmentor-') && str_ends_with(strtolower($stored), '.csv')) {
+                                $renamed = self::renameWinMentorCsvFile($fid, $stored, (string)($f['original_name'] ?? ''));
+                                if ($renamed) {
+                                    $stored = $renamed['stored_name'];
+                                    $f['stored_name'] = $stored;
+                                    $f['original_name'] = $renamed['original_name'];
+                                }
+                            }
                             $ppId = 0;
                             if ($etype === 'project_products') {
                                 $ppId = (int)($f['entity_id'] ?? 0);
